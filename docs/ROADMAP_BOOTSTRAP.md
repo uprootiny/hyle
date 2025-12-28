@@ -2,13 +2,15 @@
 
 Goal: hyle develops hyle. No more claude-code dependency.
 
-## Current State
+## Current State (Updated 2025-12-28)
 
 ```
-21 tests passing
-Core: config, models, client, session, telemetry, traces, skills, tools, ui, backburner
-TUI: fuzzy picker, tabs, scroll, prompt history, session views
-Missing: tool call execution, observability, reliable code generation
+93 tests passing
+Modules: config, models, client, session, telemetry, traces, skills, tools, ui, backburner, agent, git
+TUI: fuzzy picker, tabs, scroll, prompt history, session views, Ctrl-C handling, Esc zoom-out
+Agent: tool call parsing (JSON/XML/function), execution, result formatting
+Git: status parsing, commit validation, atomic commits, diff generation
+Observable: spinner, elapsed time, output buffering, multi-tool tracking
 ```
 
 ## Milestones

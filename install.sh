@@ -5,26 +5,29 @@ set -e
 
 echo "Installing hyle..."
 
-# Check for Rust with minimum version
-MIN_RUST="1.75.0"
+# Check for apt-installed Rust (conflicts with rustup)
+if [[ -f /usr/bin/rustc ]] && ! command -v rustup &> /dev/null; then
+    echo ""
+    echo "WARNING: System Rust detected at /usr/bin/rustc"
+    echo "This conflicts with rustup. Please remove it first:"
+    echo ""
+    echo "  sudo apt remove rustc cargo && sudo apt autoremove"
+    echo ""
+    echo "Then run this installer again."
+    echo ""
+    exit 1
+fi
 
-check_rust_version() {
-    if command -v cargo &> /dev/null; then
-        RUST_VER=$(rustc --version | cut -d' ' -f2)
-        # Compare versions (simple check)
-        if [[ "$(printf '%s\n' "$MIN_RUST" "$RUST_VER" | sort -V | head -n1)" == "$MIN_RUST" ]]; then
-            return 0
-        fi
-    fi
-    return 1
-}
-
-if ! check_rust_version; then
-    echo "Rust not found or too old (need >= $MIN_RUST). Installing via rustup..."
-    echo "Note: If you have apt-installed rust, rustup will take precedence."
+# Check for Rust via rustup
+if ! command -v rustup &> /dev/null; then
+    echo "rustup not found. Installing..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     source "$HOME/.cargo/env"
 fi
+
+# Ensure latest stable
+rustup default stable
+rustup update stable
 
 # Create install directory
 mkdir -p ~/.local/bin

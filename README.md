@@ -2,10 +2,24 @@
 
 Rust-native code assistant. OpenRouter powered, no JS runtime.
 
-## One-Liner Install
+## Prerequisites
+
+**Install Rust via rustup** (not apt/dnf/pacman):
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+```
+
+> **Note**: If you have apt-installed Rust, remove it first:
+> ```bash
+> sudo apt remove rustc cargo  # Ubuntu/Debian
+> sudo apt autoremove
+> ```
+
+## Install
 
 ```bash
-# Install with cargo (requires Rust toolchain)
+# One-liner install
 cargo install --git https://github.com/uprootiny/hyle && hyle config set key YOUR_KEY
 ```
 
