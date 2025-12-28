@@ -18,6 +18,8 @@ mod session;
 mod ui;
 mod tools;
 mod backburner;
+mod agent;
+mod git;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;

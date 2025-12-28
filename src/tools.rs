@@ -117,7 +117,260 @@ impl ToolCall {
     pub fn get_output(&self) -> String {
         self.output.lock().map(|o| o.clone()).unwrap_or_default()
     }
+
+    /// Get output with line limit (for display)
+    pub fn get_output_tail(&self, max_lines: usize) -> String {
+        let output = self.get_output();
+        let lines: Vec<&str> = output.lines().collect();
+        if lines.len() <= max_lines {
+            output
+        } else {
+            let skip = lines.len() - max_lines;
+            format!("... ({} lines hidden)\n{}", skip, lines[skip..].join("\n"))
+        }
+    }
+
+    /// Get output byte count
+    pub fn output_size(&self) -> usize {
+        self.output.lock().map(|o| o.len()).unwrap_or(0)
+    }
+
+    /// Format args for display (abbreviated)
+    pub fn args_summary(&self) -> String {
+        if let Some(path) = self.args.get("path").and_then(|v| v.as_str()) {
+            return path.to_string();
+        }
+        if let Some(cmd) = self.args.get("command").and_then(|v| v.as_str()) {
+            let truncated = if cmd.len() > 40 {
+                format!("{}...", &cmd[..40])
+            } else {
+                cmd.to_string()
+            };
+            return truncated;
+        }
+        if let Some(pattern) = self.args.get("pattern").and_then(|v| v.as_str()) {
+            return pattern.to_string();
+        }
+        "...".to_string()
+    }
+
+    /// Is this tool still running?
+    pub fn is_running(&self) -> bool {
+        self.status == ToolCallStatus::Running
+    }
+
+    /// Is this tool finished (done, failed, or killed)?
+    pub fn is_finished(&self) -> bool {
+        matches!(self.status, ToolCallStatus::Done | ToolCallStatus::Failed | ToolCallStatus::Killed)
+    }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// OBSERVABLE EXECUTION DISPLAY
+// ═══════════════════════════════════════════════════════════════
+
+/// Spinner frames for running operations
+const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+/// Get spinner frame for current tick
+pub fn spinner_frame(tick: usize) -> &'static str {
+    SPINNER_FRAMES[tick % SPINNER_FRAMES.len()]
+}
+
+/// Display formatter for tool calls
+pub struct ToolCallDisplay<'a> {
+    call: &'a ToolCall,
+    tick: usize,
+    show_output: bool,
+    max_output_lines: usize,
+}
+
+impl<'a> ToolCallDisplay<'a> {
+    pub fn new(call: &'a ToolCall) -> Self {
+        Self {
+            call,
+            tick: 0,
+            show_output: true,
+            max_output_lines: 20,
+        }
+    }
+
+    pub fn with_tick(mut self, tick: usize) -> Self {
+        self.tick = tick;
+        self
+    }
+
+    pub fn with_output(mut self, show: bool) -> Self {
+        self.show_output = show;
+        self
+    }
+
+    pub fn with_max_lines(mut self, lines: usize) -> Self {
+        self.max_output_lines = lines;
+        self
+    }
+
+    /// Render header line (name, status, elapsed)
+    pub fn header(&self) -> String {
+        let icon = match self.call.status {
+            ToolCallStatus::Pending => "○",
+            ToolCallStatus::Running => spinner_frame(self.tick),
+            ToolCallStatus::Done => "●",
+            ToolCallStatus::Failed => "✗",
+            ToolCallStatus::Killed => "◌",
+        };
+
+        let elapsed = self.call.elapsed()
+            .map(|d| {
+                if d.as_secs() >= 60 {
+                    format!("{}m{}s", d.as_secs() / 60, d.as_secs() % 60)
+                } else if d.as_millis() >= 1000 {
+                    format!("{:.1}s", d.as_secs_f32())
+                } else {
+                    format!("{}ms", d.as_millis())
+                }
+            })
+            .unwrap_or_default();
+
+        let args = self.call.args_summary();
+        let size = if self.call.output_size() > 0 {
+            format!(" [{}b]", self.call.output_size())
+        } else {
+            String::new()
+        };
+
+        format!("{} {}({}) {}{}", icon, self.call.name, args, elapsed, size)
+    }
+
+    /// Render full display (header + output)
+    pub fn render(&self) -> String {
+        let mut result = self.header();
+
+        if self.show_output && self.call.output_size() > 0 {
+            let output = self.call.get_output_tail(self.max_output_lines);
+            result.push_str("\n  ⎿ ");
+            result.push_str(&output.replace('\n', "\n    "));
+        }
+
+        if let Some(err) = &self.call.error {
+            result.push_str(&format!("\n  ✗ {}", err));
+        }
+
+        result
+    }
+}
+
+/// Track multiple concurrent tool calls
+pub struct ToolCallTracker {
+    calls: Vec<ToolCall>,
+    max_concurrent: usize,
+    max_history: usize,
+}
+
+impl Default for ToolCallTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ToolCallTracker {
+    pub fn new() -> Self {
+        Self {
+            calls: Vec::new(),
+            max_concurrent: 10,
+            max_history: 100,
+        }
+    }
+
+    /// Add a new tool call to track
+    pub fn add(&mut self, call: ToolCall) -> usize {
+        let idx = self.calls.len();
+        self.calls.push(call);
+
+        // Prune old finished calls if over limit
+        self.prune();
+
+        idx
+    }
+
+    /// Get a tool call by index
+    pub fn get(&self, idx: usize) -> Option<&ToolCall> {
+        self.calls.get(idx)
+    }
+
+    /// Get mutable reference
+    pub fn get_mut(&mut self, idx: usize) -> Option<&mut ToolCall> {
+        self.calls.get_mut(idx)
+    }
+
+    /// Get all running calls
+    pub fn running(&self) -> Vec<&ToolCall> {
+        self.calls.iter().filter(|c| c.is_running()).collect()
+    }
+
+    /// Get all finished calls
+    pub fn finished(&self) -> Vec<&ToolCall> {
+        self.calls.iter().filter(|c| c.is_finished()).collect()
+    }
+
+    /// Count running calls
+    pub fn running_count(&self) -> usize {
+        self.calls.iter().filter(|c| c.is_running()).count()
+    }
+
+    /// Prune old finished calls
+    fn prune(&mut self) {
+        if self.calls.len() > self.max_history {
+            // Keep running calls and most recent finished
+            let mut running: Vec<_> = self.calls.iter()
+                .filter(|c| c.is_running())
+                .cloned()
+                .collect();
+
+            let finished: Vec<_> = self.calls.iter()
+                .filter(|c| c.is_finished())
+                .cloned()
+                .collect();
+
+            let keep_finished = finished.len().min(self.max_history - running.len());
+            running.extend(finished.into_iter().rev().take(keep_finished).rev());
+
+            self.calls = running;
+        }
+    }
+
+    /// Render status summary (for status bar)
+    pub fn status_summary(&self, tick: usize) -> String {
+        let running = self.running_count();
+        if running == 0 {
+            return String::new();
+        }
+
+        let spinner = spinner_frame(tick);
+        if running == 1 {
+            if let Some(call) = self.running().first() {
+                format!("{} {}({})", spinner, call.name, call.args_summary())
+            } else {
+                format!("{} 1 tool", spinner)
+            }
+        } else {
+            format!("{} {} tools", spinner, running)
+        }
+    }
+
+    /// Render all running calls
+    pub fn render_running(&self, tick: usize) -> String {
+        self.running()
+            .iter()
+            .map(|c| ToolCallDisplay::new(c).with_tick(tick).render())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOOL EXECUTOR
+// ═══════════════════════════════════════════════════════════════
 
 /// Tool executor with kill support
 pub struct ToolExecutor {
@@ -542,5 +795,309 @@ mod tests {
         assert!(result.is_ok());
         let output = call.get_output();
         assert!(output.contains("main.rs") || output.is_empty()); // May be empty in temp dir
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // OBSERVABLE EXECUTION TESTS
+    // ═══════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_spinner_frames() {
+        // All frames should be different
+        let frames: Vec<_> = (0..SPINNER_FRAMES.len())
+            .map(|i| spinner_frame(i))
+            .collect();
+        assert_eq!(frames.len(), SPINNER_FRAMES.len());
+
+        // Should cycle correctly
+        assert_eq!(spinner_frame(0), spinner_frame(SPINNER_FRAMES.len()));
+        assert_eq!(spinner_frame(1), spinner_frame(SPINNER_FRAMES.len() + 1));
+    }
+
+    #[test]
+    fn test_output_tail_short() {
+        let call = ToolCall::new("test", serde_json::json!({}));
+        call.append_output("line 1\nline 2\nline 3\n");
+
+        // Should return all lines when under limit
+        let tail = call.get_output_tail(10);
+        assert!(tail.contains("line 1"));
+        assert!(tail.contains("line 2"));
+        assert!(tail.contains("line 3"));
+        assert!(!tail.contains("hidden"));
+    }
+
+    #[test]
+    fn test_output_tail_long() {
+        let call = ToolCall::new("test", serde_json::json!({}));
+        for i in 1..=50 {
+            call.append_output(&format!("line {}\n", i));
+        }
+
+        // Should truncate and show hidden count
+        let tail = call.get_output_tail(10);
+        assert!(tail.contains("hidden"));
+        assert!(tail.contains("line 50")); // Last line visible
+        assert!(!tail.contains("line 1")); // First line hidden
+    }
+
+    #[test]
+    fn test_args_summary_path() {
+        let call = ToolCall::new("read", serde_json::json!({
+            "path": "/home/user/project/src/main.rs"
+        }));
+        assert_eq!(call.args_summary(), "/home/user/project/src/main.rs");
+    }
+
+    #[test]
+    fn test_args_summary_command() {
+        let call = ToolCall::new("bash", serde_json::json!({
+            "command": "echo hello"
+        }));
+        assert_eq!(call.args_summary(), "echo hello");
+    }
+
+    #[test]
+    fn test_args_summary_long_command() {
+        let long_cmd = "this is a very long command that should be truncated because it's too long to display nicely";
+        let call = ToolCall::new("bash", serde_json::json!({
+            "command": long_cmd
+        }));
+        let summary = call.args_summary();
+        assert!(summary.len() <= 43); // 40 + "..."
+        assert!(summary.ends_with("..."));
+    }
+
+    #[test]
+    fn test_is_running_is_finished() {
+        let mut call = ToolCall::new("test", serde_json::json!({}));
+
+        assert!(!call.is_running());
+        assert!(!call.is_finished());
+
+        call.start();
+        assert!(call.is_running());
+        assert!(!call.is_finished());
+
+        call.complete();
+        assert!(!call.is_running());
+        assert!(call.is_finished());
+    }
+
+    #[test]
+    fn test_display_header_pending() {
+        let call = ToolCall::new("read", serde_json::json!({
+            "path": "test.txt"
+        }));
+
+        let display = ToolCallDisplay::new(&call);
+        let header = display.header();
+
+        assert!(header.contains("○")); // pending icon
+        assert!(header.contains("read"));
+        assert!(header.contains("test.txt"));
+    }
+
+    #[test]
+    fn test_display_header_running() {
+        let mut call = ToolCall::new("bash", serde_json::json!({
+            "command": "sleep 1"
+        }));
+        call.start();
+
+        let display = ToolCallDisplay::new(&call).with_tick(0);
+        let header = display.header();
+
+        assert!(header.contains("⠋")); // first spinner frame
+        assert!(header.contains("bash"));
+    }
+
+    #[test]
+    fn test_display_header_done() {
+        let mut call = ToolCall::new("test", serde_json::json!({}));
+        call.start();
+        call.complete();
+
+        let display = ToolCallDisplay::new(&call);
+        let header = display.header();
+
+        assert!(header.contains("●")); // done icon
+        assert!(header.contains("ms")); // elapsed time
+    }
+
+    #[test]
+    fn test_display_header_failed() {
+        let mut call = ToolCall::new("test", serde_json::json!({}));
+        call.start();
+        call.fail("kaboom");
+
+        let display = ToolCallDisplay::new(&call);
+        let header = display.header();
+
+        assert!(header.contains("✗")); // failed icon
+    }
+
+    #[test]
+    fn test_display_render_with_output() {
+        let mut call = ToolCall::new("test", serde_json::json!({}));
+        call.start();
+        call.append_output("hello world\n");
+        call.complete();
+
+        let display = ToolCallDisplay::new(&call).with_output(true);
+        let rendered = display.render();
+
+        assert!(rendered.contains("hello world"));
+        assert!(rendered.contains("⎿")); // output indicator
+    }
+
+    #[test]
+    fn test_display_render_without_output() {
+        let mut call = ToolCall::new("test", serde_json::json!({}));
+        call.start();
+        call.append_output("hello world\n");
+        call.complete();
+
+        let display = ToolCallDisplay::new(&call).with_output(false);
+        let rendered = display.render();
+
+        assert!(!rendered.contains("hello world"));
+    }
+
+    #[test]
+    fn test_display_render_with_error() {
+        let mut call = ToolCall::new("test", serde_json::json!({}));
+        call.start();
+        call.fail("something bad happened");
+
+        let display = ToolCallDisplay::new(&call);
+        let rendered = display.render();
+
+        assert!(rendered.contains("something bad happened"));
+    }
+
+    #[test]
+    fn test_tracker_add_and_get() {
+        let mut tracker = ToolCallTracker::new();
+
+        let call = ToolCall::new("test", serde_json::json!({}));
+        let idx = tracker.add(call);
+
+        assert_eq!(idx, 0);
+        assert!(tracker.get(idx).is_some());
+        assert!(tracker.get(999).is_none());
+    }
+
+    #[test]
+    fn test_tracker_running_and_finished() {
+        let mut tracker = ToolCallTracker::new();
+
+        // Add running call
+        let mut call1 = ToolCall::new("running", serde_json::json!({}));
+        call1.start();
+        tracker.add(call1);
+
+        // Add finished call
+        let mut call2 = ToolCall::new("done", serde_json::json!({}));
+        call2.start();
+        call2.complete();
+        tracker.add(call2);
+
+        assert_eq!(tracker.running_count(), 1);
+        assert_eq!(tracker.running().len(), 1);
+        assert_eq!(tracker.finished().len(), 1);
+    }
+
+    #[test]
+    fn test_tracker_status_summary_none() {
+        let tracker = ToolCallTracker::new();
+        assert_eq!(tracker.status_summary(0), "");
+    }
+
+    #[test]
+    fn test_tracker_status_summary_one() {
+        let mut tracker = ToolCallTracker::new();
+
+        let mut call = ToolCall::new("read", serde_json::json!({
+            "path": "file.txt"
+        }));
+        call.start();
+        tracker.add(call);
+
+        let summary = tracker.status_summary(0);
+        assert!(summary.contains("⠋")); // spinner
+        assert!(summary.contains("read"));
+        assert!(summary.contains("file.txt"));
+    }
+
+    #[test]
+    fn test_tracker_status_summary_multiple() {
+        let mut tracker = ToolCallTracker::new();
+
+        for i in 0..3 {
+            let mut call = ToolCall::new(&format!("tool{}", i), serde_json::json!({}));
+            call.start();
+            tracker.add(call);
+        }
+
+        let summary = tracker.status_summary(0);
+        assert!(summary.contains("3 tools"));
+    }
+
+    #[test]
+    fn test_tracker_render_running() {
+        let mut tracker = ToolCallTracker::new();
+
+        let mut call = ToolCall::new("bash", serde_json::json!({
+            "command": "echo hi"
+        }));
+        call.start();
+        call.append_output("hi\n");
+        tracker.add(call);
+
+        let rendered = tracker.render_running(0);
+        assert!(rendered.contains("bash"));
+        assert!(rendered.contains("hi"));
+    }
+
+    #[test]
+    fn test_elapsed_formatting() {
+        let mut call = ToolCall::new("test", serde_json::json!({}));
+        call.start();
+
+        // Manually set started_at to test formatting
+        call.started_at = Some(Instant::now() - Duration::from_millis(500));
+        call.finished_at = Some(Instant::now());
+
+        let display = ToolCallDisplay::new(&call);
+        let header = display.header();
+        // Should show milliseconds for < 1 second
+        assert!(header.contains("ms"));
+    }
+
+    #[test]
+    fn test_output_size() {
+        let call = ToolCall::new("test", serde_json::json!({}));
+
+        assert_eq!(call.output_size(), 0);
+
+        call.append_output("hello");
+        assert_eq!(call.output_size(), 5);
+
+        call.append_output(" world");
+        assert_eq!(call.output_size(), 11);
+    }
+
+    #[test]
+    fn test_display_output_size_in_header() {
+        let mut call = ToolCall::new("test", serde_json::json!({}));
+        call.start();
+        call.append_output("x".repeat(100).as_str());
+        call.complete();
+
+        let display = ToolCallDisplay::new(&call);
+        let header = display.header();
+
+        assert!(header.contains("[100b]"));
     }
 }

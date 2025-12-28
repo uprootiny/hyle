@@ -5,9 +5,23 @@ set -e
 
 echo "Installing hyle..."
 
-# Check for Rust
-if ! command -v cargo &> /dev/null; then
-    echo "Rust not found. Installing via rustup..."
+# Check for Rust with minimum version
+MIN_RUST="1.75.0"
+
+check_rust_version() {
+    if command -v cargo &> /dev/null; then
+        RUST_VER=$(rustc --version | cut -d' ' -f2)
+        # Compare versions (simple check)
+        if [[ "$(printf '%s\n' "$MIN_RUST" "$RUST_VER" | sort -V | head -n1)" == "$MIN_RUST" ]]; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+if ! check_rust_version; then
+    echo "Rust not found or too old (need >= $MIN_RUST). Installing via rustup..."
+    echo "Note: If you have apt-installed rust, rustup will take precedence."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     source "$HOME/.cargo/env"
 fi

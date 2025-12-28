@@ -29,9 +29,9 @@ reqwest-eventsource = "0.5"
 eventsource-stream = "0.2"
 
 # File operations
-globwalk = "0.9"
+globwalk = "0.8"  # Pin to 0.8 for Rust 1.75 compat
 glob = "0.3"
-regex = "1"
+regex = "1.10"  # Pin for compat
 similar = "2"  # For unified diffs
 
 # TUI
