@@ -14,8 +14,10 @@ mod client;
 mod telemetry;
 mod traces;
 mod skills;
+mod session;
 mod ui;
 mod tools;
+mod backburner;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -30,9 +32,13 @@ enum Command {
         free_only: bool,
         model: Option<String>,
         paths: Vec<PathBuf>,
+        resume: bool,
     },
     Task {
         task: String,
+        paths: Vec<PathBuf>,
+    },
+    Backburner {
         paths: Vec<PathBuf>,
     },
     Doctor,
@@ -42,6 +48,10 @@ enum Command {
     ConfigSet {
         key: String,
         value: String,
+    },
+    Sessions {
+        list: bool,
+        clean: bool,
     },
     Help,
 }
@@ -54,6 +64,7 @@ fn parse_args() -> Command {
             free_only: false,
             model: None,
             paths: vec![],
+            resume: true, // Default: resume last session
         };
     }
 
@@ -71,6 +82,13 @@ fn parse_args() -> Command {
         };
     }
 
+    if args.first().map(|s| s.as_str()) == Some("sessions") {
+        return Command::Sessions {
+            list: args.iter().any(|a| a == "--list" || a == "-l"),
+            clean: args.iter().any(|a| a == "--clean"),
+        };
+    }
+
     if args.first().map(|s| s.as_str()) == Some("config") {
         if args.get(1).map(|s| s.as_str()) == Some("set") {
             return Command::ConfigSet {
@@ -80,16 +98,27 @@ fn parse_args() -> Command {
         }
     }
 
+    // Check for --backburner flag
+    if args.iter().any(|a| a == "--backburner" || a == "-b") {
+        let paths: Vec<PathBuf> = args.iter()
+            .filter(|a| !a.starts_with('-'))
+            .map(|s| PathBuf::from(s))
+            .collect();
+        return Command::Backburner { paths };
+    }
+
     // Parse flags and paths
     let mut free_only = false;
     let mut model = None;
     let mut task = None;
     let mut paths = Vec::new();
+    let mut resume = true;
     let mut i = 0;
 
     while i < args.len() {
         match args[i].as_str() {
             "--free" | "-f" => free_only = true,
+            "--new" | "-n" => resume = false,
             "--model" | "-m" => {
                 i += 1;
                 model = args.get(i).cloned();
@@ -109,7 +138,7 @@ fn parse_args() -> Command {
     if let Some(task_str) = task {
         Command::Task { task: task_str, paths }
     } else {
-        Command::Interactive { free_only, model, paths }
+        Command::Interactive { free_only, model, paths, resume }
     }
 }
 
@@ -117,23 +146,30 @@ fn print_help() {
     println!(r#"hyle - Rust-native code assistant (OpenRouter powered)
 
 USAGE:
+    hyle                          # resume last session (or start new)
     hyle --free [PATHS...]        # choose free model, interactive loop
+    hyle --new                    # start fresh session
     hyle --model <id> [PATHS...]  # use specific model
     hyle --task "..." [PATHS...]  # one-shot: produce diff, ask apply
+    hyle --backburner [PATHS...]  # background maintenance daemon
     hyle doctor                   # check config, key, network
     hyle models --refresh         # refresh models cache
+    hyle sessions --list          # list saved sessions
+    hyle sessions --clean         # clean old sessions
     hyle config set key <value>   # set config value
 
 FLAGS:
     -f, --free              Only show free models in picker
+    -n, --new               Start new session (don't resume)
     -m, --model <id>        Use specific model ID
     -t, --task <text>       One-shot task mode
+    -b, --backburner        Run background maintenance daemon
     -h, --help              Show this help
 
 CONFIG:
     ~/.config/hyle/config.json    API key, preferences
     ~/.cache/hyle/models.json     Cached model list
-    ~/.local/state/hyle/          Session logs
+    ~/.local/state/hyle/sessions/ Session history
 
 ENVIRONMENT:
     OPENROUTER_API_KEY              Override API key from config
@@ -144,6 +180,14 @@ CONTROLS (interactive mode):
     f       Full speed
     Tab     Switch tabs
     Esc     Quit
+
+BACKBURNER MODE:
+    Runs slow, non-intrusive maintenance tasks:
+    - Git garbage collection and integrity checks
+    - Session cleanup (keeps last 10)
+    - Dependency audit suggestions
+    - Code quality hints
+    Send SIGINT/SIGTERM to stop gracefully.
 "#);
 }
 
@@ -164,14 +208,20 @@ async fn main() -> Result<()> {
         Command::Models { refresh } => {
             run_models(refresh).await
         }
+        Command::Sessions { list, clean } => {
+            run_sessions(list, clean)
+        }
         Command::ConfigSet { key, value } => {
             run_config_set(&key, &value)
         }
         Command::Task { task, paths } => {
             run_task(&task, &paths).await
         }
-        Command::Interactive { free_only, model, paths } => {
-            run_interactive(free_only, model, paths).await
+        Command::Backburner { paths } => {
+            run_backburner(&paths).await
+        }
+        Command::Interactive { free_only, model, paths, resume } => {
+            run_interactive(free_only, model, paths, resume).await
         }
     }
 }
@@ -234,6 +284,47 @@ async fn run_models(refresh: bool) -> Result<()> {
     }
     if free.len() > 20 {
         println!("  ... and {} more", free.len() - 20);
+    }
+
+    Ok(())
+}
+
+fn run_sessions(list: bool, clean: bool) -> Result<()> {
+    if clean {
+        let removed = session::cleanup_sessions(10)?;
+        println!("Cleaned up {} old sessions", removed);
+        return Ok(());
+    }
+
+    // Default: list sessions
+    let sessions = session::list_sessions()?;
+    if sessions.is_empty() {
+        println!("No sessions found");
+        return Ok(());
+    }
+
+    println!("Sessions ({}):\n", sessions.len());
+    for s in sessions.iter().take(10) {
+        let age = chrono::Utc::now() - s.updated_at;
+        let age_str = if age.num_hours() < 1 {
+            format!("{}m ago", age.num_minutes())
+        } else if age.num_days() < 1 {
+            format!("{}h ago", age.num_hours())
+        } else {
+            format!("{}d ago", age.num_days())
+        };
+
+        println!("  {} | {} | {} msgs | {} tokens | {}",
+            s.id,
+            s.model.split('/').last().unwrap_or(&s.model),
+            s.message_count,
+            s.total_tokens,
+            age_str,
+        );
+    }
+
+    if sessions.len() > 10 {
+        println!("  ... and {} more", sessions.len() - 10);
     }
 
     Ok(())
@@ -313,7 +404,7 @@ async fn run_task(task: &str, paths: &[PathBuf]) -> Result<()> {
     Ok(())
 }
 
-async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<PathBuf>) -> Result<()> {
+async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<PathBuf>, resume: bool) -> Result<()> {
     // Ensure we have an API key
     let api_key = match config::get_api_key() {
         Ok(key) => key,
@@ -351,6 +442,17 @@ async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<Path
 
     println!("Using model: {}", selected_model);
 
-    // Run TUI
-    ui::run_tui(&api_key, &selected_model, paths).await
+    // Run TUI with session
+    ui::run_tui(&api_key, &selected_model, paths, resume).await
+}
+
+async fn run_backburner(paths: &[PathBuf]) -> Result<()> {
+    let work_dir = if paths.is_empty() {
+        std::env::current_dir()?
+    } else {
+        paths[0].clone()
+    };
+
+    let mut bb = backburner::Backburner::new(work_dir);
+    bb.run().await
 }

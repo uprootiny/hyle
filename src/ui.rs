@@ -26,6 +26,7 @@ use tokio::sync::mpsc;
 
 use crate::client::{self, StreamEvent};
 use crate::models::Model;
+use crate::session::Session;
 use crate::telemetry::{Telemetry, ThrottleMode, PressureLevel};
 use crate::traces::Traces;
 
@@ -246,6 +247,9 @@ struct TuiState {
     tokens_per_sec: f32,
     last_token_time: std::time::Instant,
     ttft: Option<Duration>, // Time to first token
+
+    // Current response for session saving
+    current_response: String,
 }
 
 impl TuiState {
@@ -266,6 +270,7 @@ impl TuiState {
             tokens_per_sec: 0.0,
             last_token_time: std::time::Instant::now(),
             ttft: None,
+            current_response: String::new(),
         }
     }
 
@@ -276,9 +281,9 @@ impl TuiState {
 }
 
 /// Run the main TUI
-pub async fn run_tui(api_key: &str, model: &str, paths: Vec<PathBuf>) -> Result<()> {
+pub async fn run_tui(api_key: &str, model: &str, paths: Vec<PathBuf>, resume: bool) -> Result<()> {
     let mut terminal = setup_terminal()?;
-    let result = run_tui_loop(&mut terminal, api_key, model, paths).await;
+    let result = run_tui_loop(&mut terminal, api_key, model, paths, resume).await;
     restore_terminal(terminal)?;
     result
 }
@@ -288,11 +293,42 @@ async fn run_tui_loop(
     api_key: &str,
     model: &str,
     _paths: Vec<PathBuf>,
+    resume: bool,
 ) -> Result<()> {
     // Get context window for this model
     let context_window = crate::models::get_context_window(model);
     let mut state = TuiState::new(context_window);
-    state.log(format!("Using model: {} ({}k ctx)", model, context_window / 1000));
+
+    // Load or create session
+    let mut session = if resume {
+        match Session::load_or_create(model) {
+            Ok(s) => {
+                if s.messages.len() > 1 {
+                    state.log(format!("Resumed session {} ({} messages)", s.meta.id, s.messages.len()));
+                    // Restore conversation to output
+                    for msg in &s.messages {
+                        if msg.role == "user" {
+                            state.output.push(format!("> {}", msg.content));
+                        } else if msg.role == "assistant" {
+                            state.output.push(format!("  {}", msg.content.lines().next().unwrap_or("")));
+                            if msg.content.lines().count() > 1 {
+                                state.output.push("  ...".into());
+                            }
+                        }
+                    }
+                }
+                s
+            }
+            Err(e) => {
+                state.log(format!("Failed to resume: {}", e));
+                Session::new(model)?
+            }
+        }
+    } else {
+        Session::new(model)?
+    };
+
+    state.log(format!("Model: {} ({}k ctx)", model, context_window / 1000));
 
     let (tx, mut rx) = mpsc::channel::<TuiMsg>(256);
 
@@ -333,7 +369,8 @@ async fn run_tui_loop(
                     }
                     state.last_token_time = std::time::Instant::now();
 
-                    // Append to output
+                    // Append to output and accumulate response
+                    state.current_response.push_str(&t);
                     if let Some(last) = state.output.last_mut() {
                         last.push_str(&t);
                     }
@@ -352,6 +389,22 @@ async fn run_tui_loop(
                         duration.as_secs_f64()
                     );
                     state.traces.context.record(usage.prompt_tokens);
+
+                    // Save assistant message to session
+                    if !state.current_response.is_empty() {
+                        if let Err(e) = session.add_assistant_message(
+                            &state.current_response,
+                            Some(usage.completion_tokens)
+                        ) {
+                            state.log(format!("Session save error: {}", e));
+                        }
+                        state.current_response.clear();
+                    }
+
+                    // Save session metadata
+                    if let Err(e) = session.save_meta() {
+                        state.log(format!("Session meta save error: {}", e));
+                    }
 
                     state.output.push(format!(
                         "\n[{} + {} = {} tokens, {:.1}s]",
@@ -419,6 +472,11 @@ async fn run_tui_loop(
                                 state.request_start = std::time::Instant::now();
                                 state.last_token_time = std::time::Instant::now();
                                 state.log(format!("Sending: {}", &prompt[..prompt.len().min(50)]));
+
+                                // Save user message to session
+                                if let Err(e) = session.add_user_message(&prompt) {
+                                    state.log(format!("Session save error: {}", e));
+                                }
 
                                 // Spawn API call
                                 let tx = tx.clone();
