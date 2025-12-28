@@ -429,8 +429,18 @@ pub async fn run_agent_loop(
     let mut total_tool_calls = 0;
     let mut final_response = String::new();
 
+    // Cognitive tracking for stuck detection
+    let mut recent_actions: Vec<String> = Vec::new();
+    let mut consecutive_failures = 0;
+
     // Build system prompt with tool instructions
-    let _system_prompt = code_assistant_prompt(work_dir); // TODO: inject into conversation
+    let system_prompt = code_assistant_prompt(work_dir);
+
+    // Start with system message
+    conversation.push(serde_json::json!({
+        "role": "system",
+        "content": system_prompt
+    }));
 
     // Add initial user message
     conversation.push(serde_json::json!({
@@ -443,14 +453,23 @@ pub async fn run_agent_loop(
             "Iteration {} of {}", iteration + 1, config.max_iterations
         ))).await;
 
-        // Stream LLM response
+        // Stream LLM response - pass full conversation history
         let mut response = String::new();
+        let last_user_msg = conversation.iter().rev()
+            .find(|m| m["role"] == "user")
+            .and_then(|m| m["content"].as_str())
+            .unwrap_or("");
+        let history: Vec<_> = conversation.iter()
+            .filter(|m| m["role"] != "system") // System handled separately
+            .take(conversation.len().saturating_sub(1))
+            .cloned()
+            .collect();
         let stream_result = client::stream_completion_full(
             api_key,
             model,
-            &conversation.last().map(|m| m["content"].as_str().unwrap_or("")).unwrap_or(""),
+            last_user_msg,
             None,
-            &conversation[..conversation.len().saturating_sub(1)],
+            &history,
         ).await;
 
         let mut rx = match stream_result {
@@ -531,11 +550,19 @@ pub async fn run_agent_loop(
 
         // Execute tool calls (up to limit)
         let mut tool_results = String::new();
+        let mut iteration_failures = 0;
         let calls_to_execute = tool_calls.into_iter()
             .take(config.max_tool_calls_per_iteration)
             .collect::<Vec<_>>();
 
         for parsed in &calls_to_execute {
+            // Track action for stuck detection
+            let action_sig = format!("{}:{}", parsed.name, parsed.args);
+            recent_actions.push(action_sig.clone());
+            if recent_actions.len() > 10 {
+                recent_actions.remove(0);
+            }
+
             let _ = event_tx.send(AgentEvent::ToolExecuting {
                 name: parsed.name.clone(),
                 args: parsed.args.to_string(),
@@ -548,6 +575,9 @@ pub async fn run_agent_loop(
             total_tool_calls += 1;
 
             let success = result.is_ok();
+            if !success {
+                iteration_failures += 1;
+            }
             let output = format_tool_results(&tracker, &[idx]);
 
             let _ = event_tx.send(AgentEvent::ToolResult {
@@ -557,6 +587,35 @@ pub async fn run_agent_loop(
             }).await;
 
             tool_results.push_str(&output);
+        }
+
+        // Track consecutive failures for stuck detection
+        if iteration_failures == calls_to_execute.len() && !calls_to_execute.is_empty() {
+            consecutive_failures += 1;
+        } else {
+            consecutive_failures = 0;
+        }
+
+        // Stuck detection: repeated actions or consecutive failures
+        let is_stuck = consecutive_failures >= 3 || {
+            // Check if same action repeated 3+ times in recent history
+            recent_actions.len() >= 3 && {
+                let last = recent_actions.last().unwrap();
+                recent_actions.iter().filter(|a| *a == last).count() >= 3
+            }
+        };
+
+        if is_stuck {
+            let _ = event_tx.send(AgentEvent::Error(
+                "Agent appears stuck (repeated failures or actions)".into()
+            )).await;
+            return AgentResult {
+                iterations: iteration + 1,
+                tool_calls_executed: total_tool_calls,
+                final_response,
+                success: false,
+                error: Some("Agent stuck".into()),
+            };
         }
 
         // Add tool results to conversation for next iteration
@@ -579,6 +638,108 @@ pub async fn run_agent_loop(
         final_response,
         success: false,
         error: Some("Max iterations reached".into()),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AGENT CORE - Unified interface for TUI and CLI
+// ═══════════════════════════════════════════════════════════════
+
+/// Agent core - the single source of truth for agentic behavior
+///
+/// Use this instead of directly calling run_agent_loop.
+/// Both TUI and CLI consume events from this.
+pub struct AgentCore {
+    pub api_key: String,
+    pub model: String,
+    pub work_dir: std::path::PathBuf,
+    pub config: AgentConfig,
+}
+
+impl AgentCore {
+    pub fn new(api_key: &str, model: &str, work_dir: &Path) -> Self {
+        Self {
+            api_key: api_key.to_string(),
+            model: model.to_string(),
+            work_dir: work_dir.to_path_buf(),
+            config: AgentConfig::default(),
+        }
+    }
+
+    pub fn with_config(mut self, config: AgentConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    /// Run agent and return event receiver
+    ///
+    /// Spawns the agent loop in background, returns channel to receive events.
+    /// Caller should poll the receiver and handle events appropriately.
+    pub fn run(&self, prompt: &str) -> (mpsc::Receiver<AgentEvent>, tokio::task::JoinHandle<AgentResult>) {
+        let (tx, rx) = mpsc::channel(256);
+
+        let api_key = self.api_key.clone();
+        let model = self.model.clone();
+        let prompt = prompt.to_string();
+        let work_dir = self.work_dir.clone();
+        let config = self.config.clone();
+
+        let handle = tokio::spawn(async move {
+            run_agent_loop(&api_key, &model, &prompt, &work_dir, config, tx).await
+        });
+
+        (rx, handle)
+    }
+
+    /// Run agent synchronously, blocking until complete
+    ///
+    /// Useful for CLI batch mode.
+    pub async fn run_blocking(&self, prompt: &str) -> AgentResult {
+        let (mut rx, handle) = self.run(prompt);
+
+        // Drain events (caller can also process them if needed)
+        while rx.recv().await.is_some() {}
+
+        handle.await.unwrap_or_else(|e| AgentResult {
+            iterations: 0,
+            tool_calls_executed: 0,
+            final_response: String::new(),
+            success: false,
+            error: Some(e.to_string()),
+        })
+    }
+
+    /// Run agent with event callback
+    ///
+    /// Events are passed to callback as they arrive.
+    pub async fn run_with_callback<F>(&self, prompt: &str, mut on_event: F) -> AgentResult
+    where
+        F: FnMut(&AgentEvent),
+    {
+        let (mut rx, handle) = self.run(prompt);
+
+        while let Some(event) = rx.recv().await {
+            on_event(&event);
+        }
+
+        handle.await.unwrap_or_else(|e| AgentResult {
+            iterations: 0,
+            tool_calls_executed: 0,
+            final_response: String::new(),
+            success: false,
+            error: Some(e.to_string()),
+        })
+    }
+}
+
+// Make AgentConfig cloneable for AgentCore
+impl Clone for AgentConfig {
+    fn clone(&self) -> Self {
+        Self {
+            max_iterations: self.max_iterations,
+            max_tool_calls_per_iteration: self.max_tool_calls_per_iteration,
+            timeout_per_tool_ms: self.timeout_per_tool_ms,
+        }
     }
 }
 

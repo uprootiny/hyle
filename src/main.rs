@@ -160,7 +160,7 @@ USAGE:
     hyle --free [PATHS...]        # choose free model, interactive loop
     hyle --new                    # start fresh session
     hyle --model <id> [PATHS...]  # use specific model
-    hyle --task "..." [PATHS...]  # one-shot: produce diff, ask apply
+    hyle --task "..." [PATHS...]  # autonomous agent mode (no TUI)
     hyle --backburner [PATHS...]  # background maintenance daemon
     hyle doctor                   # check config, key, network
     hyle models --refresh         # refresh models cache
@@ -387,6 +387,9 @@ fn run_config_set(key: &str, value: &str) -> Result<()> {
 }
 
 async fn run_task(task: &str, paths: &[PathBuf]) -> Result<()> {
+    use agent::{AgentCore, AgentEvent};
+    use std::io::Write;
+
     let api_key = config::get_api_key()?;
     let cfg = config::Config::load()?;
 
@@ -394,9 +397,15 @@ async fn run_task(task: &str, paths: &[PathBuf]) -> Result<()> {
     let model = cfg.default_model.clone()
         .unwrap_or_else(|| "meta-llama/llama-3.2-3b-instruct:free".to_string());
 
+    let work_dir = std::env::current_dir()?;
+
     println!("Task: {}", task);
     println!("Model: {}", model);
-    println!("Paths: {:?}\n", paths);
+    println!("Mode: Agent (autonomous tool execution)");
+    if !paths.is_empty() {
+        println!("Paths: {:?}", paths);
+    }
+    println!();
 
     // Read file contents if paths provided
     let mut context = String::new();
@@ -412,29 +421,56 @@ async fn run_task(task: &str, paths: &[PathBuf]) -> Result<()> {
     let prompt = if context.is_empty() {
         task.to_string()
     } else {
-        format!("Given these files:\n{}\n\nTask: {}\n\nProvide your changes as a unified diff.", context, task)
+        format!("Given these files:\n{}\n\nTask: {}", context, task)
     };
 
-    // Stream response
-    println!("Generating...\n");
-    let mut response = String::new();
-    let mut stream = client::stream_completion(&api_key, &model, &prompt).await?;
+    // Run agent with event printing
+    let agent = AgentCore::new(&api_key, &model, &work_dir);
 
-    while let Some(chunk) = stream.recv().await {
-        match chunk {
-            client::StreamEvent::Token(t) => {
+    let result = agent.run_with_callback(&prompt, |event| {
+        match event {
+            AgentEvent::Token(t) => {
                 print!("{}", t);
-                response.push_str(&t);
+                let _ = std::io::stdout().flush();
             }
-            client::StreamEvent::Done(usage) => {
-                println!("\n\n[{} prompt + {} completion tokens]",
-                    usage.prompt_tokens, usage.completion_tokens);
+            AgentEvent::Status(s) => {
+                println!("\n[{}]", s);
             }
-            client::StreamEvent::Error(e) => {
-                eprintln!("\nError: {}", e);
+            AgentEvent::ToolExecuting { name, args: _ } => {
+                println!("\n  → {}", name);
             }
+            AgentEvent::ToolResult { name, success, output } => {
+                let icon = if *success { "✓" } else { "✗" };
+                println!("  {} {}", icon, name);
+                // Show first few lines of output
+                for line in output.lines().take(3) {
+                    println!("    {}", line);
+                }
+                if output.lines().count() > 3 {
+                    println!("    ...");
+                }
+            }
+            AgentEvent::IterationComplete { iteration, tool_count } => {
+                println!("\n─── Iteration {} ({} tools) ───\n", iteration, tool_count);
+            }
+            AgentEvent::Complete { iterations, success } => {
+                let status = if *success { "completed" } else { "stopped" };
+                println!("\n\n[Agent {} after {} iterations]", status, iterations);
+            }
+            AgentEvent::Error(e) => {
+                eprintln!("\n[Error: {}]", e);
+            }
+            AgentEvent::ToolCallsParsed(_) => {}
         }
+    }).await;
+
+    if result.success {
+        println!("\nTask completed successfully.");
+    } else if let Some(err) = result.error {
+        println!("\nTask failed: {}", err);
     }
+
+    println!("[{} iterations, {} tool calls]", result.iterations, result.tool_calls_executed);
 
     Ok(())
 }
