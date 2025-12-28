@@ -29,6 +29,7 @@ mod prompts;
 mod tmux;
 mod cognitive;
 mod docs;
+mod server;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -51,6 +52,9 @@ enum Command {
     },
     Backburner {
         paths: Vec<PathBuf>,
+    },
+    Server {
+        port: u16,
     },
     Doctor,
     Models {
@@ -117,6 +121,16 @@ fn parse_args() -> Command {
         return Command::Backburner { paths };
     }
 
+    // Check for --serve flag
+    if args.iter().any(|a| a == "--serve" || a == "-s") {
+        let port = args.iter()
+            .position(|a| a == "--serve" || a == "-s")
+            .and_then(|i| args.get(i + 1))
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(8420);
+        return Command::Server { port };
+    }
+
     // Parse flags and paths
     let mut free_only = false;
     let mut model = None;
@@ -162,6 +176,7 @@ USAGE:
     hyle --model <id> [PATHS...]  # use specific model
     hyle --task "..." [PATHS...]  # autonomous agent mode (no TUI)
     hyle --backburner [PATHS...]  # background maintenance daemon
+    hyle --serve [PORT]           # HTTP API server (default: 8420)
     hyle doctor                   # check config, key, network
     hyle models --refresh         # refresh models cache
     hyle sessions --list          # list saved sessions
@@ -174,6 +189,7 @@ FLAGS:
     -m, --model <id>        Use specific model ID
     -t, --task <text>       One-shot task mode
     -b, --backburner        Run background maintenance daemon
+    -s, --serve [port]      HTTP API server mode
     -h, --help              Show this help
 
 CONFIG:
@@ -234,6 +250,9 @@ async fn main() -> Result<()> {
         }
         Command::Backburner { paths } => {
             run_backburner(&paths).await
+        }
+        Command::Server { port } => {
+            server::run_server(port).await
         }
         Command::Interactive { free_only, model, paths, resume } => {
             run_interactive(free_only, model, paths, resume).await
