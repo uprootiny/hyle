@@ -592,6 +592,11 @@ pub fn execute_slash_command_with_context(
             },
             success: true,
         }),
+        "agent" => Some(SlashResult {
+            // Toggle agent mode (autonomous tool chaining)
+            output: "TOGGLE_AGENT_MODE".into(),
+            success: true,
+        }),
 
         // === Editor Integration ===
         "edit" | "open" => Some(run_edit(args)),
@@ -691,6 +696,7 @@ fn slash_help_full() -> SlashResult {
   /status         Show session status
   /model          Show current model
   /switch [name]  Switch to different model
+  /agent          Toggle autonomous agent mode
 
 ═══ Git ═══
   /git <cmd>      Run git command

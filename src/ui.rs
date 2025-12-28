@@ -269,6 +269,12 @@ enum TuiMsg {
     Error(String),
     /// Continue agentic loop with tool results
     ContinueLoop { results: String, iteration: u8 },
+    /// Agent mode events
+    AgentStatus(String),
+    AgentToolExecuting { name: String },
+    AgentToolDone { name: String, success: bool, output: String },
+    AgentIterationDone { iteration: usize, tools: usize },
+    AgentComplete { iterations: usize, success: bool },
 }
 
 /// Main TUI state
@@ -363,6 +369,10 @@ struct TuiState {
     rate_limit_pending: bool, // True when we hit rate limit - ESC should offer model switch
     pending_retry: bool,      // True when we should retry last prompt with new model
     session_cost: f64,        // Running cost for this session (in $)
+
+    // Agent mode - autonomous tool chaining like Claude Code
+    agent_mode: bool,
+    agent_running: bool,
 }
 
 /// An artifact (file, diff, etc.)
@@ -490,6 +500,9 @@ impl TuiState {
             rate_limit_pending: false,
             pending_retry: false,
             session_cost: 0.0,
+            // Agent mode
+            agent_mode: true, // Enable by default - this is what makes hyle like Claude Code
+            agent_running: false,
         }
     }
 
@@ -1349,6 +1362,38 @@ async fn run_tui_loop(
                         state.log(format!("Error: {}", e));
                     }
                 }
+                // Agent mode events
+                TuiMsg::AgentStatus(status) => {
+                    state.output.push(format!("[Agent: {}]", status));
+                    state.mark_dirty();
+                }
+                TuiMsg::AgentToolExecuting { name } => {
+                    state.output.push(format!("  → Executing: {}", name));
+                    state.mark_dirty();
+                }
+                TuiMsg::AgentToolDone { name, success, output } => {
+                    let icon = if success { "✓" } else { "✗" };
+                    state.output.push(format!("  {} {}", icon, name));
+                    // Show first few lines of output
+                    for line in output.lines().take(5) {
+                        state.output.push(format!("    {}", line));
+                    }
+                    if output.lines().count() > 5 {
+                        state.output.push("    ...".into());
+                    }
+                    state.mark_dirty();
+                }
+                TuiMsg::AgentIterationDone { iteration, tools } => {
+                    state.output.push(format!("─── Iteration {} ({} tools) ───", iteration, tools));
+                    state.mark_dirty();
+                }
+                TuiMsg::AgentComplete { iterations, success } => {
+                    state.agent_running = false;
+                    state.is_generating = false;
+                    let status = if success { "completed" } else { "stopped" };
+                    state.output.push(format!("[Agent {} after {} iterations]", status, iterations));
+                    state.mark_dirty();
+                }
                 TuiMsg::ContinueLoop { results, iteration } => {
                     // AGENTIC LOOP: Continue with tool results
                     state.output.push(String::new());
@@ -1668,6 +1713,17 @@ async fn run_tui_loop(
                                             }
                                             state.mark_dirty();
                                             continue;
+                                        } else if result.output == "TOGGLE_AGENT_MODE" {
+                                            state.agent_mode = !state.agent_mode;
+                                            let mode = if state.agent_mode { "ON" } else { "OFF" };
+                                            state.output.push(format!("[Agent Mode: {}]", mode));
+                                            if state.agent_mode {
+                                                state.output.push("  LLM will autonomously execute tools until task complete".into());
+                                            } else {
+                                                state.output.push("  LLM will respond without automatic tool execution".into());
+                                            }
+                                            state.mark_dirty();
+                                            continue;
                                         }
 
                                         let status = if result.success { "✓" } else { "✗" };
@@ -1875,16 +1931,25 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
         String::new()
     };
 
+    // Agent mode indicator
+    let agent_indicator = if state.agent_running {
+        " | 🤖⚡"
+    } else if state.agent_mode {
+        " | 🤖"
+    } else {
+        ""
+    };
+
     let header_title = if exit_warning {
         format!("hyle | {} | ⚠ Press Ctrl-C again to quit{}", model_display, nav_hint)
     } else if state.rate_limit_pending {
         format!("hyle | {} | ⚠ Rate limited - press ESC{}", model_display, nav_hint)
     } else if state.traces.context.is_full() {
-        format!("hyle | {}{} | ⚠ CONTEXT FULL{}", model_display, context_indicator, nav_hint)
+        format!("hyle | {}{}{} | ⚠ CONTEXT FULL{}", model_display, context_indicator, agent_indicator, nav_hint)
     } else if state.traces.context.is_warning() {
-        format!("hyle | {}{} | ⚠ >80%{}", model_display, context_indicator, nav_hint)
+        format!("hyle | {}{}{} | ⚠ >80%{}", model_display, context_indicator, agent_indicator, nav_hint)
     } else {
-        format!("hyle | {}{}{}", model_display, context_indicator, nav_hint)
+        format!("hyle | {}{}{}{}", model_display, context_indicator, agent_indicator, nav_hint)
     };
 
     let header_style = if exit_warning {

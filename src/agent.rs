@@ -380,6 +380,246 @@ Guidelines:
 }
 
 // ═══════════════════════════════════════════════════════════════
+// AUTONOMOUS AGENT LOOP
+// ═══════════════════════════════════════════════════════════════
+
+use tokio::sync::mpsc;
+use crate::client::{self, StreamEvent};
+
+/// Events emitted by the agent loop
+#[derive(Debug, Clone)]
+pub enum AgentEvent {
+    /// LLM is generating text
+    Token(String),
+    /// LLM finished generating, parsed tool calls
+    ToolCallsParsed(Vec<ParsedToolCall>),
+    /// Executing a tool
+    ToolExecuting { name: String, args: String },
+    /// Tool finished with result
+    ToolResult { name: String, success: bool, output: String },
+    /// Iteration complete, continuing
+    IterationComplete { iteration: usize, tool_count: usize },
+    /// Agent finished
+    Complete { iterations: usize, success: bool },
+    /// Error occurred
+    Error(String),
+    /// Status message
+    Status(String),
+}
+
+/// Run the autonomous agent loop
+///
+/// This is the core function that makes hyle work like Claude Code:
+/// 1. Send user prompt to LLM with tool-use system prompt
+/// 2. Stream LLM response, parsing for tool calls
+/// 3. Execute tool calls, collect results
+/// 4. Feed results back to LLM
+/// 5. Repeat until task complete or max iterations
+pub async fn run_agent_loop(
+    api_key: &str,
+    model: &str,
+    user_prompt: &str,
+    work_dir: &Path,
+    config: AgentConfig,
+    event_tx: mpsc::Sender<AgentEvent>,
+) -> AgentResult {
+    let mut executor = ToolExecutor::new();
+    let mut tracker = ToolCallTracker::new();
+    let mut conversation: Vec<serde_json::Value> = Vec::new();
+    let mut total_tool_calls = 0;
+    let mut final_response = String::new();
+
+    // Build system prompt with tool instructions
+    let _system_prompt = code_assistant_prompt(work_dir); // TODO: inject into conversation
+
+    // Add initial user message
+    conversation.push(serde_json::json!({
+        "role": "user",
+        "content": user_prompt
+    }));
+
+    for iteration in 0..config.max_iterations {
+        let _ = event_tx.send(AgentEvent::Status(format!(
+            "Iteration {} of {}", iteration + 1, config.max_iterations
+        ))).await;
+
+        // Stream LLM response
+        let mut response = String::new();
+        let stream_result = client::stream_completion_full(
+            api_key,
+            model,
+            &conversation.last().map(|m| m["content"].as_str().unwrap_or("")).unwrap_or(""),
+            None,
+            &conversation[..conversation.len().saturating_sub(1)],
+        ).await;
+
+        let mut rx = match stream_result {
+            Ok(rx) => rx,
+            Err(e) => {
+                let _ = event_tx.send(AgentEvent::Error(e.to_string())).await;
+                return AgentResult {
+                    iterations: iteration,
+                    tool_calls_executed: total_tool_calls,
+                    final_response: response,
+                    success: false,
+                    error: Some(e.to_string()),
+                };
+            }
+        };
+
+        // Collect streaming response
+        while let Some(event) = rx.recv().await {
+            match event {
+                StreamEvent::Token(t) => {
+                    response.push_str(&t);
+                    let _ = event_tx.send(AgentEvent::Token(t)).await;
+                }
+                StreamEvent::Done(_usage) => {
+                    break;
+                }
+                StreamEvent::Error(e) => {
+                    let _ = event_tx.send(AgentEvent::Error(e.clone())).await;
+                    return AgentResult {
+                        iterations: iteration,
+                        tool_calls_executed: total_tool_calls,
+                        final_response: response,
+                        success: false,
+                        error: Some(e),
+                    };
+                }
+            }
+        }
+
+        // Add assistant response to conversation
+        conversation.push(serde_json::json!({
+            "role": "assistant",
+            "content": response.clone()
+        }));
+
+        final_response = response.clone();
+
+        // Check for fatal error
+        if is_fatal_error(&response) {
+            let _ = event_tx.send(AgentEvent::Error("Agent reported fatal error".into())).await;
+            return AgentResult {
+                iterations: iteration + 1,
+                tool_calls_executed: total_tool_calls,
+                final_response,
+                success: false,
+                error: Some("Agent reported fatal error".into()),
+            };
+        }
+
+        // Parse tool calls
+        let tool_calls = parse_tool_calls(&response);
+        let _ = event_tx.send(AgentEvent::ToolCallsParsed(tool_calls.clone())).await;
+
+        // Check if task is complete (no tool calls or explicit completion)
+        if tool_calls.is_empty() || is_task_complete(&response) {
+            let _ = event_tx.send(AgentEvent::Complete {
+                iterations: iteration + 1,
+                success: true,
+            }).await;
+            return AgentResult {
+                iterations: iteration + 1,
+                tool_calls_executed: total_tool_calls,
+                final_response,
+                success: true,
+                error: None,
+            };
+        }
+
+        // Execute tool calls (up to limit)
+        let mut tool_results = String::new();
+        let calls_to_execute = tool_calls.into_iter()
+            .take(config.max_tool_calls_per_iteration)
+            .collect::<Vec<_>>();
+
+        for parsed in &calls_to_execute {
+            let _ = event_tx.send(AgentEvent::ToolExecuting {
+                name: parsed.name.clone(),
+                args: parsed.args.to_string(),
+            }).await;
+
+            let call = ToolCall::new(&parsed.name, parsed.args.clone());
+            let idx = tracker.add(call);
+
+            let result = executor.execute(tracker.get_mut(idx).unwrap());
+            total_tool_calls += 1;
+
+            let success = result.is_ok();
+            let output = format_tool_results(&tracker, &[idx]);
+
+            let _ = event_tx.send(AgentEvent::ToolResult {
+                name: parsed.name.clone(),
+                success,
+                output: output.clone(),
+            }).await;
+
+            tool_results.push_str(&output);
+        }
+
+        // Add tool results to conversation for next iteration
+        conversation.push(serde_json::json!({
+            "role": "user",
+            "content": format!("Tool execution results:\n{}", tool_results)
+        }));
+
+        let _ = event_tx.send(AgentEvent::IterationComplete {
+            iteration: iteration + 1,
+            tool_count: calls_to_execute.len(),
+        }).await;
+    }
+
+    // Max iterations reached
+    let _ = event_tx.send(AgentEvent::Error("Max iterations reached".into())).await;
+    AgentResult {
+        iterations: config.max_iterations,
+        tool_calls_executed: total_tool_calls,
+        final_response,
+        success: false,
+        error: Some("Max iterations reached".into()),
+    }
+}
+
+/// Simplified agent runner that collects output to a callback
+pub async fn run_agent_simple<F>(
+    api_key: &str,
+    model: &str,
+    prompt: &str,
+    work_dir: &Path,
+    mut on_event: F,
+) -> AgentResult
+where
+    F: FnMut(AgentEvent) + Send + 'static,
+{
+    let (tx, mut rx) = mpsc::channel(256);
+    let config = AgentConfig::default();
+
+    let api_key = api_key.to_string();
+    let model = model.to_string();
+    let prompt = prompt.to_string();
+    let work_dir = work_dir.to_path_buf();
+
+    let handle = tokio::spawn(async move {
+        run_agent_loop(&api_key, &model, &prompt, &work_dir, config, tx).await
+    });
+
+    // Forward events to callback
+    while let Some(event) = rx.recv().await {
+        on_event(event);
+    }
+
+    handle.await.unwrap_or_else(|e| AgentResult {
+        iterations: 0,
+        tool_calls_executed: 0,
+        final_response: String::new(),
+        success: false,
+        error: Some(e.to_string()),
+    })
+}
+
+// ═══════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════
 
