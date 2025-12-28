@@ -286,6 +286,8 @@ struct TuiState {
     scroll_offset: u16,
     auto_scroll: bool,
     output_line_count: usize, // Cached line count for efficiency
+    output_cache: String,     // Cached joined output for rendering
+    output_dirty: bool,       // Flag to rebuild cache
 
     // Prompt history (separate from conversation)
     prompt_history: Vec<String>,
@@ -384,6 +386,8 @@ impl TuiState {
             scroll_offset: 0,
             auto_scroll: true,
             output_line_count: 1,
+            output_cache: String::new(),
+            output_dirty: true,
             prompt_history: Vec::new(),
             history_index: None,
             saved_input: String::new(),
@@ -531,6 +535,7 @@ impl TuiState {
                 }
             }
         }
+        self.mark_dirty();
 
         self.executing_tools = false;
 
@@ -656,6 +661,36 @@ impl TuiState {
             .sum();
     }
 
+    /// Mark output as dirty (needs cache rebuild)
+    fn mark_dirty(&mut self) {
+        self.output_dirty = true;
+    }
+
+    /// Rebuild output cache if dirty, return cached text
+    fn get_output_text(&mut self) -> &str {
+        if self.output_dirty {
+            self.output_cache = self.output.join("\n");
+            self.update_line_count();
+            self.output_dirty = false;
+        }
+        &self.output_cache
+    }
+
+    /// Append to output with dirty marking
+    fn append_output(&mut self, line: String) {
+        self.output.push(line);
+        self.mark_dirty();
+        self.trim_output_buffer();
+    }
+
+    /// Append to last line (for streaming tokens)
+    fn append_to_last(&mut self, text: &str) {
+        if let Some(last) = self.output.last_mut() {
+            last.push_str(text);
+            self.mark_dirty();
+        }
+    }
+
     /// Scroll to bottom
     fn scroll_to_bottom(&mut self, visible_height: u16) {
         let total = self.output_line_count as u16;
@@ -708,6 +743,7 @@ async fn run_tui_loop(
                             }
                         }
                     }
+                    state.mark_dirty();
                 }
                 s
             }
@@ -765,6 +801,7 @@ async fn run_tui_loop(
                     state.current_response.push_str(&t);
                     if let Some(last) = state.output.last_mut() {
                         last.push_str(&t);
+                        state.output_dirty = true; // Mark for cache rebuild
                     }
                 }
                 TuiMsg::Done(usage) => {
@@ -803,14 +840,23 @@ async fn run_tui_loop(
                         usage.prompt_tokens, usage.completion_tokens, usage.total_tokens,
                         duration.as_secs_f64()
                     ));
+                    state.mark_dirty();
                     state.log(format!("Completed: {} tokens in {:.1}s", usage.total_tokens, duration.as_secs_f64()));
                 }
                 TuiMsg::Error(e) => {
                     state.is_generating = false;
                     state.output.push(format!("\n[Error: {}]", e));
+                    state.mark_dirty();
                     state.log(format!("Error: {}", e));
                 }
             }
+        }
+
+        // Update cache before render (avoids allocation during draw)
+        if state.output_dirty {
+            state.output_cache = state.output.join("\n");
+            state.update_line_count();
+            state.output_dirty = false;
         }
 
         // Render
@@ -927,6 +973,7 @@ async fn run_tui_loop(
                                 state.history_index = None;
                                 state.output.push(format!("> {}", prompt));
                                 state.output.push(String::new()); // For response
+                                state.mark_dirty();
                                 state.is_generating = true;
                                 state.ttft = None;
                                 state.auto_scroll = true; // Auto-scroll on new message
@@ -1093,12 +1140,12 @@ fn render_tui(f: &mut Frame, state: &TuiState, model: &str) {
 
 fn render_chat(f: &mut Frame, state: &TuiState, area: Rect) {
     let visible_height = area.height.saturating_sub(2); // Account for borders
-    let text: String = state.output.join("\n");
-    let line_count = text.lines().count() as u16;
+
+    // Use cached values - no allocation on render
+    let line_count = state.output_line_count as u16;
 
     // Calculate scroll position
     let scroll = if state.auto_scroll {
-        // Auto-scroll to bottom
         line_count.saturating_sub(visible_height)
     } else {
         state.scroll_offset.min(line_count.saturating_sub(visible_height))
@@ -1126,7 +1173,8 @@ fn render_chat(f: &mut Frame, state: &TuiState, area: Rect) {
 
     let title = format!("Chat{}{}", history_indicator, scroll_indicator);
 
-    let para = Paragraph::new(text)
+    // Use cached output - rebuilt only when dirty
+    let para = Paragraph::new(state.output_cache.as_str())
         .wrap(Wrap { trim: false })
         .scroll((scroll, 0))
         .block(Block::default().borders(Borders::ALL).title(title));
