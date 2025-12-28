@@ -9,6 +9,20 @@ use tokio::sync::mpsc;
 
 use crate::models::Model;
 
+use crate::project::Project;
+use crate::prompt::SystemPrompt;
+
+/// Build system prompt with optional project context
+fn build_system_prompt(project: Option<&Project>) -> String {
+    let mut builder = SystemPrompt::new();
+
+    if let Some(p) = project {
+        builder = builder.with_project(p.clone());
+    }
+
+    builder.build()
+}
+
 const OPENROUTER_API_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODELS_URL: &str = "https://openrouter.ai/api/v1/models";
 
@@ -88,20 +102,61 @@ pub async fn stream_completion(
     model: &str,
     prompt: &str,
 ) -> Result<mpsc::Receiver<StreamEvent>> {
+    stream_completion_with_context(api_key, model, prompt, None).await
+}
+
+/// Stream a chat completion with project context
+pub async fn stream_completion_with_context(
+    api_key: &str,
+    model: &str,
+    prompt: &str,
+    project: Option<&Project>,
+) -> Result<mpsc::Receiver<StreamEvent>> {
+    stream_completion_full(api_key, model, prompt, project, &[]).await
+}
+
+/// Stream a chat completion with full context (project + history)
+pub async fn stream_completion_full(
+    api_key: &str,
+    model: &str,
+    prompt: &str,
+    project: Option<&Project>,
+    history: &[serde_json::Value],
+) -> Result<mpsc::Receiver<StreamEvent>> {
     let (tx, rx) = mpsc::channel(256);
+
+    let system_prompt = build_system_prompt(project);
+
+    // Build messages: system + history + current user message
+    let mut messages = vec![
+        ChatMessage {
+            role: "system".to_string(),
+            content: system_prompt,
+        },
+    ];
+
+    // Add conversation history
+    for msg in history {
+        if let (Some(role), Some(content)) = (
+            msg.get("role").and_then(|v| v.as_str()),
+            msg.get("content").and_then(|v| v.as_str()),
+        ) {
+            messages.push(ChatMessage {
+                role: role.to_string(),
+                content: content.to_string(),
+            });
+        }
+    }
+
+    // Add current user message
+    messages.push(ChatMessage {
+        role: "user".to_string(),
+        content: prompt.to_string(),
+    });
 
     let request = ChatRequest {
         model: model.to_string(),
-        messages: vec![
-            ChatMessage {
-                role: "system".to_string(),
-                content: "You are a helpful coding assistant. Be concise and precise.".to_string(),
-            },
-            ChatMessage {
-                role: "user".to_string(),
-                content: prompt.to_string(),
-            },
-        ],
+        messages,
         stream: true,
         max_tokens: Some(4096),
         temperature: Some(0.7),
@@ -124,8 +179,54 @@ pub async fn stream_completion(
     Ok(rx)
 }
 
-/// Perform the actual streaming request
+/// Request timeout in seconds
+const REQUEST_TIMEOUT_SECS: u64 = 120;
+/// Max retries for transient errors
+const MAX_RETRIES: u32 = 3;
+/// Base delay for exponential backoff (ms)
+const RETRY_BASE_DELAY_MS: u64 = 500;
+
+/// Perform the actual streaming request with retry
 async fn do_stream(
+    client: &reqwest::Client,
+    api_key: &str,
+    request: &ChatRequest,
+    tx: &mpsc::Sender<StreamEvent>,
+) -> Result<TokenUsage> {
+    let mut last_error = None;
+
+    for attempt in 0..MAX_RETRIES {
+        if attempt > 0 {
+            // Exponential backoff: 500ms, 1s, 2s
+            let delay = RETRY_BASE_DELAY_MS * (1 << (attempt - 1));
+            let _ = tx.send(StreamEvent::Token(format!("\n[Retrying in {}ms...]\n", delay))).await;
+            tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+        }
+
+        match do_stream_attempt(client, api_key, request, tx).await {
+            Ok(usage) => return Ok(usage),
+            Err(e) => {
+                let err_str = e.to_string();
+                // Don't retry on auth errors or rate limits (handled elsewhere)
+                if err_str.contains("401") || err_str.contains("403") || err_str.contains("429") {
+                    return Err(e);
+                }
+                // Retry on network/timeout errors
+                if err_str.contains("timeout") || err_str.contains("connect") ||
+                   err_str.contains("reset") || err_str.contains("closed") {
+                    last_error = Some(e);
+                    continue;
+                }
+                return Err(e);
+            }
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| anyhow::anyhow!("Max retries exceeded")))
+}
+
+/// Single attempt at streaming request
+async fn do_stream_attempt(
     client: &reqwest::Client,
     api_key: &str,
     request: &ChatRequest,
@@ -136,6 +237,7 @@ async fn do_stream(
         .header("Content-Type", "application/json")
         .header("HTTP-Referer", "https://github.com/hyle-org/hyle")
         .header("X-Title", "hyle")
+        .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .json(request)
         .send()
         .await

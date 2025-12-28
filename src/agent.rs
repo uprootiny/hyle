@@ -3,7 +3,9 @@
 //! Parses LLM responses for tool calls and executes them in a loop.
 //! This is the core of self-bootstrapping: hyle using hyle to develop hyle.
 
-use anyhow::{Context, Result};
+#![allow(dead_code)] // Forward-looking module
+
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -162,7 +164,44 @@ fn value_to_tool_call(value: &serde_json::Value) -> Option<ParsedToolCall> {
 
 /// Check if a name is a known tool
 fn is_known_tool(name: &str) -> bool {
-    matches!(name, "read" | "write" | "glob" | "grep" | "bash" | "edit" | "search")
+    matches!(name, "read" | "write" | "glob" | "grep" | "bash" | "edit" | "search" | "patch" | "diff")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DIFF DETECTION IN RESPONSES
+// ═══════════════════════════════════════════════════════════════
+
+/// A diff/patch found in an LLM response
+#[derive(Debug, Clone)]
+pub struct DetectedDiff {
+    pub target_file: Option<String>,
+    pub content: String,
+    pub is_unified: bool,
+}
+
+/// Detect unified diffs in LLM response
+pub fn detect_diffs(response: &str) -> Vec<DetectedDiff> {
+    let mut diffs = Vec::new();
+
+    // Look for code blocks that look like diffs
+    let re = regex::Regex::new(r"```(?:diff|patch)?\s*\n([\s\S]*?)\n```").unwrap();
+
+    for cap in re.captures_iter(response) {
+        if let Some(content) = cap.get(1) {
+            let content = content.as_str();
+            // Check if it looks like a unified diff
+            if content.contains("@@") && (content.contains("---") || content.contains("+++")) {
+                let target = crate::tools::extract_diff_target(content);
+                diffs.push(DetectedDiff {
+                    target_file: target,
+                    content: content.to_string(),
+                    is_unified: true,
+                });
+            }
+        }
+    }
+
+    diffs
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -252,7 +291,7 @@ pub fn execute_tool_calls(
     let mut results = Vec::new();
 
     for parsed in calls {
-        let mut call = ToolCall::new(&parsed.name, parsed.args.clone());
+        let call = ToolCall::new(&parsed.name, parsed.args.clone());
         let idx = tracker.add(call.clone());
 
         let result = executor.execute(tracker.get_mut(idx).unwrap());
@@ -308,6 +347,7 @@ Working directory: {}
 Available tools:
 - read(path="..."): Read a file with line numbers
 - write(path="...", content="..."): Write content to a file (creates backup)
+- patch(path="...", diff="..."): Apply a unified diff patch to a file
 - glob(pattern="..."): Find files matching a glob pattern
 - grep(pattern="...", path="..."): Search for regex pattern in files
 - bash(command="..."): Execute a shell command
@@ -320,12 +360,18 @@ To use a tool, respond with a JSON block:
 Or use function syntax:
 read(path="src/main.rs")
 
+For code changes, prefer using unified diffs with the patch tool:
+```json
+{{"tool": "patch", "args": {{"path": "src/main.rs", "diff": "--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,3 +1,3 @@\n line1\n-old line\n+new line\n line3"}}}}
+```
+
 After executing tools, I will show you the results. Continue until the task is complete.
 
 When finished, say "Task complete" and summarize what was done.
 
 Guidelines:
 - Read files before modifying them
+- Use patch for targeted changes, write for complete rewrites
 - Make atomic, focused changes
 - Run tests after modifications
 - Commit changes with clear messages
@@ -486,8 +532,72 @@ Then read one:
         assert!(prompt.contains("/home/user/project"));
         assert!(prompt.contains("read"));
         assert!(prompt.contains("write"));
+        assert!(prompt.contains("patch"));
         assert!(prompt.contains("bash"));
         assert!(prompt.contains("Task complete"));
+    }
+
+    #[test]
+    fn test_detect_diffs_in_code_block() {
+        let response = r#"Here's the change:
+
+```diff
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,3 +1,3 @@
+ fn main() {
+-    println!("hello");
++    println!("hello world");
+ }
+```
+"#;
+        let diffs = detect_diffs(response);
+        assert_eq!(diffs.len(), 1);
+        assert_eq!(diffs[0].target_file, Some("src/main.rs".to_string()));
+        assert!(diffs[0].is_unified);
+    }
+
+    #[test]
+    fn test_detect_multiple_diffs() {
+        let response = r#"
+```diff
+--- a/file1.rs
++++ b/file1.rs
+@@ -1 +1 @@
+-old
++new
+```
+
+```diff
+--- a/file2.rs
++++ b/file2.rs
+@@ -1 +1 @@
+-foo
++bar
+```
+"#;
+        let diffs = detect_diffs(response);
+        assert_eq!(diffs.len(), 2);
+    }
+
+    #[test]
+    fn test_detect_no_diffs() {
+        let response = "This is just a regular response with no diffs.";
+        let diffs = detect_diffs(response);
+        assert!(diffs.is_empty());
+    }
+
+    #[test]
+    fn test_parse_patch_tool() {
+        let response = r#"
+```json
+{"tool": "patch", "args": {"path": "test.rs", "diff": "--- a/test.rs\n+++ b/test.rs\n@@ -1 +1 @@\n-old\n+new"}}
+```
+"#;
+        let calls = parse_tool_calls(response);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "patch");
+        assert_eq!(calls[0].args["path"], "test.rs");
     }
 
     #[test]

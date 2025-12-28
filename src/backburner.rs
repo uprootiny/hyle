@@ -24,15 +24,17 @@ pub struct Feature {
     pub name: String,
     pub status: FeatureStatus,
     pub last_check: Option<Instant>,
+    #[allow(dead_code)] // Forward-looking: per-feature notes
     pub notes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)] // All variants used in display
 pub enum FeatureStatus {
     Untested,
     Passing,
     Failing,
-    Partial,
+    Partial,  // Partially passing/implemented
 }
 
 impl FeatureStatus {
@@ -44,6 +46,66 @@ impl FeatureStatus {
             Self::Partial => "[~]",
         }
     }
+}
+
+/// Results from running cargo test
+#[derive(Debug, Clone, Default)]
+pub struct TestResults {
+    pub passed: usize,
+    pub failed: usize,
+    pub ignored: usize,
+    pub duration_secs: f64,
+    pub failed_tests: Vec<String>,
+}
+
+impl TestResults {
+    pub fn success(&self) -> bool {
+        self.failed == 0
+    }
+}
+
+/// Parse cargo test output to extract results
+pub fn parse_test_output(stdout: &str, _stderr: &str) -> TestResults {
+    let mut results = TestResults::default();
+
+    // Look for the summary line: "test result: ok. X passed; Y failed; Z ignored"
+    for line in stdout.lines() {
+        if line.starts_with("test result:") {
+            // Parse "test result: ok. 165 passed; 0 failed; 0 ignored"
+            if let Some(rest) = line.strip_prefix("test result:") {
+                let rest = rest.trim();
+                // Extract numbers
+                for part in rest.split(';') {
+                    let part = part.trim();
+                    if part.contains("passed") {
+                        if let Some(num) = part.split_whitespace().next() {
+                            results.passed = num.parse().unwrap_or(0);
+                        }
+                    } else if part.contains("failed") {
+                        if let Some(num) = part.split_whitespace().next() {
+                            results.failed = num.parse().unwrap_or(0);
+                        }
+                    } else if part.contains("ignored") {
+                        if let Some(num) = part.split_whitespace().next() {
+                            results.ignored = num.parse().unwrap_or(0);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Capture failed test names: "test module::test_name ... FAILED"
+        if line.contains("FAILED") && line.starts_with("test ") {
+            if let Some(name) = line.strip_prefix("test ") {
+                let name = name.split(" ...").next().unwrap_or("").trim();
+                if !name.is_empty() {
+                    results.failed_tests.push(name.to_string());
+                }
+            }
+        }
+    }
+
+    results
 }
 
 /// Backburner state
@@ -157,7 +219,7 @@ impl Backburner {
         ];
 
         for (name, args) in tests {
-            let result = std::process::Command::new(&self.work_dir.join("target/release/hyle"))
+            let result = std::process::Command::new(self.work_dir.join("target/release/hyle"))
                 .args(&args)
                 .output();
 
@@ -434,6 +496,55 @@ impl Backburner {
                 }
             }
             Err(e) => println!("error: {}", e),
+        }
+    }
+
+    /// Run cargo test and parse results
+    pub fn run_cargo_tests(&mut self) -> TestResults {
+        let now = self.timestamp();
+
+        if !self.work_dir.join("Cargo.toml").exists() {
+            return TestResults::default();
+        }
+
+        print!("[{}] Running cargo test... ", now);
+        std::io::Write::flush(&mut std::io::stdout()).ok();
+
+        let start = Instant::now();
+        let output = std::process::Command::new("cargo")
+            .args(["test", "--", "--color=never"])
+            .current_dir(&self.work_dir)
+            .output();
+
+        let duration = start.elapsed();
+
+        match output {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+
+                let results = parse_test_output(&stdout, &stderr);
+
+                if results.failed == 0 {
+                    println!("{} passed in {:.1}s", results.passed, duration.as_secs_f64());
+                    self.observe(format!("Tests: {} passed", results.passed));
+                } else {
+                    println!("{} passed, {} FAILED in {:.1}s",
+                        results.passed, results.failed, duration.as_secs_f64());
+                    self.observe(format!("Tests: {} FAILED!", results.failed));
+
+                    // Show failed test names
+                    for name in &results.failed_tests {
+                        println!("  FAIL: {}", name);
+                    }
+                }
+
+                results
+            }
+            Err(e) => {
+                println!("error: {}", e);
+                TestResults::default()
+            }
         }
     }
 

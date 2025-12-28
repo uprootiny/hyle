@@ -185,7 +185,18 @@ impl Session {
         })
     }
 
-    /// Log an event
+    /// Add system message (for tool results, context injection, etc.)
+    pub fn add_system_message(&mut self, content: &str) -> Result<()> {
+        self.add_message(Message {
+            role: "system".into(),
+            content: content.to_string(),
+            timestamp: Utc::now(),
+            tokens: None,
+        })
+    }
+
+    /// Log an event (for detailed session logging - forward-looking)
+    #[allow(dead_code)]
     pub fn log(&mut self, kind: &str, data: serde_json::Value) -> Result<()> {
         let entry = LogEntry {
             timestamp: Utc::now(),
@@ -230,7 +241,8 @@ impl Session {
         }).collect()
     }
 
-    /// Get conversation summary for display
+    /// Get conversation summary for display (used in session list)
+    #[allow(dead_code)]
     pub fn summary(&self) -> String {
         let user_msgs: Vec<_> = self.messages.iter()
             .filter(|m| m.role == "user")

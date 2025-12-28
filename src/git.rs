@@ -6,9 +6,11 @@
 //! - Atomic commit creation with message validation
 //! - Branch management
 
+#![allow(dead_code)] // Forward-looking module for git operations
+
 use anyhow::{Context, Result};
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Command;
 
 // ═══════════════════════════════════════════════════════════════
 // GIT STATUS
@@ -134,7 +136,7 @@ fn parse_status_output(output: &str) -> Result<GitStatus> {
         } else if line.starts_with("# branch.ab ") {
             // Parse "+N -M" format
             let parts: Vec<&str> = line[12..].split_whitespace().collect();
-            if let Some(ahead) = parts.get(0) {
+            if let Some(ahead) = parts.first() {
                 status.ahead = ahead.trim_start_matches('+').parse().unwrap_or(0);
             }
             if let Some(behind) = parts.get(1) {
@@ -314,11 +316,10 @@ pub fn validate_commit_message(msg: &str) -> MessageValidation {
     }
 
     // Body checks
-    if lines.len() > 1 {
-        if !lines[1].is_empty() {
+    if lines.len() > 1
+        && !lines[1].is_empty() {
             result.warn("Second line should be blank (separates subject from body)");
         }
-    }
 
     result
 }
@@ -326,6 +327,11 @@ pub fn validate_commit_message(msg: &str) -> MessageValidation {
 // ═══════════════════════════════════════════════════════════════
 // ATOMIC COMMITS
 // ═══════════════════════════════════════════════════════════════
+
+/// Stage a single file
+pub fn stage_file(work_dir: &Path, file: &str) -> Result<()> {
+    stage_files(work_dir, &[file])
+}
 
 /// Stage files for commit
 pub fn stage_files(work_dir: &Path, files: &[&str]) -> Result<()> {

@@ -63,12 +63,46 @@ hyle sessions --clean         # cleanup old sessions
 hyle config set key <value>   # set config value
 ```
 
+## Slash Commands
+
+Claude Code-style commands executed locally without LLM:
+
+| Command | Description |
+|---------|-------------|
+| `/build` | Build project (Rust/Node/Python/Go) |
+| `/test` | Run project tests |
+| `/check` | Type check / lint |
+| `/update` | Update dependencies |
+| `/clean` | Clean build artifacts |
+| `/git [args]` | Run git command |
+| `/diff [staged]` | Show git diff |
+| `/commit [msg]` | Create commit |
+| `/status` | Project status |
+| `/ls [path]` | List files |
+| `/find [pattern]` | Find files by glob |
+| `/grep [pattern]` | Search in files |
+| `/view [file]` | Read file contents |
+| `/edit [file]` | Open in $EDITOR |
+| `/cd [path]` | Change directory |
+| `/doctor` | Health check |
+| `/model` | Show current model |
+| `/cost` | Show token usage |
+| `/help` | List all commands |
+| `/analyze` | Codebase health analysis |
+| `/improve` | Generate improvement prompts |
+| `/deps` | Module dependency graph |
+
 ## Controls
 
 | Key | Action |
 |-----|--------|
 | Enter | Send prompt |
 | Up/Down | Browse prompt history |
+| Ctrl-A | Jump to line start |
+| Ctrl-E | Jump to line end |
+| Ctrl-K | Kill to end of line |
+| Ctrl-U | Kill to start of line |
+| Ctrl-P | Prompt palette |
 | PageUp/PageDown | Scroll conversation |
 | End | Jump to bottom (auto-scroll) |
 | Tab | Switch tabs (Chat/Telemetry/Log) |
@@ -76,7 +110,7 @@ hyle config set key <value>   # set config value
 | t | Throttle mode |
 | f | Full speed mode |
 | n | Normal mode |
-| Esc | Quit |
+| Esc | Zoom out / Quit |
 
 ## Config
 
@@ -88,26 +122,17 @@ hyle config set key <value>   # set config value
 
 ## Features
 
-- **Free models**: 35+ free models on OpenRouter
-- **Session persistence**: Resume conversations across restarts
-- **Fuzzy picker**: Incremental search for models
-- **SSE streaming**: Real-time token display
+- **Agentic Loop**: Automatic tool execution and iteration
+- **Session Persistence**: Resume conversations across restarts
+- **Slash Commands**: 20+ Claude Code-style local commands
+- **Free Models**: 35+ free models on OpenRouter
+- **Fuzzy Picker**: Incremental search for models
+- **SSE Streaming**: Real-time token display
 - **Telemetry**: CPU, memory, token, latency traces
 - **Auto-throttle**: Backs off under pressure
-- **Backburner mode**: LLM-powered maintenance daemon
-- **Git hygiene**: Commit message analysis, atomic commit suggestions
-- **Skills system**: Extensible tools and subagents
-
-## Backburner Mode
-
-Run `hyle --backburner` for intelligent background maintenance:
-
-- CLI feature testing
-- Session cleanup
-- Git status and hygiene checks
-- Cargo build/check monitoring
-- LLM-powered improvement suggestions
-- Feature progress dashboard
+- **Readline Keys**: Full readline navigation support
+- **Intent Tracking**: Multi-granularity goal management
+- **Backburner Mode**: LLM-powered maintenance daemon
 
 ## Architecture
 
@@ -118,13 +143,95 @@ src/
 ├── models.rs     # Model list caching, free filter
 ├── client.rs     # OpenRouter SSE streaming
 ├── session.rs    # Conversation persistence
+├── ui.rs         # TUI, agentic loop, controls
+├── agent.rs      # Tool parsing and execution
+├── tools.rs      # File operations, diff generation
+├── skills.rs     # Slash commands, skills
+├── intent.rs     # Multi-granularity intent tracking
+├── cognitive.rs  # Multi-LLM cognitive architecture
+├── prompt.rs     # Dynamic context injection
+├── project.rs    # Project detection and context
 ├── backburner.rs # Intelligent maintenance daemon
 ├── telemetry.rs  # CPU/mem sampling, pressure detection
 ├── traces.rs     # Token, context, memory, latency traces
-├── skills.rs     # Tools, skills, subagents
-├── ui.rs         # Fuzzy picker, TUI, controls
-└── tools.rs      # File operations, diff generation
+├── tmux.rs       # Tmux integration for wide layouts
+├── git.rs        # Git operations
+├── eval.rs       # Model quality tracking
+└── bootstrap.rs  # Self-update and bootstrapping
 ```
+
+## Cognitive Architecture
+
+hyle uses a multi-LLM architecture for intelligent context management:
+
+- **Executor**: Main model for reasoning and code generation
+- **Summarizer**: Free model for context compression
+- **Sanity Checker**: Free model for loop detection and validation
+- **Docs Watcher**: Free model for documentation maintenance
+
+This allows efficient use of context windows while maintaining coherent long-running sessions.
+
+### Salience-Aware Context
+
+Context is managed across four tiers based on salience:
+
+| Tier | Budget | Content |
+|------|--------|---------|
+| Focus (40%) | Full detail | Current task, last tool results, errors |
+| Recent (30%) | High detail | Last 2-3 exchanges, active decisions |
+| Summary (20%) | Compressed | Older exchanges, key facts extracted |
+| Background (10%) | Minimal | Project structure, conventions |
+
+Salience scoring considers:
+- **Recency**: Recent content scores higher
+- **Keywords**: Matches to current task boost score
+- **Errors**: Errors and failures are highly salient
+- **Decisions**: Confirmed decisions stay visible
+- **File focus**: References to current files score higher
+
+## Side Conversations
+
+hyle supports parallel "side conversations" using free models for auxiliary tasks:
+
+```bash
+# Main coding session
+hyle --free
+
+# In another terminal: docs maintenance
+hyle --backburner --watch-docs
+```
+
+Side conversations can:
+- Watch for code changes and suggest doc updates
+- Maintain a changelog from git history
+- Keep README synchronized with code structure
+- Generate API documentation stubs
+
+## Self-Bootstrapping
+
+hyle can analyze and improve its own codebase:
+
+```bash
+# Run self-analysis
+hyle /analyze
+
+# Generate improvement suggestions for LLM
+hyle /improve
+
+# View module dependency graph
+hyle /deps
+```
+
+Analysis includes:
+- **Health score**: Combined metric from tests, dead code, TODOs
+- **Module breakdown**: Lines, functions, tests per module
+- **TODO tracking**: High/medium/low priority items
+- **Dependency graph**: Mermaid diagram of module relationships
+
+The bootstrap system supports:
+- Pre/post-flight test runs before/after changes
+- Automatic commit of successful changes
+- Issue detection and repair suggestions
 
 ## Tests
 

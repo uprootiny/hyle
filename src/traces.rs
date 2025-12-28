@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 /// A single trace sample
 #[derive(Debug, Clone)]
 pub struct TraceSample {
+    #[allow(dead_code)] // Used by last_sample_age()
     pub timestamp: Instant,
     pub value: f64,
 }
@@ -47,6 +48,12 @@ impl TraceBuffer {
 
     pub fn last(&self) -> Option<f64> {
         self.samples.back().map(|s| s.value)
+    }
+
+    /// Get age of most recent sample
+    #[allow(dead_code)] // Utility for debugging
+    pub fn last_sample_age(&self) -> Option<std::time::Duration> {
+        self.samples.back().map(|s| s.timestamp.elapsed())
     }
 
     pub fn average(&self) -> Option<f64> {
@@ -256,32 +263,48 @@ impl Traces {
         }
     }
 
-    /// Render traces as multi-line summary
+    /// Render traces as multi-line summary using buffer labels and units
     pub fn render(&self, width: usize) -> Vec<String> {
         let sw = width.saturating_sub(20).min(30);
 
+        // Helper to render a buffer with its metadata
+        let render_buf = |buf: &TraceBuffer, extra: &str| -> String {
+            format!(
+                "{}: {} [{} {} samples]{}",
+                buf.label,
+                buf.sparkline(sw),
+                buf.len(),
+                buf.unit,
+                extra
+            )
+        };
+
         vec![
             format!(
-                "Tokens: {} [{:>6} total]",
+                "{}: {} [{:>6} total, {} samples]",
+                self.tokens.tokens_per_sec.label,
                 self.tokens.tokens_per_sec.sparkline(sw),
-                format_count(self.tokens.total())
+                format_count(self.tokens.total()),
+                self.tokens.tokens_per_sec.len()
             ),
             format!(
-                "Context: {} [{:>5.1}%]",
+                "{}: {} [{:>5.1}%, {} samples]",
+                self.context.usage.label,
                 self.context.usage.sparkline(sw),
-                self.context.usage.last().unwrap_or(0.0)
+                self.context.usage.last().unwrap_or(0.0),
+                self.context.usage.len()
             ),
-            format!(
-                "Memory: {} [{:>5.1} MB]",
-                self.memory.rss.sparkline(sw),
-                self.memory.rss.last().unwrap_or(0.0)
-            ),
-            format!(
-                "Latency: {} [TTFT {:>4.0}ms]",
-                self.latency.ttft.sparkline(sw),
-                self.latency.ttft.last().unwrap_or(0.0)
-            ),
+            render_buf(&self.memory.rss, &format!(" [{:.1} MB]", self.memory.rss.last().unwrap_or(0.0))),
+            render_buf(&self.latency.ttft, &format!(" [{:.0}ms]", self.latency.ttft.last().unwrap_or(0.0))),
         ]
+    }
+
+    /// Check if any traces have data
+    pub fn has_data(&self) -> bool {
+        !self.tokens.tokens_per_sec.is_empty() ||
+        !self.context.usage.is_empty() ||
+        !self.memory.rss.is_empty() ||
+        !self.latency.ttft.is_empty()
     }
 }
 

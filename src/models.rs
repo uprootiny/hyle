@@ -2,6 +2,8 @@
 //!
 //! Fetches models from OpenRouter, caches them, filters for free models.
 
+#![allow(dead_code)] // Utility functions for model filtering
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -104,6 +106,27 @@ pub fn get_free_models(models: &[Model]) -> Vec<&Model> {
     let mut free: Vec<_> = models.iter().filter(|m| m.is_free()).collect();
     free.sort_by(|a, b| b.context_length.cmp(&a.context_length));
     free
+}
+
+/// Get pricing for a model (prompt, completion) in $/1M tokens
+/// Returns (0.0, 0.0) for free models
+pub fn get_model_pricing(model_id: &str) -> (f64, f64) {
+    // Try to load from cache
+    if let Ok(Some(cache)) = load_cache() {
+        if let Some(model) = cache.models.iter().find(|m| m.id == model_id) {
+            return (model.pricing_prompt, model.pricing_completion);
+        }
+    }
+    // Default to free for unknown models
+    (0.0, 0.0)
+}
+
+/// Calculate cost for a request
+pub fn calculate_cost(model_id: &str, prompt_tokens: u32, completion_tokens: u32) -> f64 {
+    let (prompt_price, completion_price) = get_model_pricing(model_id);
+    // Prices are typically per 1M tokens
+    (prompt_tokens as f64 * prompt_price / 1_000_000.0) +
+    (completion_tokens as f64 * completion_price / 1_000_000.0)
 }
 
 /// Get context window for a model (from cache or default)

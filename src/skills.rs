@@ -5,10 +5,13 @@
 //! - Tools: Low-level operations (e.g., "read_file", "write_file", "run_command")
 //! - Subagents: Specialized workers for specific tasks
 
-use anyhow::Result;
+#![allow(dead_code)] // Forward-looking module
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+use crate::bootstrap::SelfAnalyzer;
+use crate::backburner::{Backburner, parse_test_output};
 
 // ═══════════════════════════════════════════════════════════════
 // TOOL DEFINITIONS
@@ -230,6 +233,24 @@ pub struct Skill {
 /// Built-in skills
 pub fn builtin_skills() -> Vec<Skill> {
     vec![
+        Skill {
+            name: "build".into(),
+            description: "Build the project".into(),
+            prompt_template: "Build the project and report any errors.".into(),
+            required_tools: vec!["shell".into()],
+        },
+        Skill {
+            name: "test".into(),
+            description: "Run project tests".into(),
+            prompt_template: "Run the project tests and report results.".into(),
+            required_tools: vec!["shell".into()],
+        },
+        Skill {
+            name: "update".into(),
+            description: "Update dependencies or self".into(),
+            prompt_template: "Update project dependencies to latest versions.".into(),
+            required_tools: vec!["shell".into()],
+        },
         Skill {
             name: "explain".into(),
             description: "Explain code in detail".into(),
@@ -466,6 +487,653 @@ impl Default for ToolRegistry {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SLASH COMMANDS
+// ═══════════════════════════════════════════════════════════════
+
+/// Result of a slash command
+#[derive(Debug)]
+pub struct SlashResult {
+    pub output: String,
+    pub success: bool,
+}
+
+impl From<ToolResult> for SlashResult {
+    fn from(r: ToolResult) -> Self {
+        SlashResult {
+            output: r.output,
+            success: r.success,
+        }
+    }
+}
+
+/// Slash command context for stateful commands
+pub struct SlashContext {
+    pub project_type: Option<String>,
+    pub model: String,
+    pub session_id: String,
+    pub total_tokens: u64,
+    pub message_count: usize,
+}
+
+/// Execute a slash command directly (no LLM involved)
+pub fn execute_slash_command(cmd: &str, project_type: Option<&str>) -> Option<SlashResult> {
+    execute_slash_command_with_context(cmd, project_type, None)
+}
+
+/// Execute a slash command with full context
+pub fn execute_slash_command_with_context(
+    cmd: &str,
+    project_type: Option<&str>,
+    ctx: Option<&SlashContext>,
+) -> Option<SlashResult> {
+    let parts: Vec<&str> = cmd.trim().splitn(2, ' ').collect();
+    let command = parts.first()?.trim_start_matches('/');
+    let args = parts.get(1).copied().unwrap_or("");
+
+    match command {
+        // === Project Commands ===
+        "build" => Some(run_build(project_type)),
+        "test" => Some(run_test(project_type)),
+        "update" => Some(run_update(project_type)),
+        "clean" => Some(run_clean(project_type)),
+        "check" | "lint" => Some(run_check(project_type)),
+
+        // === Session Commands ===
+        "clear" => Some(SlashResult {
+            output: "CLEAR_CONVERSATION".into(),
+            success: true,
+        }),
+        "compact" => Some(SlashResult {
+            output: "COMPACT_CONVERSATION".into(),
+            success: true,
+        }),
+        "cost" | "tokens" | "usage" => Some(run_cost(ctx)),
+        "status" => {
+            // /status git → git status, otherwise project status
+            if args == "git" {
+                Some(git::status().into())
+            } else {
+                Some(run_status(project_type, ctx))
+            }
+        }
+
+        // === Git Commands ===
+        "git" => Some(run_git(args)),
+        "diff" => Some(git::diff(args == "staged" || args == "--staged").into()),
+        "commit" => Some(run_commit(args)),
+
+        // === Navigation ===
+        "cd" => Some(run_cd(args)),
+        "ls" | "files" => Some(run_ls(args)),
+        "find" | "glob" => Some(tool_glob(if args.is_empty() { "**/*" } else { args }).into()),
+        "grep" | "search" => Some(run_grep(args)),
+
+        // === Utility ===
+        "help" | "?" => Some(slash_help_full()),
+        "doctor" => Some(run_doctor()),
+        "version" => Some(SlashResult {
+            output: format!("hyle v{}", env!("CARGO_PKG_VERSION")),
+            success: true,
+        }),
+        "model" | "models" => Some(SlashResult {
+            output: ctx.map(|c| format!("Current model: {}", c.model)).unwrap_or_else(|| "unknown".into()),
+            success: true,
+        }),
+        "switch" => Some(SlashResult {
+            // Return the switch target - ui.rs will handle actual switching
+            output: if args.is_empty() {
+                "SWITCH_MODEL_PICKER".into() // Signal to show picker
+            } else {
+                format!("SWITCH_MODEL:{}", args) // Signal to switch to specific model
+            },
+            success: true,
+        }),
+
+        // === Editor Integration ===
+        "edit" | "open" => Some(run_edit(args)),
+        "view" | "cat" | "read" => Some(tool_read_file(args).into()),
+
+        // === Self-Analysis ===
+        "analyze" | "health" => Some(run_analyze()),
+        "improve" => Some(run_improve()),
+        "deps" | "graph" => Some(run_deps()),
+        "selftest" => Some(run_selftest()),
+
+        // === Patch Operations ===
+        "apply" => Some(run_apply(args)),
+        "revert" => Some(run_revert(args)),
+
+        _ => None, // Unknown command, let LLM handle
+    }
+}
+
+fn run_build(project_type: Option<&str>) -> SlashResult {
+    let cmd = match project_type {
+        Some("Rust") => "cargo build",
+        Some("Node.js") => "npm run build",
+        Some("Python") => "python -m build",
+        Some("Go") => "go build ./...",
+        _ => "make build 2>/dev/null || cargo build 2>/dev/null || npm run build 2>/dev/null",
+    };
+    let result = tool_shell(cmd, None);
+    SlashResult { output: result.output, success: result.success }
+}
+
+fn run_test(project_type: Option<&str>) -> SlashResult {
+    let cmd = match project_type {
+        Some("Rust") => "cargo test",
+        Some("Node.js") => "npm test",
+        Some("Python") => "pytest",
+        Some("Go") => "go test ./...",
+        _ => "make test 2>/dev/null || cargo test 2>/dev/null || npm test 2>/dev/null || pytest 2>/dev/null",
+    };
+    let result = tool_shell(cmd, None);
+    SlashResult { output: result.output, success: result.success }
+}
+
+fn run_update(project_type: Option<&str>) -> SlashResult {
+    let cmd = match project_type {
+        Some("Rust") => "cargo update",
+        Some("Node.js") => "npm update",
+        Some("Python") => "pip install --upgrade -r requirements.txt",
+        Some("Go") => "go get -u ./...",
+        _ => "cargo update 2>/dev/null || npm update 2>/dev/null",
+    };
+    let result = tool_shell(cmd, None);
+    SlashResult { output: result.output, success: result.success }
+}
+
+fn run_clean(project_type: Option<&str>) -> SlashResult {
+    let cmd = match project_type {
+        Some("Rust") => "cargo clean",
+        Some("Node.js") => "rm -rf node_modules && npm install",
+        Some("Python") => "find . -type d -name __pycache__ -exec rm -rf {} +",
+        Some("Go") => "go clean -cache",
+        _ => "cargo clean 2>/dev/null || rm -rf node_modules 2>/dev/null",
+    };
+    let result = tool_shell(cmd, None);
+    SlashResult { output: result.output, success: result.success }
+}
+
+fn run_check(project_type: Option<&str>) -> SlashResult {
+    let cmd = match project_type {
+        Some("Rust") => "cargo check && cargo clippy",
+        Some("Node.js") => "npm run lint",
+        Some("Python") => "ruff check . || flake8",
+        Some("Go") => "go vet ./...",
+        _ => "cargo check 2>/dev/null || npm run lint 2>/dev/null",
+    };
+    let result = tool_shell(cmd, None);
+    SlashResult { output: result.output, success: result.success }
+}
+
+fn slash_help_full() -> SlashResult {
+    SlashResult {
+        output: r#"═══ Project ═══
+  /build          Build the project
+  /test           Run tests
+  /check, /lint   Run lints and checks
+  /update         Update dependencies
+  /clean          Clean build artifacts
+
+═══ Session ═══
+  /clear          Clear conversation history
+  /compact        Summarize and compact history
+  /cost, /tokens  Show token usage
+  /status         Show session status
+  /model          Show current model
+  /switch [name]  Switch to different model
+
+═══ Git ═══
+  /git <cmd>      Run git command
+  /diff [staged]  Show git diff
+  /commit <msg>   Commit with message
+
+═══ Files ═══
+  /ls [path]      List files
+  /find <pattern> Find files (glob)
+  /grep <pattern> Search in files
+  /view <file>    View file contents
+  /edit <file>    Open in $EDITOR
+
+═══ Utility ═══
+  /help, /?       Show this help
+  /doctor         Run diagnostics
+  /version        Show version
+  /cd <path>      Change directory
+
+═══ Self-Analysis ═══
+  /analyze        Codebase health analysis
+  /improve        Generate improvement suggestions
+  /deps           Show module dependency graph
+  /selftest       Run cargo test and parse results
+
+═══ Patch Operations ═══
+  /apply <file>   Apply unified diff to file
+  /revert <file>  Restore from .bak backup"#.into(),
+        success: true,
+    }
+}
+
+fn run_cost(ctx: Option<&SlashContext>) -> SlashResult {
+    match ctx {
+        Some(c) => SlashResult {
+            output: format!(
+                "Session: {}\nMessages: {}\nTokens: {}\nModel: {}",
+                c.session_id, c.message_count, c.total_tokens, c.model
+            ),
+            success: true,
+        },
+        None => SlashResult {
+            output: "No session context available".into(),
+            success: false,
+        },
+    }
+}
+
+fn run_status(project_type: Option<&str>, ctx: Option<&SlashContext>) -> SlashResult {
+    let mut lines = vec![];
+
+    if let Some(pt) = project_type {
+        lines.push(format!("Project type: {}", pt));
+    }
+
+    if let Some(c) = ctx {
+        lines.push(format!("Model: {}", c.model));
+        lines.push(format!("Session: {}", c.session_id));
+        lines.push(format!("Messages: {}", c.message_count));
+        lines.push(format!("Tokens: {}", c.total_tokens));
+    }
+
+    if git::is_repo() {
+        if let Some(branch) = git::current_branch() {
+            lines.push(format!("Git branch: {}", branch));
+        }
+    }
+
+    SlashResult {
+        output: if lines.is_empty() { "No status available".into() } else { lines.join("\n") },
+        success: true,
+    }
+}
+
+fn run_git(args: &str) -> SlashResult {
+    if args.is_empty() {
+        git::status().into()
+    } else {
+        tool_shell(&format!("git {}", args), None).into()
+    }
+}
+
+fn run_commit(msg: &str) -> SlashResult {
+    if msg.is_empty() {
+        SlashResult {
+            output: "Usage: /commit <message>".into(),
+            success: false,
+        }
+    } else {
+        git::commit(msg).into()
+    }
+}
+
+fn run_cd(path: &str) -> SlashResult {
+    if path.is_empty() {
+        SlashResult {
+            output: std::env::current_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "unknown".into()),
+            success: true,
+        }
+    } else {
+        match std::env::set_current_dir(path) {
+            Ok(()) => SlashResult {
+                output: format!("Changed to: {}", path),
+                success: true,
+            },
+            Err(e) => SlashResult {
+                output: format!("cd failed: {}", e),
+                success: false,
+            },
+        }
+    }
+}
+
+fn run_ls(path: &str) -> SlashResult {
+    let target = if path.is_empty() { "." } else { path };
+    tool_shell(&format!("ls -la {}", target), None).into()
+}
+
+fn run_grep(args: &str) -> SlashResult {
+    if args.is_empty() {
+        SlashResult {
+            output: "Usage: /grep <pattern> [path]".into(),
+            success: false,
+        }
+    } else {
+        tool_shell(&format!("grep -rn --color=never {} .", args), None).into()
+    }
+}
+
+fn run_edit(path: &str) -> SlashResult {
+    if path.is_empty() {
+        SlashResult {
+            output: "Usage: /edit <file>".into(),
+            success: false,
+        }
+    } else {
+        let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".into());
+        SlashResult {
+            output: format!("Open with: {} {}", editor, path),
+            success: true,
+        }
+    }
+}
+
+fn run_improve() -> SlashResult {
+    match SelfAnalyzer::new() {
+        Ok(analyzer) => {
+            match analyzer.improvement_prompt() {
+                Ok(prompt) => SlashResult {
+                    output: prompt,
+                    success: true,
+                },
+                Err(e) => SlashResult {
+                    output: format!("Failed to generate improvement prompt: {}", e),
+                    success: false,
+                }
+            }
+        }
+        Err(e) => SlashResult {
+            output: format!("Not in hyle project: {}", e),
+            success: false,
+        }
+    }
+}
+
+fn run_deps() -> SlashResult {
+    match SelfAnalyzer::new() {
+        Ok(analyzer) => {
+            match analyzer.dependency_graph() {
+                Ok(graph) => SlashResult {
+                    output: format!("Module Dependencies (Mermaid):\n\n```mermaid\n{}\n```", graph),
+                    success: true,
+                },
+                Err(e) => SlashResult {
+                    output: format!("Failed to generate dependency graph: {}", e),
+                    success: false,
+                }
+            }
+        }
+        Err(e) => SlashResult {
+            output: format!("Not in hyle project: {}", e),
+            success: false,
+        }
+    }
+}
+
+fn run_apply(args: &str) -> SlashResult {
+    use crate::tools::{apply_patch, preview_changes};
+
+    let parts: Vec<&str> = args.splitn(2, ' ').collect();
+    if parts.is_empty() || parts[0].is_empty() {
+        return SlashResult {
+            output: "Usage: /apply <file> [diff]\n\nApplies a unified diff to a file.\nIf diff is not provided, reads from stdin or last clipboard.\n\nExamples:\n  /apply src/main.rs\n  /apply src/main.rs \"--- a/...\"".into(),
+            success: false,
+        };
+    }
+
+    let path = parts[0];
+    let file_path = std::path::Path::new(path);
+
+    // Read original file
+    let original = match std::fs::read_to_string(file_path) {
+        Ok(content) => content,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return SlashResult {
+            output: format!("Failed to read {}: {}", path, e),
+            success: false,
+        }
+    };
+
+    // Get diff content
+    let diff = if parts.len() > 1 {
+        parts[1].to_string()
+    } else {
+        // Try to get from environment or return usage
+        return SlashResult {
+            output: format!(
+                "No diff provided. Usage: /apply {} \"<diff content>\"\n\nOr pipe diff: cat patch.diff | hyle /apply {}",
+                path, path
+            ),
+            success: false,
+        };
+    };
+
+    // Apply patch
+    match apply_patch(&original, &diff) {
+        Ok(patched) => {
+            // Show preview
+            let preview = preview_changes(&original, &patched, path);
+
+            // Backup original
+            if file_path.exists() {
+                let backup = file_path.with_extension("bak");
+                if let Err(e) = std::fs::copy(file_path, &backup) {
+                    return SlashResult {
+                        output: format!("Failed to backup: {}", e),
+                        success: false,
+                    };
+                }
+            }
+
+            // Write patched content
+            match std::fs::write(file_path, &patched) {
+                Ok(()) => SlashResult {
+                    output: format!("{}\n\nApplied successfully. Backup saved as {}.bak", preview, path),
+                    success: true,
+                },
+                Err(e) => SlashResult {
+                    output: format!("Failed to write: {}", e),
+                    success: false,
+                }
+            }
+        }
+        Err(e) => SlashResult {
+            output: format!("Failed to apply patch: {}", e),
+            success: false,
+        }
+    }
+}
+
+fn run_revert(args: &str) -> SlashResult {
+    if args.is_empty() {
+        return SlashResult {
+            output: "Usage: /revert <file>\n\nRestores a file from its .bak backup.".into(),
+            success: false,
+        };
+    }
+
+    let path = std::path::Path::new(args);
+    let backup = path.with_extension("bak");
+
+    if !backup.exists() {
+        return SlashResult {
+            output: format!("No backup found: {}", backup.display()),
+            success: false,
+        };
+    }
+
+    match std::fs::copy(&backup, path) {
+        Ok(_) => {
+            // Remove backup after successful restore
+            std::fs::remove_file(&backup).ok();
+            SlashResult {
+                output: format!("Reverted {} from backup", args),
+                success: true,
+            }
+        }
+        Err(e) => SlashResult {
+            output: format!("Failed to revert: {}", e),
+            success: false,
+        }
+    }
+}
+
+fn run_selftest() -> SlashResult {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+    // Check if we're in a Rust project
+    if !cwd.join("Cargo.toml").exists() {
+        return SlashResult {
+            output: "Not in a Rust project (no Cargo.toml)".into(),
+            success: false,
+        };
+    }
+
+    // Run cargo test and capture output
+    let start = std::time::Instant::now();
+    let output = std::process::Command::new("cargo")
+        .args(["test", "--", "--color=never"])
+        .current_dir(&cwd)
+        .output();
+
+    let duration = start.elapsed();
+
+    match output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+
+            let results = parse_test_output(&stdout, &stderr);
+
+            let mut out = String::new();
+            out.push_str(&format!("Test Results ({:.1}s)\n", duration.as_secs_f64()));
+            out.push_str(&format!("═══════════════════════════\n"));
+            out.push_str(&format!("Passed:  {}\n", results.passed));
+            out.push_str(&format!("Failed:  {}\n", results.failed));
+            out.push_str(&format!("Ignored: {}\n", results.ignored));
+
+            if !results.failed_tests.is_empty() {
+                out.push_str(&format!("\nFailed Tests:\n"));
+                for name in &results.failed_tests {
+                    out.push_str(&format!("  ✗ {}\n", name));
+                }
+            }
+
+            // Add summary
+            if results.success() {
+                out.push_str(&format!("\n✓ All tests passed!"));
+            } else {
+                out.push_str(&format!("\n✗ {} tests failed", results.failed));
+            }
+
+            SlashResult {
+                output: out,
+                success: results.success(),
+            }
+        }
+        Err(e) => SlashResult {
+            output: format!("Failed to run tests: {}", e),
+            success: false,
+        }
+    }
+}
+
+fn run_analyze() -> SlashResult {
+    match SelfAnalyzer::new() {
+        Ok(analyzer) => {
+            match analyzer.analyze() {
+                Ok(analysis) => {
+                    let mut output = format!("{}", analysis);
+
+                    // Add top modules by size
+                    output.push_str("\nTop Modules:\n");
+                    for m in analysis.modules.iter().take(5) {
+                        output.push_str(&format!(
+                            "  {} ({} lines, {} tests, {:.0}% doc)\n",
+                            m.name, m.lines, m.tests, m.doc_coverage * 100.0
+                        ));
+                    }
+
+                    // Add high priority TODOs
+                    let high_todos: Vec<_> = analysis.todos.iter()
+                        .filter(|t| t.priority == crate::bootstrap::TodoPriority::High)
+                        .take(5)
+                        .collect();
+
+                    if !high_todos.is_empty() {
+                        output.push_str("\nHigh Priority TODOs:\n");
+                        for todo in high_todos {
+                            output.push_str(&format!(
+                                "  {}:{}: {}\n",
+                                todo.file.file_name().unwrap_or_default().to_string_lossy(),
+                                todo.line,
+                                todo.text.chars().take(60).collect::<String>()
+                            ));
+                        }
+                    }
+
+                    SlashResult { output, success: true }
+                }
+                Err(e) => SlashResult {
+                    output: format!("Analysis failed: {}", e),
+                    success: false,
+                }
+            }
+        }
+        Err(e) => SlashResult {
+            output: format!("Not in hyle project: {}", e),
+            success: false,
+        }
+    }
+}
+
+fn run_doctor() -> SlashResult {
+    let mut lines = vec!["hyle doctor".to_string(), "".to_string()];
+
+    // Check git
+    let git_ok = git::is_repo();
+    lines.push(format!("[{}] Git repo: {}",
+        if git_ok { "✓" } else { "○" },
+        if git_ok { "detected" } else { "not a repo" }
+    ));
+
+    // Check project files
+    let has_cargo = std::path::Path::new("Cargo.toml").exists();
+    let has_package = std::path::Path::new("package.json").exists();
+    let has_pyproject = std::path::Path::new("pyproject.toml").exists();
+
+    if has_cargo {
+        lines.push("[✓] Cargo.toml found (Rust project)".into());
+    }
+    if has_package {
+        lines.push("[✓] package.json found (Node project)".into());
+    }
+    if has_pyproject {
+        lines.push("[✓] pyproject.toml found (Python project)".into());
+    }
+    if !has_cargo && !has_package && !has_pyproject {
+        lines.push("[○] No recognized project manifest".into());
+    }
+
+    // Check tools
+    let has_rg = tool_shell("which rg", None).success;
+    let has_fd = tool_shell("which fd", None).success;
+    lines.push(format!("[{}] ripgrep: {}", if has_rg { "✓" } else { "○" }, if has_rg { "available" } else { "not found" }));
+    lines.push(format!("[{}] fd: {}", if has_fd { "✓" } else { "○" }, if has_fd { "available" } else { "not found" }));
+
+    SlashResult {
+        output: lines.join("\n"),
+        success: true,
+    }
+}
+
+/// Check if input is a slash command
+pub fn is_slash_command(input: &str) -> bool {
+    input.trim().starts_with('/')
 }
 
 #[cfg(test)]

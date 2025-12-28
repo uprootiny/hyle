@@ -5,6 +5,8 @@
 //! - Apply patches
 //! - Tool call infrastructure for self-bootstrapping
 
+#![allow(dead_code)] // Tool infrastructure for self-bootstrapping
+
 use anyhow::{Context, Result};
 use similar::TextDiff;
 use std::fs;
@@ -403,6 +405,7 @@ impl ToolExecutor {
             "glob" => self.exec_glob(call),
             "grep" => self.exec_grep(call),
             "bash" => self.exec_bash(call, kill),
+            "patch" | "diff" => self.exec_patch(call),
             _ => Err(anyhow::anyhow!("Unknown tool: {}", call.name)),
         };
 
@@ -488,6 +491,51 @@ impl ToolExecutor {
                 call.append_output(&format!("{}:{}: {}\n", path, i + 1, line));
             }
         }
+        Ok(())
+    }
+
+    fn exec_patch(&self, call: &mut ToolCall) -> Result<()> {
+        let path = call.args.get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("patch: missing 'path' argument"))?;
+
+        let diff = call.args.get("diff")
+            .or_else(|| call.args.get("patch"))
+            .or_else(|| call.args.get("content"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("patch: missing 'diff' or 'patch' argument"))?;
+
+        let path = Path::new(path);
+
+        // Read original content
+        let original = if path.exists() {
+            fs::read_to_string(path)
+                .with_context(|| format!("Failed to read {}", path.display()))?
+        } else {
+            // New file - start from empty
+            String::new()
+        };
+
+        // Apply the patch
+        let patched = apply_patch(&original, diff)?;
+
+        // Preview the change
+        let preview = preview_changes(&original, &patched, &path.display().to_string());
+        call.append_output(&format!("Preview:\n{}\n", preview));
+
+        // Create backup if file exists
+        if path.exists() {
+            let backup = path.with_extension("bak");
+            fs::copy(path, &backup)
+                .with_context(|| format!("Failed to backup {}", path.display()))?;
+            call.append_output(&format!("Backed up to: {}\n", backup.display()));
+        }
+
+        // Write patched content
+        fs::write(path, &patched)
+            .with_context(|| format!("Failed to write {}", path.display()))?;
+
+        call.append_output(&format!("Patched {} ({} bytes)\n", path.display(), patched.len()));
         Ok(())
     }
 
@@ -587,6 +635,7 @@ pub fn generate_diff(original: &str, modified: &str, filename: &str) -> String {
 }
 
 /// Parse a unified diff and extract hunks
+#[derive(Debug, Clone)]
 pub struct DiffHunk {
     pub old_start: usize,
     pub old_count: usize,
@@ -595,26 +644,180 @@ pub struct DiffHunk {
     pub lines: Vec<DiffLine>,
 }
 
+#[derive(Debug, Clone)]
 pub enum DiffLine {
     Context(String),
     Delete(String),
     Insert(String),
 }
 
-/// Apply a patch to a file (simple implementation)
-pub fn apply_patch(original: &str, patch: &str) -> Result<String> {
-    // Very simple patch application - just use the "modified" content
-    // For a real implementation, we'd parse the unified diff format
+/// Parse unified diff format into hunks
+pub fn parse_unified_diff(patch: &str) -> Vec<DiffHunk> {
+    let mut hunks = Vec::new();
+    let mut current_hunk: Option<DiffHunk> = None;
 
-    // For now, if the patch looks like a unified diff, try to apply it
-    if patch.starts_with("---") || patch.starts_with("diff") {
-        // TODO: Implement proper unified diff parsing and application
-        // For now, return original unchanged
-        Ok(original.to_string())
-    } else {
-        // Not a unified diff, return as-is
-        Ok(patch.to_string())
+    for line in patch.lines() {
+        // Parse hunk header: @@ -old_start,old_count +new_start,new_count @@
+        if line.starts_with("@@") && line.contains("@@") {
+            // Save previous hunk
+            if let Some(hunk) = current_hunk.take() {
+                hunks.push(hunk);
+            }
+
+            // Parse header like "@@ -1,4 +1,5 @@" or "@@ -1 +1 @@"
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 3 {
+                let old_part = parts[1].trim_start_matches('-');
+                let new_part = parts[2].trim_start_matches('+');
+
+                let (old_start, old_count) = parse_range(old_part);
+                let (new_start, new_count) = parse_range(new_part);
+
+                current_hunk = Some(DiffHunk {
+                    old_start,
+                    old_count,
+                    new_start,
+                    new_count,
+                    lines: Vec::new(),
+                });
+            }
+        } else if let Some(ref mut hunk) = current_hunk {
+            // Parse hunk content
+            if let Some(content) = line.strip_prefix(' ') {
+                hunk.lines.push(DiffLine::Context(content.to_string()));
+            } else if let Some(content) = line.strip_prefix('-') {
+                hunk.lines.push(DiffLine::Delete(content.to_string()));
+            } else if let Some(content) = line.strip_prefix('+') {
+                hunk.lines.push(DiffLine::Insert(content.to_string()));
+            } else if line.is_empty() {
+                // Empty context line
+                hunk.lines.push(DiffLine::Context(String::new()));
+            }
+            // Skip header lines like "---", "+++"
+        }
     }
+
+    // Save last hunk
+    if let Some(hunk) = current_hunk {
+        hunks.push(hunk);
+    }
+
+    hunks
+}
+
+/// Parse range like "1,4" or "1" into (start, count)
+fn parse_range(s: &str) -> (usize, usize) {
+    if let Some((start, count)) = s.split_once(',') {
+        (
+            start.parse().unwrap_or(1),
+            count.parse().unwrap_or(1),
+        )
+    } else {
+        (s.parse().unwrap_or(1), 1)
+    }
+}
+
+/// Apply a unified diff patch to original text
+pub fn apply_patch(original: &str, patch: &str) -> Result<String> {
+    // If patch doesn't look like a unified diff, treat as replacement
+    if !patch.contains("@@") {
+        return Ok(patch.to_string());
+    }
+
+    let hunks = parse_unified_diff(patch);
+    if hunks.is_empty() {
+        return Ok(original.to_string());
+    }
+
+    let original_lines: Vec<&str> = original.lines().collect();
+    let mut result_lines: Vec<String> = Vec::new();
+    let mut old_pos = 0; // Current position in original
+
+    for hunk in &hunks {
+        // Copy unchanged lines before this hunk
+        let hunk_start = hunk.old_start.saturating_sub(1); // Convert to 0-indexed
+        while old_pos < hunk_start && old_pos < original_lines.len() {
+            result_lines.push(original_lines[old_pos].to_string());
+            old_pos += 1;
+        }
+
+        // Apply hunk
+        for diff_line in &hunk.lines {
+            match diff_line {
+                DiffLine::Context(content) => {
+                    // Context should match original
+                    if old_pos < original_lines.len() {
+                        result_lines.push(content.clone());
+                        old_pos += 1;
+                    }
+                }
+                DiffLine::Delete(_) => {
+                    // Skip this line in original
+                    if old_pos < original_lines.len() {
+                        old_pos += 1;
+                    }
+                }
+                DiffLine::Insert(content) => {
+                    // Add new line
+                    result_lines.push(content.clone());
+                }
+            }
+        }
+    }
+
+    // Copy remaining lines after last hunk
+    while old_pos < original_lines.len() {
+        result_lines.push(original_lines[old_pos].to_string());
+        old_pos += 1;
+    }
+
+    // Join with newlines, preserving trailing newline if original had one
+    let mut result = result_lines.join("\n");
+    if original.ends_with('\n') && !result.is_empty() {
+        result.push('\n');
+    }
+
+    Ok(result)
+}
+
+/// Apply multiple patches to a file, with validation
+pub fn apply_patches_to_file(path: &Path, patches: &[String]) -> Result<()> {
+    let original = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+
+    let mut content = original.clone();
+    for patch in patches {
+        content = apply_patch(&content, patch)?;
+    }
+
+    // Create backup
+    let backup = path.with_extension("bak");
+    fs::write(&backup, &original)
+        .with_context(|| format!("Failed to backup to {}", backup.display()))?;
+
+    // Write patched content
+    fs::write(path, &content)
+        .with_context(|| format!("Failed to write {}", path.display()))?;
+
+    Ok(())
+}
+
+/// Extract target file path from a unified diff
+pub fn extract_diff_target(patch: &str) -> Option<String> {
+    for line in patch.lines() {
+        // Look for "+++ b/path/to/file" format
+        if let Some(path) = line.strip_prefix("+++ b/") {
+            return Some(path.to_string());
+        }
+        // Or "+++ path/to/file" format
+        if let Some(path) = line.strip_prefix("+++ ") {
+            // Skip "/dev/null"
+            if path != "/dev/null" {
+                return Some(path.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Preview changes to a file
@@ -655,6 +858,130 @@ mod tests {
         assert!(preview.contains("Changes to test.txt"));
         // Just check it produces some output
         assert!(!preview.is_empty());
+    }
+
+    #[test]
+    fn test_parse_unified_diff_basic() {
+        let patch = r#"--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,4 @@
+ line 1
+-line 2
++line 2 modified
++line 2.5
+ line 3
+"#;
+        let hunks = parse_unified_diff(patch);
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].old_start, 1);
+        assert_eq!(hunks[0].old_count, 3);
+        assert_eq!(hunks[0].new_start, 1);
+        assert_eq!(hunks[0].new_count, 4);
+        assert_eq!(hunks[0].lines.len(), 5);
+    }
+
+    #[test]
+    fn test_parse_unified_diff_multiple_hunks() {
+        let patch = r#"--- a/test.txt
++++ b/test.txt
+@@ -1,2 +1,2 @@
+ line 1
+-line 2
++line 2 changed
+@@ -10,2 +10,3 @@
+ line 10
++line 10.5
+ line 11
+"#;
+        let hunks = parse_unified_diff(patch);
+        assert_eq!(hunks.len(), 2);
+        assert_eq!(hunks[1].old_start, 10);
+    }
+
+    #[test]
+    fn test_apply_patch_simple() {
+        let original = "line 1\nline 2\nline 3\n";
+        let patch = r#"--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line 2 modified
+ line 3
+"#;
+        let result = apply_patch(original, patch).unwrap();
+        assert_eq!(result, "line 1\nline 2 modified\nline 3\n");
+    }
+
+    #[test]
+    fn test_apply_patch_insert() {
+        let original = "line 1\nline 2\n";
+        let patch = r#"--- a/test.txt
++++ b/test.txt
+@@ -1,2 +1,3 @@
+ line 1
++inserted
+ line 2
+"#;
+        let result = apply_patch(original, patch).unwrap();
+        assert_eq!(result, "line 1\ninserted\nline 2\n");
+    }
+
+    #[test]
+    fn test_apply_patch_delete() {
+        let original = "line 1\nline 2\nline 3\n";
+        let patch = r#"--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,2 @@
+ line 1
+-line 2
+ line 3
+"#;
+        let result = apply_patch(original, patch).unwrap();
+        assert_eq!(result, "line 1\nline 3\n");
+    }
+
+    #[test]
+    fn test_apply_patch_not_a_diff() {
+        let original = "line 1\n";
+        let patch = "completely new content";
+
+        // Non-diff input should return the patch as replacement
+        let result = apply_patch(original, patch).unwrap();
+        assert_eq!(result, "completely new content");
+    }
+
+    #[test]
+    fn test_extract_diff_target() {
+        let patch = r#"--- a/src/main.rs
++++ b/src/main.rs
+@@ -1 +1 @@
+-old
++new
+"#;
+        assert_eq!(extract_diff_target(patch), Some("src/main.rs".to_string()));
+    }
+
+    #[test]
+    fn test_extract_diff_target_no_prefix() {
+        let patch = r#"--- /dev/null
++++ src/new_file.rs
+@@ -0,0 +1 @@
++new content
+"#;
+        assert_eq!(extract_diff_target(patch), Some("src/new_file.rs".to_string()));
+    }
+
+    #[test]
+    fn test_roundtrip_diff_apply() {
+        // Generate a diff, then apply it - should get the modified version
+        let original = "line 1\nline 2\nline 3\n";
+        let modified = "line 1\nline 2 changed\nline 3\n";
+
+        let diff = generate_diff(original, modified, "test.txt");
+        let result = apply_patch(original, &diff).unwrap();
+
+        assert_eq!(result, modified);
     }
 
     // ═══════════════════════════════════════════════════════════════

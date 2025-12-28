@@ -61,6 +61,13 @@ tempfile = "3"
 
 [profile.release]
 opt-level = 3
+lto = "thin"        # Fast LTO - good balance of speed and size
+codegen-units = 16  # Parallel compilation
+strip = true
+
+# For minimal binary size (slow build, use `cargo build --profile=small`)
+[profile.small]
+inherits = "release"
 lto = true
 codegen-units = 1
-strip = true
+panic = "abort"

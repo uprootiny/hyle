@@ -10,6 +10,7 @@ use sysinfo::{System, Networks};
 /// Telemetry sample
 #[derive(Debug, Clone)]
 pub struct Sample {
+    #[allow(dead_code)] // Available for sample age calculation
     pub timestamp: Instant,
     pub cpu_percent: f32,
     pub mem_percent: f32,

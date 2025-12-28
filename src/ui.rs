@@ -7,6 +7,8 @@
 //! - Telemetry display
 //! - Kill/throttle/fullspeed controls
 
+#![allow(dead_code)] // UI has forward-looking features
+
 use anyhow::Result;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
@@ -26,11 +28,19 @@ use tokio::sync::mpsc;
 
 use crate::client::{self, StreamEvent};
 use crate::models::Model;
+use crate::project::{Project, ProjectType};
 use crate::session::Session;
+use crate::skills::{is_slash_command, execute_slash_command_with_context, SlashContext};
 use crate::telemetry::{Telemetry, ThrottleMode, PressureLevel};
 use crate::traces::Traces;
 use crate::tools::{ToolCallTracker, ToolExecutor, ToolCallDisplay};
 use crate::agent::{parse_tool_calls, execute_tool_calls, format_tool_results};
+use crate::eval::ModelTracker;
+use crate::intent::{IntentStack, IntentView, Verbosity};
+use crate::cognitive::{
+    CognitiveConfig, LoopDecision, Momentum, StuckDetector,
+    SalienceContext, SalienceTier, ContextCategory, extract_keywords,
+};
 
 // ═══════════════════════════════════════════════════════════════
 // API KEY PROMPT
@@ -257,12 +267,15 @@ enum TuiMsg {
     Token(String),
     Done(client::TokenUsage),
     Error(String),
+    /// Continue agentic loop with tool results
+    ContinueLoop { results: String, iteration: u8 },
 }
 
 /// Main TUI state
 struct TuiState {
     tab: Tab,
     input: String,
+    cursor_pos: usize, // Cursor position within input
     output: Vec<String>,
     log: Vec<String>,
     telemetry: Telemetry,
@@ -318,6 +331,38 @@ struct TuiState {
     tool_tracker: ToolCallTracker,
     tool_executor: ToolExecutor,
     executing_tools: bool,
+
+    // Model quality tracking
+    model_tracker: ModelTracker,
+    last_prompt: String,
+
+    // Project context for LLM
+    project: Option<Project>,
+
+    // Agentic loop state
+    loop_iteration: u8,
+    max_iterations: u8,
+
+    // Multi-granularity intent tracking
+    intent_stack: IntentStack,
+    intent_view: IntentView,
+
+    // Cognitive architecture state
+    cognitive_config: CognitiveConfig,
+    momentum: Momentum,
+    stuck_detector: StuckDetector,
+
+    // Salience-aware context
+    salience_keywords: Vec<String>,
+    focus_files: Vec<String>,
+
+    // Model management for auto-switch on rate limit
+    current_model: String,
+    rate_limited_models: Vec<String>,
+    api_key: String,
+    rate_limit_pending: bool, // True when we hit rate limit - ESC should offer model switch
+    pending_retry: bool,      // True when we should retry last prompt with new model
+    session_cost: f64,        // Running cost for this session (in $)
 }
 
 /// An artifact (file, diff, etc.)
@@ -364,12 +409,29 @@ enum Integration {
     ReadOnly, // Can view but not control
 }
 
+/// Free models to fall back to on rate limit
+const FREE_MODEL_FALLBACKS: &[&str] = &[
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "google/gemma-2-9b-it:free",
+    "qwen/qwen-2-7b-instruct:free",
+    "mistralai/mistral-7b-instruct:free",
+    "microsoft/phi-3-mini-128k-instruct:free",
+];
+
 impl TuiState {
-    fn new(context_window: u32) -> Self {
+    fn new(context_window: u32, project: Option<Project>, model: &str, api_key: &str) -> Self {
+        let welcome = if let Some(ref p) = project {
+            format!("hyle: {} ({} files, {} lines). Ctrl-C×2 quit, Esc zoom-out.",
+                p.name, p.files.len(), p.total_lines())
+        } else {
+            "Welcome to hyle. Press Ctrl-C twice to quit, Esc to zoom out.".into()
+        };
+
         Self {
             tab: Tab::Chat,
             input: String::new(),
-            output: vec!["Welcome to hyle. Press Ctrl-C twice to quit, Esc to zoom out.".into()],
+            cursor_pos: 0,
+            output: vec![welcome],
             log: Vec::new(),
             telemetry: Telemetry::new(60, 4), // 60 second window, 4Hz
             traces: Traces::new(context_window),
@@ -406,7 +468,76 @@ impl TuiState {
             tool_tracker: ToolCallTracker::new(),
             tool_executor: ToolExecutor::new(),
             executing_tools: false,
+            model_tracker: ModelTracker::new(),
+            last_prompt: String::new(),
+            project,
+            loop_iteration: 0,
+            max_iterations: 10, // Prevent runaway loops
+            // Multi-granularity intent tracking
+            intent_stack: IntentStack::new(),
+            intent_view: IntentView::default(),
+            // Cognitive architecture
+            cognitive_config: CognitiveConfig::default(),
+            momentum: Momentum::default(),
+            stuck_detector: StuckDetector::default(),
+            // Salience tracking
+            salience_keywords: Vec::new(),
+            focus_files: Vec::new(),
+            // Model management
+            current_model: model.to_string(),
+            rate_limited_models: Vec::new(),
+            api_key: api_key.to_string(),
+            rate_limit_pending: false,
+            pending_retry: false,
+            session_cost: 0.0,
         }
+    }
+
+    /// Switch to the next available free model
+    fn switch_to_next_model(&mut self) -> Option<String> {
+        // Add current model to rate-limited list
+        if !self.rate_limited_models.contains(&self.current_model) {
+            self.rate_limited_models.push(self.current_model.clone());
+        }
+
+        // Find next available model
+        for model in FREE_MODEL_FALLBACKS {
+            if !self.rate_limited_models.contains(&model.to_string()) {
+                let old = self.current_model.clone();
+                self.current_model = model.to_string();
+                self.log(format!("Rate limited on {}. Switching to {}", old, model));
+                return Some(model.to_string());
+            }
+        }
+
+        None // All models exhausted
+    }
+
+    /// Check if error is a rate limit and handle it
+    /// Returns (handled, should_retry)
+    fn handle_rate_limit_error(&mut self, error: &str) -> (bool, bool) {
+        if error.contains("429") || error.to_lowercase().contains("rate") ||
+           error.to_lowercase().contains("too many requests") {
+            self.rate_limit_pending = true;
+
+            if let Some(new_model) = self.switch_to_next_model() {
+                self.output.push(format!("\n[Rate limited on {}. Auto-switching to {}]",
+                    self.rate_limited_models.last().unwrap_or(&"?".to_string()),
+                    new_model));
+                self.output.push("[Press ESC to select a different model, or wait to retry...]".into());
+                self.rate_limit_pending = false; // Switched, no longer pending
+                return (true, true); // Handled, should retry
+            } else {
+                self.output.push("\n[All free models rate limited. Press ESC to pick a different model.]".into());
+                return (true, false); // Handled, but no retry - user must pick
+            }
+        }
+        (false, false)
+    }
+
+    /// Clear rate limit state (when user selects new model or succeeds)
+    fn clear_rate_limit(&mut self) {
+        self.rate_limit_pending = false;
     }
 
     /// Scan for sessions (hyle and foreign)
@@ -516,7 +647,7 @@ impl TuiState {
         }
 
         self.executing_tools = true;
-        self.log(&format!("Executing {} tool call(s)...", calls.len()));
+        self.log(format!("Executing {} tool call(s)...", calls.len()));
 
         // Execute all tool calls
         let results = execute_tool_calls(&calls, &mut self.tool_executor, &mut self.tool_tracker);
@@ -531,7 +662,7 @@ impl TuiState {
                 self.output.push(format!("  {}", display.header()));
 
                 if result.is_err() {
-                    self.log(&format!("Tool {} failed", call.name));
+                    self.log(format!("Tool {} failed", call.name));
                 }
             }
         }
@@ -546,6 +677,17 @@ impl TuiState {
     /// Get tool status for status bar
     fn tool_status(&self) -> String {
         self.tool_tracker.status_summary(self.tick)
+    }
+
+    /// Get project type as string for slash commands
+    fn project_type_str(&self) -> Option<&'static str> {
+        self.project.as_ref().map(|p| match p.project_type {
+            ProjectType::Rust => "Rust",
+            ProjectType::Node => "Node.js",
+            ProjectType::Python => "Python",
+            ProjectType::Go => "Go",
+            ProjectType::Unknown => "Unknown",
+        })
     }
 
     /// Handle Ctrl-C - returns true if should exit
@@ -616,6 +758,7 @@ impl TuiState {
                 self.saved_input = self.input.clone();
                 self.history_index = Some(self.prompt_history.len() - 1);
                 self.input = self.prompt_history.last().unwrap().clone();
+                self.cursor_pos = self.input.len();
             }
             Some(0) => {
                 // Already at oldest
@@ -623,6 +766,7 @@ impl TuiState {
             Some(i) => {
                 self.history_index = Some(i - 1);
                 self.input = self.prompt_history[i - 1].clone();
+                self.cursor_pos = self.input.len();
             }
         }
     }
@@ -635,10 +779,12 @@ impl TuiState {
                 // Restore saved input
                 self.history_index = None;
                 self.input = std::mem::take(&mut self.saved_input);
+                self.cursor_pos = self.input.len();
             }
             Some(i) => {
                 self.history_index = Some(i + 1);
                 self.input = self.prompt_history[i + 1].clone();
+                self.cursor_pos = self.input.len();
             }
         }
     }
@@ -683,11 +829,15 @@ impl TuiState {
         self.trim_output_buffer();
     }
 
-    /// Append to last line (for streaming tokens)
+    /// Append to last line (for streaming tokens) - incremental update
     fn append_to_last(&mut self, text: &str) {
         if let Some(last) = self.output.last_mut() {
             last.push_str(text);
-            self.mark_dirty();
+            // Incremental cache update: just append to cache instead of full rebuild
+            if !self.output_dirty {
+                self.output_cache.push_str(text);
+            }
+            // Don't mark dirty - we updated incrementally
         }
     }
 
@@ -705,12 +855,216 @@ impl TuiState {
         let now = chrono::Local::now().format("%H:%M:%S");
         self.log.push(format!("[{}] {}", now, msg.into()));
     }
+
+    // === COGNITIVE ARCHITECTURE METHODS ===
+
+    /// Update intent from user prompt
+    fn update_intent_from_prompt(&mut self, prompt: &str) {
+        use crate::intent::{Intent, IntentKind};
+
+        // Extract keywords for salience tracking
+        self.salience_keywords = extract_keywords(prompt);
+
+        // Extract file references for focus tracking
+        self.focus_files = prompt.split_whitespace()
+            .filter(|w| w.contains('.') && (
+                w.ends_with(".rs") || w.ends_with(".py") || w.ends_with(".js") ||
+                w.ends_with(".ts") || w.ends_with(".go") || w.ends_with(".md") ||
+                w.ends_with(".json") || w.ends_with(".toml") || w.ends_with(".yaml")
+            ))
+            .map(|s| s.to_string())
+            .collect();
+
+        // Simple heuristic: check if this looks like a new task or continuation
+        let prompt_lower = prompt.to_lowercase();
+
+        // Detect intent type
+        if prompt_lower.starts_with("fix ") || prompt_lower.contains("bug") || prompt_lower.contains("error") {
+            let intent = Intent::new(&prompt[..prompt.len().min(100)], IntentKind::Fix);
+            self.intent_stack.push(intent);
+        } else if prompt_lower.starts_with("also ") || prompt_lower.starts_with("and ") {
+            // Continuation of existing task
+            if let Some(active) = self.intent_stack.active() {
+                let intent = Intent::subtask(&prompt[..prompt.len().min(100)], &active.id);
+                self.intent_stack.push(intent);
+            }
+        } else if self.intent_stack.is_empty() || prompt.len() > 50 {
+            // New primary intent
+            let intent = Intent::primary(&prompt[..prompt.len().min(100)]);
+            self.intent_stack.push(intent);
+        }
+
+        // Update the view
+        self.intent_view = IntentView::from_stack(&self.intent_stack);
+    }
+
+    /// Assess whether to continue the agentic loop
+    fn should_continue_loop(&self, tool_results: &str) -> LoopDecision {
+        use crate::cognitive::LoopDecision;
+
+        // Check iteration limit
+        if self.loop_iteration >= self.max_iterations {
+            return LoopDecision::MaxIterations;
+        }
+
+        // Check if stuck
+        if self.stuck_detector.is_stuck() {
+            return LoopDecision::Stuck {
+                reason: "Repeated actions or errors detected".into(),
+                suggestions: vec![
+                    "Try a different approach".into(),
+                    "Break down the task into smaller steps".into(),
+                ],
+            };
+        }
+
+        // Check momentum
+        if self.momentum.should_pause() {
+            return LoopDecision::PauseConcern {
+                reason: "Multiple tool failures detected".into(),
+            };
+        }
+
+        // Check for completion signals in results
+        if tool_results.contains("Task complete") ||
+           tool_results.contains("No more changes needed") ||
+           tool_results.contains("All done") {
+            return LoopDecision::Complete {
+                summary: "Task appears complete based on tool results".into(),
+            };
+        }
+
+        LoopDecision::Continue
+    }
+
+    /// Record tool execution outcome for momentum tracking
+    fn record_tool_outcome(&mut self, tool_name: &str, success: bool, was_useful: bool) {
+        use crate::cognitive::ToolOutcome;
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // Record in momentum
+        self.momentum.record(ToolOutcome {
+            tool_name: tool_name.to_string(),
+            success,
+            was_useful,
+        });
+
+        // Record in stuck detector
+        let mut hasher = DefaultHasher::new();
+        tool_name.hash(&mut hasher);
+        self.stuck_detector.record_action(hasher.finish());
+
+        if !success {
+            self.stuck_detector.record_error(tool_name);
+        }
+
+        if was_useful {
+            self.stuck_detector.record_change();
+        } else {
+            self.stuck_detector.record_no_change();
+        }
+    }
+
+    /// Get context for LLM with intent info
+    fn get_llm_context(&self) -> String {
+        let mut ctx = String::new();
+
+        // Add intent view at appropriate verbosity based on loop iteration
+        let verbosity = if self.loop_iteration == 0 {
+            Verbosity::Full  // First iteration: full context
+        } else if self.loop_iteration < 3 {
+            Verbosity::Normal
+        } else {
+            Verbosity::Minimal  // Later iterations: minimal
+        };
+
+        ctx.push_str(&self.intent_view.for_llm(verbosity));
+        ctx
+    }
+
+    /// Build salience-aware context from conversation history
+    /// Returns context string with most salient items in full detail
+    fn build_salient_context(&self, messages: &[serde_json::Value], budget_tokens: usize) -> String {
+        let mut salience = SalienceContext::new(budget_tokens);
+        salience.set_keywords(self.salience_keywords.clone());
+        salience.set_focus_files(self.focus_files.clone());
+
+        // Process messages from oldest to newest, assigning age
+        let total = messages.len();
+        for (i, msg) in messages.iter().enumerate() {
+            let age = (total - i - 1) as u32;
+            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("unknown");
+            let content = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
+
+            let category = match role {
+                "system" => ContextCategory::SystemPrompt,
+                "user" => ContextCategory::UserMessage,
+                "assistant" => {
+                    // Check if it contains tool calls or errors
+                    if content.contains("```tool") || content.contains("<tool") {
+                        ContextCategory::ToolCall
+                    } else if content.to_lowercase().contains("error") {
+                        ContextCategory::Error
+                    } else {
+                        ContextCategory::AssistantResponse
+                    }
+                }
+                _ => ContextCategory::Summary,
+            };
+
+            // System prompt always at focus tier
+            if role == "system" {
+                salience.add_with_tier(content.to_string(), category, SalienceTier::Focus);
+            } else {
+                salience.add(content.to_string(), category, age);
+            }
+        }
+
+        // Add current intent as high-salience context
+        let intent_ctx = self.intent_view.for_llm(Verbosity::Normal);
+        if !intent_ctx.is_empty() {
+            salience.add_with_tier(
+                format!("[Current Focus]\n{}", intent_ctx),
+                ContextCategory::Intent,
+                SalienceTier::Focus
+            );
+        }
+
+        // Stats available for debugging
+        let _stats = salience.stats();
+
+        salience.build()
+    }
+
+    /// Get salience stats for display
+    fn salience_stats(&self, messages: &[serde_json::Value]) -> String {
+        let mut salience = SalienceContext::new(4000);
+        salience.set_keywords(self.salience_keywords.clone());
+
+        for (i, msg) in messages.iter().enumerate() {
+            let age = (messages.len() - i - 1) as u32;
+            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("unknown");
+            let content = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
+
+            let category = match role {
+                "system" => ContextCategory::SystemPrompt,
+                "user" => ContextCategory::UserMessage,
+                "assistant" => ContextCategory::AssistantResponse,
+                _ => ContextCategory::Summary,
+            };
+
+            salience.add(content.to_string(), category, age);
+        }
+
+        format!("{}", salience.stats())
+    }
 }
 
 /// Run the main TUI
-pub async fn run_tui(api_key: &str, model: &str, paths: Vec<PathBuf>, resume: bool) -> Result<()> {
+pub async fn run_tui(api_key: &str, model: &str, paths: Vec<PathBuf>, resume: bool, project: Option<Project>) -> Result<()> {
     let mut terminal = setup_terminal()?;
-    let result = run_tui_loop(&mut terminal, api_key, model, paths, resume).await;
+    let result = run_tui_loop(&mut terminal, api_key, model, paths, resume, project).await;
     restore_terminal(terminal)?;
     result
 }
@@ -721,10 +1075,11 @@ async fn run_tui_loop(
     model: &str,
     _paths: Vec<PathBuf>,
     resume: bool,
+    project: Option<Project>,
 ) -> Result<()> {
     // Get context window for this model
     let context_window = crate::models::get_context_window(model);
-    let mut state = TuiState::new(context_window);
+    let mut state = TuiState::new(context_window, project, model, api_key);
 
     // Load or create session
     let mut session = if resume {
@@ -757,6 +1112,10 @@ async fn run_tui_loop(
     };
 
     state.log(format!("Model: {} ({}k ctx)", model, context_window / 1000));
+    state.model_tracker.set_model(model);
+
+    // Load existing sessions on startup
+    state.refresh_sessions();
 
     let (tx, mut rx) = mpsc::channel::<TuiMsg>(256);
 
@@ -779,6 +1138,44 @@ async fn run_tui_loop(
             }
         }
 
+        // Handle pending retry after model switch
+        if state.pending_retry && !state.last_prompt.is_empty() {
+            state.pending_retry = false;
+            state.output.push(format!("[Retrying with {}...]", state.current_model));
+            state.mark_dirty();
+
+            // Spawn retry API call
+            let tx = tx.clone();
+            let api_key = state.api_key.clone();
+            let model = state.current_model.clone();
+            let project_clone = state.project.clone();
+            let history = session.messages_for_api();
+            let prompt = state.last_prompt.clone();
+
+            tokio::spawn(async move {
+                match client::stream_completion_full(&api_key, &model, &prompt, project_clone.as_ref(), &history).await {
+                    Ok(mut stream) => {
+                        while let Some(event) = stream.recv().await {
+                            match event {
+                                StreamEvent::Token(t) => {
+                                    let _ = tx.send(TuiMsg::Token(t)).await;
+                                }
+                                StreamEvent::Done(u) => {
+                                    let _ = tx.send(TuiMsg::Done(u)).await;
+                                }
+                                StreamEvent::Error(e) => {
+                                    let _ = tx.send(TuiMsg::Error(e)).await;
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(TuiMsg::Error(e.to_string())).await;
+                    }
+                }
+            });
+        }
+
         // Check for API responses
         while let Ok(msg) = rx.try_recv() {
             match msg {
@@ -799,15 +1196,21 @@ async fn run_tui_loop(
 
                     // Append to output and accumulate response
                     state.current_response.push_str(&t);
-                    if let Some(last) = state.output.last_mut() {
-                        last.push_str(&t);
-                        state.output_dirty = true; // Mark for cache rebuild
-                    }
+                    // Use incremental update to avoid full cache rebuild per token
+                    state.append_to_last(&t);
                 }
                 TuiMsg::Done(usage) => {
                     state.is_generating = false;
                     state.prompt_tokens = usage.prompt_tokens;
                     state.completion_tokens = usage.completion_tokens;
+
+                    // Calculate and accumulate cost
+                    let request_cost = crate::models::calculate_cost(
+                        &state.current_model,
+                        usage.prompt_tokens,
+                        usage.completion_tokens
+                    );
+                    state.session_cost += request_cost;
 
                     // Record traces
                     let duration = state.request_start.elapsed();
@@ -819,6 +1222,24 @@ async fn run_tui_loop(
                     );
                     state.traces.context.record(usage.prompt_tokens);
 
+                    // Evaluate response quality
+                    if !state.current_response.is_empty() && !state.last_prompt.is_empty() {
+                        state.model_tracker.record_response(
+                            &state.last_prompt,
+                            &state.current_response,
+                            usage.completion_tokens as u64
+                        );
+
+                        if let Some(stats) = state.model_tracker.current_stats() {
+                            if stats.should_switch() {
+                                state.log(format!(
+                                    "Quality warning: avg={:.2}, {} consecutive low scores",
+                                    stats.average_quality, stats.consecutive_failures
+                                ));
+                            }
+                        }
+                    }
+
                     // Save assistant message to session
                     if !state.current_response.is_empty() {
                         if let Err(e) = session.add_assistant_message(
@@ -827,6 +1248,39 @@ async fn run_tui_loop(
                         ) {
                             state.log(format!("Session save error: {}", e));
                         }
+
+                        // Process tool calls in the response
+                        let response_copy = state.current_response.clone();
+                        if let Some(tool_feedback) = state.process_tool_calls(&response_copy) {
+                            // Show tool execution results
+                            state.output.push(String::new());
+                            state.output.push("─── Tool Results ───".to_string());
+                            for line in tool_feedback.lines().take(20) {
+                                state.output.push(format!("  {}", line));
+                            }
+                            state.mark_dirty();
+
+                            // AGENTIC LOOP: Continue if we have tool results and haven't hit max iterations
+                            if state.loop_iteration < state.max_iterations {
+                                state.loop_iteration += 1;
+                                state.log(format!("Agentic loop iteration {}/{}", state.loop_iteration, state.max_iterations));
+
+                                // Send continuation message
+                                let tx = tx.clone();
+                                let tool_results = tool_feedback.clone();
+                                let iteration = state.loop_iteration;
+                                tokio::spawn(async move {
+                                    let _ = tx.send(TuiMsg::ContinueLoop {
+                                        results: tool_results,
+                                        iteration,
+                                    }).await;
+                                });
+                            }
+                        } else {
+                            // No tool calls - reset loop counter
+                            state.loop_iteration = 0;
+                        }
+
                         state.current_response.clear();
                     }
 
@@ -845,9 +1299,133 @@ async fn run_tui_loop(
                 }
                 TuiMsg::Error(e) => {
                     state.is_generating = false;
-                    state.output.push(format!("\n[Error: {}]", e));
+                    state.loop_iteration = 0; // Reset on error
+
+                    // Check for rate limit and auto-switch
+                    let (handled, should_retry) = state.handle_rate_limit_error(&e);
+
+                    if handled {
+                        state.mark_dirty();
+                        if should_retry {
+                            // Set flag to retry with new model
+                            state.pending_retry = true;
+                            state.is_generating = true; // Keep generating state
+                            state.log(format!("Rate limit: switched to {}, retrying...", state.current_model));
+                        } else {
+                            state.log("All models rate limited. Press ESC to pick a model.");
+                        }
+                    } else {
+                        state.output.push(format!("\n[Error: {}]", e));
+                        state.mark_dirty();
+                        state.log(format!("Error: {}", e));
+                    }
+                }
+                TuiMsg::ContinueLoop { results, iteration } => {
+                    // AGENTIC LOOP: Continue with tool results
+                    state.output.push(String::new());
+                    state.output.push(format!("─── Continuing (iteration {}) ───", iteration));
                     state.mark_dirty();
-                    state.log(format!("Error: {}", e));
+
+                    // Add tool results to session as a system message
+                    let tool_msg = format!("Tool execution results:\n{}", results);
+                    if let Err(e) = session.add_system_message(&tool_msg) {
+                        state.log(format!("Session save error: {}", e));
+                    }
+
+                    // Use cognitive architecture for loop decision
+                    let decision = state.should_continue_loop(&results);
+                    match decision {
+                        LoopDecision::MaxIterations => {
+                            state.output.push("[Max iterations reached - pausing for input]".into());
+                            state.is_generating = false;
+                            state.loop_iteration = 0;
+                            state.mark_dirty();
+                            continue;
+                        }
+                        LoopDecision::Stuck { reason, suggestions } => {
+                            state.output.push(format!("[Stuck: {}]", reason));
+                            for s in suggestions {
+                                state.output.push(format!("  - {}", s));
+                            }
+                            state.is_generating = false;
+                            state.loop_iteration = 0;
+                            state.stuck_detector.clear();
+                            state.mark_dirty();
+                            continue;
+                        }
+                        LoopDecision::PauseConcern { reason } => {
+                            state.output.push(format!("[Pausing: {}]", reason));
+                            state.is_generating = false;
+                            state.mark_dirty();
+                            continue;
+                        }
+                        LoopDecision::Complete { summary } => {
+                            state.output.push(format!("[Complete: {}]", summary));
+                            state.is_generating = false;
+                            state.loop_iteration = 0;
+                            // Mark active intent as completed
+                            state.intent_stack.pop();
+                            state.intent_view = IntentView::from_stack(&state.intent_stack);
+                            state.mark_dirty();
+                            continue;
+                        }
+                        LoopDecision::Continue => {
+                            // Continue with next iteration
+                        }
+                        _ => {
+                            // Other decisions default to continue
+                        }
+                    }
+
+                    // Build dynamic continuation prompt with intent context
+                    let intent_ctx = state.get_llm_context();
+                    let continuation = if intent_ctx.is_empty() {
+                        "Continue based on the tool results above. If the task is complete, summarize what was done. If more steps are needed, proceed with the next step.".to_string()
+                    } else {
+                        format!("{}\n\nContinue with the next step. If done, summarize.", intent_ctx)
+                    };
+
+                    state.output.push(format!("> {}", if continuation.len() > 60 {
+                        format!("{}...", &continuation[..60])
+                    } else {
+                        continuation.clone()
+                    }));
+                    state.output.push(String::new()); // For response
+                    state.is_generating = true;
+                    state.ttft = None;
+                    state.request_start = std::time::Instant::now();
+                    state.last_token_time = std::time::Instant::now();
+
+                    // Spawn next API call
+                    let tx = tx.clone();
+                    let api_key = state.api_key.clone();
+                    let model = state.current_model.clone(); // Use state model, can switch on rate limit
+                    let project_clone = state.project.clone();
+                    let history = session.messages_for_api();
+                    let cont_prompt = continuation;
+
+                    tokio::spawn(async move {
+                        match client::stream_completion_full(&api_key, &model, &cont_prompt, project_clone.as_ref(), &history).await {
+                            Ok(mut stream) => {
+                                while let Some(event) = stream.recv().await {
+                                    match event {
+                                        StreamEvent::Token(t) => {
+                                            let _ = tx.send(TuiMsg::Token(t)).await;
+                                        }
+                                        StreamEvent::Done(u) => {
+                                            let _ = tx.send(TuiMsg::Done(u)).await;
+                                        }
+                                        StreamEvent::Error(e) => {
+                                            let _ = tx.send(TuiMsg::Error(e)).await;
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                let _ = tx.send(TuiMsg::Error(e.to_string())).await;
+                            }
+                        }
+                    });
                 }
             }
         }
@@ -889,6 +1467,23 @@ async fn run_tui_loop(
                         if state.in_overlay() {
                             // Pop back from overlay view
                             state.pop_view();
+                        } else if state.rate_limit_pending {
+                            // We hit rate limit - show available models
+                            state.output.push(String::new());
+                            state.output.push("─── Available Models (use /switch <model>) ───".into());
+                            for (i, m) in FREE_MODEL_FALLBACKS.iter().enumerate() {
+                                let marker = if state.rate_limited_models.contains(&m.to_string()) {
+                                    "✗" // Rate limited
+                                } else if *m == state.current_model {
+                                    "●" // Current
+                                } else {
+                                    " "
+                                };
+                                state.output.push(format!("  [{}] {}: {}", marker, i + 1, m));
+                            }
+                            state.output.push("─── Type /switch <name> or /switch 1-5 ───".into());
+                            state.rate_limit_pending = false;
+                            state.mark_dirty();
                         } else if state.input.is_empty() {
                             // Clear any selection state, but don't exit
                             state.history_index = None;
@@ -896,6 +1491,7 @@ async fn run_tui_loop(
                         } else {
                             // Clear input
                             state.input.clear();
+                            state.cursor_pos = 0;
                             state.history_index = None;
                         }
                     }
@@ -905,6 +1501,10 @@ async fn run_tui_loop(
                         let idx = views.iter().position(|v| *v == state.tab).unwrap_or(0);
                         state.tab = views[(idx + 1) % views.len()];
                         state.view_stack.clear(); // Clear stack when switching tabs
+                        // Auto-refresh when entering Sessions
+                        if state.tab == View::Sessions {
+                            state.refresh_sessions();
+                        }
                     }
                     // Shift+Tab: cycle backwards
                     KeyCode::BackTab => {
@@ -912,6 +1512,10 @@ async fn run_tui_loop(
                         let idx = views.iter().position(|v| *v == state.tab).unwrap_or(0);
                         state.tab = views[(idx + views.len() - 1) % views.len()];
                         state.view_stack.clear();
+                        // Auto-refresh when entering Sessions
+                        if state.tab == View::Sessions {
+                            state.refresh_sessions();
+                        }
                     }
                     // Quick access to overlay views
                     KeyCode::Char('p') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
@@ -928,6 +1532,10 @@ async fn run_tui_loop(
                         state.throttle = ThrottleMode::Killed;
                         state.log("Operation killed");
                     }
+                    KeyCode::Char('c') if key.modifiers.is_empty() && state.telemetry.spike_snapshot.is_some() => {
+                        state.telemetry.clear_spike();
+                        state.log("Spike snapshot cleared");
+                    }
                     KeyCode::Char('t') if key.modifiers.is_empty() => {
                         state.throttle = ThrottleMode::Throttled;
                         state.log("Switched to throttled mode");
@@ -939,6 +1547,11 @@ async fn run_tui_loop(
                     KeyCode::Char('n') if key.modifiers.is_empty() => {
                         state.throttle = ThrottleMode::Normal;
                         state.log("Switched to normal mode");
+                    }
+                    // Refresh sessions with 'r' in Sessions view
+                    KeyCode::Char('r') if state.tab == View::Sessions => {
+                        state.refresh_sessions();
+                        state.log(format!("Refreshed: {} sessions found", state.detected_sessions.len()));
                     }
                     _ => {}
                 }
@@ -970,29 +1583,106 @@ async fn run_tui_loop(
                                 let prompt = state.input.clone();
                                 state.add_to_history(&prompt);
                                 state.input.clear();
+                                state.cursor_pos = 0;
                                 state.history_index = None;
                                 state.output.push(format!("> {}", prompt));
-                                state.output.push(String::new()); // For response
                                 state.mark_dirty();
+                                state.auto_scroll = true;
+
+                                // Check for slash commands first
+                                if is_slash_command(&prompt) {
+                                    let project_type = state.project_type_str();
+                                    let ctx = SlashContext {
+                                        project_type: project_type.map(|s| s.to_string()),
+                                        model: state.current_model.clone(),
+                                        session_id: session.meta.id.clone(),
+                                        total_tokens: session.meta.total_tokens,
+                                        message_count: session.messages.len(),
+                                    };
+                                    if let Some(result) = execute_slash_command_with_context(&prompt, project_type, Some(&ctx)) {
+                                        // Handle special SWITCH_MODEL signals
+                                        if result.output == "SWITCH_MODEL_PICKER" {
+                                            state.output.push("─── Available Models ───".into());
+                                            for (i, m) in FREE_MODEL_FALLBACKS.iter().enumerate() {
+                                                let marker = if state.rate_limited_models.contains(&m.to_string()) {
+                                                    "✗"
+                                                } else if *m == state.current_model {
+                                                    "●"
+                                                } else {
+                                                    " "
+                                                };
+                                                state.output.push(format!("  [{}] {}: {}", marker, i + 1, m));
+                                            }
+                                            state.output.push("Use /switch <name> or /switch 1-5".into());
+                                            state.mark_dirty();
+                                            continue;
+                                        } else if result.output.starts_with("SWITCH_MODEL:") {
+                                            let target = result.output.trim_start_matches("SWITCH_MODEL:");
+                                            // Try to parse as number first
+                                            let new_model = if let Ok(n) = target.parse::<usize>() {
+                                                FREE_MODEL_FALLBACKS.get(n.saturating_sub(1)).map(|s| s.to_string())
+                                            } else {
+                                                // Find by partial match
+                                                FREE_MODEL_FALLBACKS.iter()
+                                                    .find(|m| m.contains(target))
+                                                    .map(|s| s.to_string())
+                                            };
+
+                                            if let Some(model) = new_model {
+                                                state.current_model = model.clone();
+                                                state.rate_limited_models.clear(); // Clear rate limits when manually switching
+                                                state.rate_limit_pending = false;
+                                                state.output.push(format!("[✓] Switched to: {}", model));
+                                                state.log(format!("Model switched to: {}", model));
+                                            } else {
+                                                state.output.push(format!("[✗] Unknown model: {}", target));
+                                            }
+                                            state.mark_dirty();
+                                            continue;
+                                        }
+
+                                        let status = if result.success { "✓" } else { "✗" };
+                                        state.output.push(format!("[{}] {}", status, prompt));
+                                        for line in result.output.lines().take(50) {
+                                            state.output.push(format!("  {}", line));
+                                        }
+                                        if result.output.lines().count() > 50 {
+                                            state.output.push("  ... (truncated)".into());
+                                        }
+                                        state.mark_dirty();
+                                        state.log(format!("Slash: {} -> {}", prompt, if result.success { "ok" } else { "failed" }));
+                                        continue;
+                                    }
+                                    // Unknown slash command falls through to LLM
+                                }
+
+                                state.output.push(String::new()); // For response
                                 state.is_generating = true;
                                 state.ttft = None;
-                                state.auto_scroll = true; // Auto-scroll on new message
                                 state.request_start = std::time::Instant::now();
                                 state.last_token_time = std::time::Instant::now();
                                 state.log(format!("Sending: {}", &prompt[..prompt.len().min(50)]));
+                                state.last_prompt = prompt.clone();
 
                                 // Save user message to session
                                 if let Err(e) = session.add_user_message(&prompt) {
                                     state.log(format!("Session save error: {}", e));
                                 }
 
-                                // Spawn API call
+                                // Update intent tracking
+                                state.update_intent_from_prompt(&prompt);
+                                state.loop_iteration = 0; // New prompt resets loop counter
+                                state.stuck_detector.clear(); // Clear stuck detection for new task
+
+                                // Spawn API call with session history
                                 let tx = tx.clone();
-                                let api_key = api_key.to_string();
-                                let model = model.to_string();
+                                let api_key = state.api_key.clone();
+                                let model = state.current_model.clone(); // Use state model, can switch on rate limit
+                                let project_clone = state.project.clone();
+                                let history = session.messages_for_api();
 
                                 tokio::spawn(async move {
-                                    match client::stream_completion(&api_key, &model, &prompt).await {
+                                    match client::stream_completion_full(&api_key, &model, &prompt, project_clone.as_ref(), &history).await {
                                         Ok(mut stream) => {
                                             while let Some(event) = stream.recv().await {
                                                 match event {
@@ -1015,11 +1705,94 @@ async fn run_tui_loop(
                                 });
                             }
                         }
-                        KeyCode::Char(c) => {
-                            state.input.push(c);
+                        // Readline: Ctrl-A = jump to start
+                        KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                            state.cursor_pos = 0;
                         }
+                        // Readline: Ctrl-E = jump to end
+                        KeyCode::Char('e') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                            state.cursor_pos = state.input.len();
+                        }
+                        // Readline: Ctrl-K = kill to end of line
+                        KeyCode::Char('k') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                            state.input.truncate(state.cursor_pos);
+                        }
+                        // Readline: Ctrl-U = kill to start of line
+                        KeyCode::Char('u') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                            state.input = state.input[state.cursor_pos..].to_string();
+                            state.cursor_pos = 0;
+                        }
+                        // Left arrow: move cursor left
+                        KeyCode::Left => {
+                            state.cursor_pos = state.cursor_pos.saturating_sub(1);
+                        }
+                        // Right arrow: move cursor right
+                        KeyCode::Right => {
+                            state.cursor_pos = (state.cursor_pos + 1).min(state.input.len());
+                        }
+                        // Home: jump to start
+                        KeyCode::Home => {
+                            state.cursor_pos = 0;
+                        }
+                        // Insert character at cursor position
+                        KeyCode::Char(c) => {
+                            state.input.insert(state.cursor_pos, c);
+                            state.cursor_pos += 1;
+                        }
+                        // Backspace: delete char before cursor
                         KeyCode::Backspace => {
-                            state.input.pop();
+                            if state.cursor_pos > 0 {
+                                state.input.remove(state.cursor_pos - 1);
+                                state.cursor_pos -= 1;
+                            }
+                        }
+                        // Delete: delete char at cursor
+                        KeyCode::Delete => {
+                            if state.cursor_pos < state.input.len() {
+                                state.input.remove(state.cursor_pos);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                // Prompts view navigation
+                if state.tab == View::Prompts {
+                    match key.code {
+                        KeyCode::Up => {
+                            if state.prompt_selected > 0 {
+                                state.prompt_selected -= 1;
+                            }
+                        }
+                        KeyCode::Down => {
+                            if state.prompt_selected < state.prompt_history.len().saturating_sub(1) {
+                                state.prompt_selected += 1;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            // Copy selected prompt to input and switch to Chat
+                            if let Some(prompt) = state.prompt_history.get(state.prompt_selected) {
+                                state.input = prompt.clone();
+                                state.cursor_pos = state.input.len();
+                                state.pop_view();
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                // Sessions view navigation
+                if state.tab == View::Sessions {
+                    match key.code {
+                        KeyCode::Up => {
+                            if state.session_selected > 0 {
+                                state.session_selected -= 1;
+                            }
+                        }
+                        KeyCode::Down => {
+                            if state.session_selected < state.detected_sessions.len().saturating_sub(1) {
+                                state.session_selected += 1;
+                            }
                         }
                         _ => {}
                     }
@@ -1049,21 +1822,52 @@ fn render_tui(f: &mut Frame, state: &TuiState, model: &str) {
 
     // Header with tabs and navigation hint
     let nav_hint = if state.in_overlay() {
-        format!(" [Esc to go back]")
+        " [Esc to go back]".to_string()
     } else if !state.view_stack.is_empty() {
         format!(" [{}→]", state.view_stack.len())
     } else {
         String::new()
     };
 
-    let header_title = if exit_warning {
-        format!("hyle | {} | ⚠ Press Ctrl-C again to quit{}", model, nav_hint)
+    // Use current_model from state (can change at runtime via /switch or rate limit)
+    let model_display = if !state.rate_limited_models.is_empty() {
+        format!("{} ({}✗)", state.current_model, state.rate_limited_models.len())
     } else {
-        format!("hyle | {}{}", model, nav_hint)
+        state.current_model.clone()
+    };
+
+    // Context usage indicator
+    let context_pct = state.traces.context.usage.last().unwrap_or(0.0);
+    let context_indicator = if state.traces.context.is_full() {
+        format!(" | CTX:FULL")
+    } else if context_pct > 0.0 {
+        format!(" | CTX:{:.0}%", context_pct)
+    } else {
+        String::new()
+    };
+
+    let header_title = if exit_warning {
+        format!("hyle | {} | ⚠ Press Ctrl-C again to quit{}", model_display, nav_hint)
+    } else if state.rate_limit_pending {
+        format!("hyle | {} | ⚠ Rate limited - press ESC{}", model_display, nav_hint)
+    } else if state.traces.context.is_full() {
+        format!("hyle | {}{} | ⚠ CONTEXT FULL{}", model_display, context_indicator, nav_hint)
+    } else if state.traces.context.is_warning() {
+        format!("hyle | {}{} | ⚠ >80%{}", model_display, context_indicator, nav_hint)
+    } else {
+        format!("hyle | {}{}{}", model_display, context_indicator, nav_hint)
     };
 
     let header_style = if exit_warning {
         Style::default().fg(Color::Yellow)
+    } else if state.rate_limit_pending {
+        Style::default().fg(Color::Magenta)
+    } else if state.traces.context.is_full() {
+        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+    } else if state.traces.context.is_warning() {
+        Style::default().fg(Color::Yellow)
+    } else if !state.rate_limited_models.is_empty() {
+        Style::default().fg(Color::DarkGray)
     } else {
         Style::default()
     };
@@ -1094,14 +1898,28 @@ fn render_tui(f: &mut Frame, state: &TuiState, model: &str) {
         Style::default()
     };
     let input_title = if state.is_generating {
-        format!("Generating... ({:.1} tok/s)", state.tokens_per_sec)
+        // Show token count and rate while generating
+        let elapsed = state.request_start.elapsed().as_secs_f32();
+        let estimated_tokens = (elapsed * state.tokens_per_sec).round() as u32;
+        if state.ttft.is_some() {
+            format!("Generating... ~{} tokens ({:.1} tok/s)", estimated_tokens, state.tokens_per_sec)
+        } else {
+            "Waiting for first token...".into()
+        }
     } else {
-        "Input (Enter to send)".into()
+        "Input (Enter to send, Ctrl-A/E/K/U readline)".into()
     };
     let input = Paragraph::new(state.input.as_str())
         .style(input_style)
         .block(Block::default().borders(Borders::ALL).title(input_title));
     f.render_widget(input, chunks[2]);
+
+    // Position cursor in input field (account for border)
+    if !state.is_generating && state.tab == Tab::Chat {
+        let cursor_x = chunks[2].x + 1 + state.cursor_pos as u16;
+        let cursor_y = chunks[2].y + 1;
+        f.set_cursor(cursor_x, cursor_y);
+    }
 
     // Status bar
     let pressure = state.telemetry.pressure();
@@ -1116,12 +1934,22 @@ fn render_tui(f: &mut Frame, state: &TuiState, model: &str) {
         "^C:quit ^P:prompts ^G:git Tab:tabs"
     };
 
+    // Cost indicator (only for paid models)
+    let cost_str = if state.session_cost > 0.001 {
+        format!(" | ${:.4}", state.session_cost)
+    } else if state.session_cost > 0.0 {
+        format!(" | ${:.6}", state.session_cost)
+    } else {
+        String::new()
+    };
+
     let status = format!(
-        " {} | {} {} | {} | {}",
+        " {} | {} {} | {}{} | {}",
         if state.is_generating { spinner_char(state.tick) } else { ' ' },
         sparkline,
         pressure.symbol(),
         state.throttle.name(),
+        cost_str,
         help,
     );
 
@@ -1181,20 +2009,81 @@ fn render_chat(f: &mut Frame, state: &TuiState, area: Rect) {
     f.render_widget(para, area);
 }
 
+fn format_bytes(n: u64) -> String {
+    if n >= 1_000_000 {
+        format!("{:.1}M", n as f64 / 1_000_000.0)
+    } else if n >= 1_000 {
+        format!("{:.1}K", n as f64 / 1_000.0)
+    } else {
+        format!("{}", n)
+    }
+}
+
 fn render_telemetry(f: &mut Frame, state: &TuiState, area: Rect) {
     let width = area.width as usize - 4;
+    let spark_width = width.min(30);
 
+    // Build system section with all telemetry stats
     let mut lines = vec![
         "── System ──".into(),
-        format!("Pressure: {:?}  Throttle: {}", state.telemetry.pressure(), state.throttle.name()),
-        format!("CPU: {} [{:.1}%]", state.telemetry.cpu_sparkline(width.min(30)), state.telemetry.average_cpu().unwrap_or(0.0)),
-        String::new(),
-        "── Traces ──".into(),
+        format!(
+            "Pressure: {:?}  Throttle: {} (delay: {:.1}x)",
+            state.telemetry.pressure(),
+            state.throttle.name(),
+            state.throttle.delay_multiplier()
+        ),
+        format!(
+            "CPU: {} [{:.1}% avg, last {}ms ago]",
+            state.telemetry.cpu_sparkline(spark_width),
+            state.telemetry.average_cpu().unwrap_or(0.0),
+            state.telemetry.since_last_sample().as_millis()
+        ),
     ];
 
-    // Add trace lines
-    for line in state.traces.render(width) {
-        lines.push(line);
+    // Show recent samples summary with all metrics
+    let recent = state.telemetry.recent(5);
+    if !recent.is_empty() {
+        let recent_cpu: Vec<String> = recent.iter()
+            .map(|s| format!("{:.0}", s.cpu_percent))
+            .collect();
+        lines.push(format!("Recent CPU: [{}]", recent_cpu.join(", ")));
+
+        // Show memory and network from most recent sample
+        if let Some(latest) = recent.first() {
+            lines.push(format!(
+                "Memory: {:.1}%  Net: ↓{}B ↑{}B",
+                latest.mem_percent,
+                format_bytes(latest.net_rx_bytes),
+                format_bytes(latest.net_tx_bytes)
+            ));
+        }
+    }
+
+    lines.push(String::new());
+    lines.push("── Traces ──".into());
+
+    // Add trace lines with averages and max
+    if state.traces.has_data() {
+        for line in state.traces.render(width) {
+            lines.push(line);
+        }
+    } else {
+        lines.push("(no trace data yet)".into());
+    }
+
+    // Add trace statistics
+    if let (Some(avg), Some(max)) = (
+        state.traces.tokens.tokens_per_sec.average(),
+        state.traces.tokens.tokens_per_sec.max()
+    ) {
+        lines.push(format!("Token rate: avg {:.1}/s, max {:.1}/s", avg, max));
+    }
+
+    // Context warnings
+    if state.traces.context.is_full() {
+        lines.push("⚠ CONTEXT FULL - responses may be truncated".into());
+    } else if state.traces.context.is_warning() {
+        lines.push("⚠ Context >80% - consider summarizing".into());
     }
 
     lines.push(String::new());
@@ -1210,9 +2099,21 @@ fn render_telemetry(f: &mut Frame, state: &TuiState, area: Rect) {
         lines.push(format!("Last TTFT: {}ms", ttft.as_millis()));
     }
 
+    // Latency stats
+    if let (Some(avg), Some(max)) = (
+        state.traces.latency.ttft.average(),
+        state.traces.latency.ttft.max()
+    ) {
+        lines.push(format!("TTFT: avg {:.0}ms, max {:.0}ms", avg, max));
+    }
+
+    // Spike detection
     if let Some(snapshot) = &state.telemetry.spike_snapshot {
         lines.push(String::new());
-        lines.push(format!("Pre-spike snapshot ({} samples)", snapshot.len()));
+        lines.push(format!(
+            "⚠ CPU spike detected! Pre-spike snapshot: {} samples (press 'c' to clear)",
+            snapshot.len()
+        ));
     }
 
     let para = Paragraph::new(lines.join("\n"))

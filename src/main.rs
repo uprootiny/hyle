@@ -20,6 +20,14 @@ mod tools;
 mod backburner;
 mod agent;
 mod git;
+mod eval;
+mod project;
+mod bootstrap;
+mod intent;
+mod prompt;
+mod tmux;
+mod cognitive;
+mod docs;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -91,20 +99,19 @@ fn parse_args() -> Command {
         };
     }
 
-    if args.first().map(|s| s.as_str()) == Some("config") {
-        if args.get(1).map(|s| s.as_str()) == Some("set") {
+    if args.first().map(|s| s.as_str()) == Some("config")
+        && args.get(1).map(|s| s.as_str()) == Some("set") {
             return Command::ConfigSet {
                 key: args.get(2).cloned().unwrap_or_default(),
                 value: args.get(3).cloned().unwrap_or_default(),
             };
         }
-    }
 
     // Check for --backburner flag
     if args.iter().any(|a| a == "--backburner" || a == "-b") {
         let paths: Vec<PathBuf> = args.iter()
             .filter(|a| !a.starts_with('-'))
-            .map(|s| PathBuf::from(s))
+            .map(PathBuf::from)
             .collect();
         return Command::Backburner { paths };
     }
@@ -262,6 +269,26 @@ async fn run_doctor() -> Result<()> {
         models_path.display()
     );
 
+    // Check tmux
+    let in_tmux = tmux::is_tmux();
+    let width = tmux::term_width();
+    let wide = tmux::is_wide();
+    println!("[{}] Tmux: {} ({}cols, {})",
+        if in_tmux { "✓" } else { "○" },
+        if in_tmux { "detected" } else { "not in tmux" },
+        width,
+        if wide { "wide layout available" } else { "narrow" }
+    );
+
+    // Check project
+    let cwd = std::env::current_dir()?;
+    if let Some(p) = project::Project::detect(&cwd) {
+        println!("[✓] Project: {} ({:?}, {} files, {} lines)",
+            p.name, p.project_type, p.files.len(), p.total_lines());
+    } else {
+        println!("[○] Project: not detected");
+    }
+
     // Check network
     print!("[?] Network: checking...");
     match client::check_connectivity().await {
@@ -296,7 +323,7 @@ async fn run_models(refresh: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_sessions(list: bool, clean: bool) -> Result<()> {
+fn run_sessions(_list: bool, clean: bool) -> Result<()> {
     if clean {
         let removed = session::cleanup_sessions(10)?;
         println!("Cleaned up {} old sessions", removed);
@@ -323,7 +350,7 @@ fn run_sessions(list: bool, clean: bool) -> Result<()> {
 
         println!("  {} | {} | {} msgs | {} tokens | {}",
             s.id,
-            s.model.split('/').last().unwrap_or(&s.model),
+            s.model.split('/').next_back().unwrap_or(&s.model),
             s.message_count,
             s.total_tokens,
             age_str,
@@ -427,6 +454,13 @@ async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<Path
         }
     };
 
+    // Detect project context
+    let cwd = std::env::current_dir()?;
+    let project = project::Project::detect(&cwd);
+    if let Some(ref p) = project {
+        println!("Project: {} ({:?}, {} files)", p.name, p.project_type, p.files.len());
+    }
+
     // Load or fetch models
     let models = models::load_or_fetch(&api_key).await?;
 
@@ -449,8 +483,8 @@ async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<Path
 
     println!("Using model: {}", selected_model);
 
-    // Run TUI with session
-    ui::run_tui(&api_key, &selected_model, paths, resume).await
+    // Run TUI with session and project context
+    ui::run_tui(&api_key, &selected_model, paths, resume, project).await
 }
 
 async fn run_backburner(paths: &[PathBuf]) -> Result<()> {
