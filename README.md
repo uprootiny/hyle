@@ -54,12 +54,15 @@ hyle config set key <value>   # set config value
 | Key | Action |
 |-----|--------|
 | Enter | Send prompt |
-| Esc | Quit |
+| Up/Down | Browse prompt history |
+| PageUp/PageDown | Scroll conversation |
+| End | Jump to bottom (auto-scroll) |
 | Tab | Switch tabs (Chat/Telemetry/Log) |
 | k | Kill current operation |
 | t | Throttle mode |
 | f | Full speed mode |
 | n | Normal mode |
+| Esc | Quit |
 
 ## Config
 

@@ -175,11 +175,16 @@ ENVIRONMENT:
     OPENROUTER_API_KEY              Override API key from config
 
 CONTROLS (interactive mode):
-    k       Kill current operation
-    t       Throttle (give it time)
-    f       Full speed
-    Tab     Switch tabs
-    Esc     Quit
+    Enter      Send prompt
+    Up/Down    Browse prompt history
+    PageUp/Dn  Scroll conversation
+    End        Jump to bottom (auto-scroll)
+    Tab        Switch tabs
+    k          Kill current operation
+    t          Throttle mode
+    f          Full speed mode
+    n          Normal mode
+    Esc        Quit
 
 BACKBURNER MODE:
     Runs slow, non-intrusive maintenance tasks:
