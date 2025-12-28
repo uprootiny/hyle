@@ -30,7 +30,7 @@ use crate::session::Session;
 use crate::telemetry::{Telemetry, ThrottleMode, PressureLevel};
 use crate::traces::Traces;
 use crate::tools::{ToolCallTracker, ToolExecutor, ToolCallDisplay};
-use crate::agent::{parse_tool_calls, execute_tool_calls, format_tool_results, is_task_complete};
+use crate::agent::{parse_tool_calls, execute_tool_calls, format_tool_results};
 
 // ═══════════════════════════════════════════════════════════════
 // API KEY PROMPT

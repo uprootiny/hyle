@@ -161,13 +161,15 @@ impl Backburner {
                 .args(&args)
                 .output();
 
+            let feature_key = name.split_whitespace().next().unwrap_or("unknown");
+
             match result {
                 Ok(output) if output.status.success() => {
-                    self.update_feature_status(&format!("cli.{}", name.split_whitespace().next().unwrap()), FeatureStatus::Passing);
+                    self.update_feature_status(&format!("cli.{}", feature_key), FeatureStatus::Passing);
                     println!("  {} {} PASS", FeatureStatus::Passing.symbol(), name);
                 }
                 Ok(output) => {
-                    self.update_feature_status(&format!("cli.{}", name.split_whitespace().next().unwrap()), FeatureStatus::Failing);
+                    self.update_feature_status(&format!("cli.{}", feature_key), FeatureStatus::Failing);
                     let stderr = String::from_utf8_lossy(&output.stderr);
                     println!("  {} {} FAIL: {}", FeatureStatus::Failing.symbol(), name, stderr.lines().next().unwrap_or(""));
                 }
