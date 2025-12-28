@@ -29,6 +29,8 @@ use crate::models::Model;
 use crate::session::Session;
 use crate::telemetry::{Telemetry, ThrottleMode, PressureLevel};
 use crate::traces::Traces;
+use crate::tools::{ToolCallTracker, ToolExecutor, ToolCallDisplay};
+use crate::agent::{parse_tool_calls, execute_tool_calls, format_tool_results, is_task_complete};
 
 // ═══════════════════════════════════════════════════════════════
 // API KEY PROMPT
@@ -309,6 +311,11 @@ struct TuiState {
     // Sessions view data
     detected_sessions: Vec<DetectedSession>,
     session_selected: usize,
+
+    // Tool execution
+    tool_tracker: ToolCallTracker,
+    tool_executor: ToolExecutor,
+    executing_tools: bool,
 }
 
 /// An artifact (file, diff, etc.)
@@ -392,6 +399,9 @@ impl TuiState {
             prompt_selected: 0,
             detected_sessions: vec![],
             session_selected: 0,
+            tool_tracker: ToolCallTracker::new(),
+            tool_executor: ToolExecutor::new(),
+            executing_tools: false,
         }
     }
 
@@ -492,6 +502,45 @@ impl TuiState {
     /// Check if we're in an overlay view
     fn in_overlay(&self) -> bool {
         self.tab.is_overlay()
+    }
+
+    /// Process response for tool calls, execute them, return feedback
+    fn process_tool_calls(&mut self, response: &str) -> Option<String> {
+        let calls = parse_tool_calls(response);
+        if calls.is_empty() {
+            return None;
+        }
+
+        self.executing_tools = true;
+        self.log(&format!("Executing {} tool call(s)...", calls.len()));
+
+        // Execute all tool calls
+        let results = execute_tool_calls(&calls, &mut self.tool_executor, &mut self.tool_tracker);
+
+        // Collect indices for formatting
+        let indices: Vec<usize> = results.iter().map(|(idx, _)| *idx).collect();
+
+        // Log results
+        for (idx, result) in &results {
+            if let Some(call) = self.tool_tracker.get(*idx) {
+                let display = ToolCallDisplay::new(call).with_tick(self.tick);
+                self.output.push(format!("  {}", display.header()));
+
+                if result.is_err() {
+                    self.log(&format!("Tool {} failed", call.name));
+                }
+            }
+        }
+
+        self.executing_tools = false;
+
+        // Format results for LLM feedback
+        Some(format_tool_results(&self.tool_tracker, &indices))
+    }
+
+    /// Get tool status for status bar
+    fn tool_status(&self) -> String {
+        self.tool_tracker.status_summary(self.tick)
     }
 
     /// Handle Ctrl-C - returns true if should exit
