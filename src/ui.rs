@@ -250,6 +250,16 @@ struct TuiState {
 
     // Current response for session saving
     current_response: String,
+
+    // Scroll state for long conversations
+    scroll_offset: u16,
+    auto_scroll: bool,
+    output_line_count: usize, // Cached line count for efficiency
+
+    // Prompt history (separate from conversation)
+    prompt_history: Vec<String>,
+    history_index: Option<usize>,
+    saved_input: String, // Save current input when browsing history
 }
 
 impl TuiState {
@@ -271,6 +281,95 @@ impl TuiState {
             last_token_time: std::time::Instant::now(),
             ttft: None,
             current_response: String::new(),
+            scroll_offset: 0,
+            auto_scroll: true,
+            output_line_count: 1,
+            prompt_history: Vec::new(),
+            history_index: None,
+            saved_input: String::new(),
+        }
+    }
+
+    /// Add prompt to history (dedup consecutive)
+    fn add_to_history(&mut self, prompt: &str) {
+        if prompt.trim().is_empty() {
+            return;
+        }
+        // Don't add if same as last
+        if self.prompt_history.last().map(|s| s.as_str()) != Some(prompt) {
+            self.prompt_history.push(prompt.to_string());
+            // Keep last 100 prompts
+            if self.prompt_history.len() > 100 {
+                self.prompt_history.remove(0);
+            }
+        }
+        self.history_index = None;
+    }
+
+    /// Navigate history up
+    fn history_up(&mut self) {
+        if self.prompt_history.is_empty() {
+            return;
+        }
+
+        match self.history_index {
+            None => {
+                // Save current input and go to last history item
+                self.saved_input = self.input.clone();
+                self.history_index = Some(self.prompt_history.len() - 1);
+                self.input = self.prompt_history.last().unwrap().clone();
+            }
+            Some(0) => {
+                // Already at oldest
+            }
+            Some(i) => {
+                self.history_index = Some(i - 1);
+                self.input = self.prompt_history[i - 1].clone();
+            }
+        }
+    }
+
+    /// Navigate history down
+    fn history_down(&mut self) {
+        match self.history_index {
+            None => {}
+            Some(i) if i >= self.prompt_history.len() - 1 => {
+                // Restore saved input
+                self.history_index = None;
+                self.input = std::mem::take(&mut self.saved_input);
+            }
+            Some(i) => {
+                self.history_index = Some(i + 1);
+                self.input = self.prompt_history[i + 1].clone();
+            }
+        }
+    }
+
+    /// Trim output buffer if too large (keep last 1000 lines)
+    fn trim_output_buffer(&mut self) {
+        const MAX_LINES: usize = 1000;
+        if self.output.len() > MAX_LINES {
+            let trim = self.output.len() - MAX_LINES;
+            self.output.drain(0..trim);
+            // Adjust scroll offset
+            self.scroll_offset = self.scroll_offset.saturating_sub(trim as u16);
+        }
+    }
+
+    /// Update line count cache
+    fn update_line_count(&mut self) {
+        self.output_line_count = self.output.iter()
+            .map(|s| s.lines().count().max(1))
+            .sum();
+    }
+
+    /// Scroll to bottom
+    fn scroll_to_bottom(&mut self, visible_height: u16) {
+        let total = self.output_line_count as u16;
+        if total > visible_height {
+            self.scroll_offset = total - visible_height;
+        } else {
+            self.scroll_offset = 0;
         }
     }
 
@@ -461,14 +560,36 @@ async fn run_tui_loop(
                 // Tab-specific input
                 if state.tab == Tab::Chat && !state.is_generating {
                     match key.code {
+                        KeyCode::Up => {
+                            state.history_up();
+                        }
+                        KeyCode::Down => {
+                            state.history_down();
+                        }
+                        KeyCode::PageUp => {
+                            // Scroll chat up
+                            state.scroll_offset = state.scroll_offset.saturating_sub(10);
+                            state.auto_scroll = false;
+                        }
+                        KeyCode::PageDown => {
+                            // Scroll chat down
+                            state.scroll_offset = state.scroll_offset.saturating_add(10);
+                        }
+                        KeyCode::End => {
+                            // Jump to bottom, enable auto-scroll
+                            state.auto_scroll = true;
+                        }
                         KeyCode::Enter => {
                             if !state.input.is_empty() {
                                 let prompt = state.input.clone();
+                                state.add_to_history(&prompt);
                                 state.input.clear();
+                                state.history_index = None;
                                 state.output.push(format!("> {}", prompt));
                                 state.output.push(String::new()); // For response
                                 state.is_generating = true;
                                 state.ttft = None;
+                                state.auto_scroll = true; // Auto-scroll on new message
                                 state.request_start = std::time::Instant::now();
                                 state.last_token_time = std::time::Instant::now();
                                 state.log(format!("Sending: {}", &prompt[..prompt.len().min(50)]));
@@ -587,10 +708,44 @@ fn render_tui(f: &mut Frame, state: &TuiState, model: &str) {
 }
 
 fn render_chat(f: &mut Frame, state: &TuiState, area: Rect) {
+    let visible_height = area.height.saturating_sub(2); // Account for borders
     let text: String = state.output.join("\n");
+    let line_count = text.lines().count() as u16;
+
+    // Calculate scroll position
+    let scroll = if state.auto_scroll {
+        // Auto-scroll to bottom
+        line_count.saturating_sub(visible_height)
+    } else {
+        state.scroll_offset.min(line_count.saturating_sub(visible_height))
+    };
+
+    // Build title with scroll indicator
+    let scroll_indicator = if line_count > visible_height {
+        let pct = if line_count > 0 {
+            ((scroll + visible_height) * 100 / line_count).min(100)
+        } else {
+            100
+        };
+        format!(" [{}/{}] {}%", scroll + visible_height, line_count, pct)
+    } else {
+        String::new()
+    };
+
+    let history_indicator = if state.history_index.is_some() {
+        format!(" [history {}/{}]",
+            state.history_index.unwrap() + 1,
+            state.prompt_history.len())
+    } else {
+        String::new()
+    };
+
+    let title = format!("Chat{}{}", history_indicator, scroll_indicator);
+
     let para = Paragraph::new(text)
         .wrap(Wrap { trim: false })
-        .block(Block::default().borders(Borders::ALL).title("Chat"));
+        .scroll((scroll, 0))
+        .block(Block::default().borders(Borders::ALL).title(title));
     f.render_widget(para, area);
 }
 
