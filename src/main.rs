@@ -29,6 +29,8 @@ mod prompts;
 mod tmux;
 mod cognitive;
 mod docs;
+mod environ;
+mod github;
 mod server;
 
 use anyhow::{Context, Result};
@@ -137,12 +139,16 @@ fn parse_args() -> Command {
     let mut task = None;
     let mut paths = Vec::new();
     let mut resume = true;
+    let mut trust_mode = false;
+    let mut ask_mode = false;
     let mut i = 0;
 
     while i < args.len() {
         match args[i].as_str() {
             "--free" | "-f" => free_only = true,
             "--new" | "-n" => resume = false,
+            "--trust" | "-y" => trust_mode = true,
+            "--ask" | "-a" => ask_mode = true,
             "--model" | "-m" => {
                 i += 1;
                 model = args.get(i).cloned();
@@ -157,6 +163,20 @@ fn parse_args() -> Command {
             _ => {}
         }
         i += 1;
+    }
+
+    // Apply permission modes to config
+    if trust_mode || ask_mode {
+        if let Ok(mut cfg) = config::Config::load() {
+            if trust_mode {
+                cfg.trust_mode = true;
+            }
+            if ask_mode {
+                cfg.permissions = config::Permissions::restrictive();
+            }
+            // Save temporarily for this session
+            let _ = cfg.save();
+        }
     }
 
     if let Some(task_str) = task {
@@ -190,6 +210,8 @@ FLAGS:
     -t, --task <text>       One-shot task mode
     -b, --backburner        Run background maintenance daemon
     -s, --serve [port]      HTTP API server mode
+    -y, --trust             Trust mode: auto-approve all tool operations
+    -a, --ask               Ask mode: confirm before write/execute/git ops
     -h, --help              Show this help
 
 CONFIG:
@@ -228,6 +250,20 @@ BACKBURNER MODE:
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Set up tmux integration
+    let work_dir = std::env::current_dir().unwrap_or_default();
+    tmux::setup(&work_dir);
+
+    // Ensure cleanup on exit
+    let result = run_command().await;
+
+    // Clean up tmux on exit
+    tmux::cleanup();
+
+    result
+}
+
+async fn run_command() -> Result<()> {
     match parse_args() {
         Command::Help => {
             print_help();
@@ -246,12 +282,17 @@ async fn main() -> Result<()> {
             run_config_set(&key, &value)
         }
         Command::Task { task, paths } => {
-            run_task(&task, &paths).await
+            tmux::set_status("task");
+            let result = run_task(&task, &paths).await;
+            tmux::task_complete("Task", result.is_ok());
+            result
         }
         Command::Backburner { paths } => {
+            tmux::set_status("bg");
             run_backburner(&paths).await
         }
         Command::Server { port } => {
+            tmux::set_status("serve");
             server::run_server(port).await
         }
         Command::Interactive { free_only, model, paths, resume } => {

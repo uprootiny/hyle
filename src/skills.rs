@@ -566,6 +566,11 @@ pub fn execute_slash_command_with_context(
         "diff" => Some(git::diff(args == "staged" || args == "--staged").into()),
         "commit" => Some(run_commit(args)),
 
+        // === GitHub Commands ===
+        "pr" | "prs" => Some(run_pr(args)),
+        "issue" | "issues" => Some(run_issue(args)),
+        "runs" | "actions" => Some(run_actions(args)),
+
         // === Navigation ===
         "cd" => Some(run_cd(args)),
         "ls" | "files" => Some(run_ls(args)),
@@ -608,6 +613,9 @@ pub fn execute_slash_command_with_context(
         "deps" | "graph" => Some(run_deps()),
         "selftest" => Some(run_selftest()),
 
+        // === Environment ===
+        "map" | "env" => Some(run_map()),
+
         // === Patch Operations ===
         "apply" => Some(run_apply(args)),
         "revert" => Some(run_revert(args)),
@@ -616,8 +624,86 @@ pub fn execute_slash_command_with_context(
         "toolbelt" => Some(run_toolbelt(args)),
         "prompts" => Some(run_prompts()),
 
-        _ => None, // Unknown command, let LLM handle
+        _ => {
+            // Unknown command - suggest similar commands
+            let suggestions = suggest_slash_command(command);
+            if suggestions.is_empty() {
+                Some(SlashResult {
+                    output: format!(
+                        "Unknown command: /{}. Type /help for available commands.",
+                        command
+                    ),
+                    success: false,
+                })
+            } else {
+                Some(SlashResult {
+                    output: format!(
+                        "Unknown command: /{}. Did you mean: {}? (Type /help for all commands)",
+                        command,
+                        suggestions.join(", ")
+                    ),
+                    success: false,
+                })
+            }
+        }
     }
+}
+
+/// Suggest similar slash commands for typos
+fn suggest_slash_command(input: &str) -> Vec<String> {
+    const COMMANDS: &[&str] = &[
+        "build", "test", "update", "clean", "check", "lint",
+        "clear", "compact", "cost", "tokens", "usage", "status",
+        "git", "diff", "commit", "pr", "prs", "issue", "issues", "runs", "actions",
+        "cd", "ls", "files", "find", "glob", "grep", "search",
+        "help", "doctor", "version", "model", "models", "switch", "agent",
+        "edit", "open", "view", "cat", "read",
+        "analyze", "health", "improve", "deps", "graph", "selftest",
+        "map", "env", "apply", "revert", "toolbelt", "prompts",
+    ];
+
+    let mut matches: Vec<(&str, usize)> = COMMANDS
+        .iter()
+        .filter_map(|&cmd| {
+            let dist = levenshtein_distance(input, cmd);
+            // Only suggest if distance is <= 2 (close enough to be a typo)
+            if dist <= 2 && dist > 0 {
+                Some((cmd, dist))
+            } else if cmd.starts_with(input) || input.starts_with(cmd) {
+                Some((cmd, 1))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    matches.sort_by_key(|(_, d)| *d);
+    matches.into_iter().take(3).map(|(s, _)| format!("/{}", s)).collect()
+}
+
+/// Simple Levenshtein distance for command suggestions
+fn levenshtein_distance(a: &str, b: &str) -> usize {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let m = a_chars.len();
+    let n = b_chars.len();
+
+    if m == 0 { return n; }
+    if n == 0 { return m; }
+
+    let mut prev = (0..=n).collect::<Vec<_>>();
+    let mut curr = vec![0; n + 1];
+
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min((curr[j - 1] + 1).min(prev[j - 1] + cost));
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+
+    prev[n]
 }
 
 fn run_build(project_type: Option<&str>) -> SlashResult {
@@ -703,6 +789,17 @@ fn slash_help_full() -> SlashResult {
   /diff [staged]  Show git diff
   /commit <msg>   Commit with message
 
+═══ GitHub ═══
+  /pr             List open pull requests
+  /pr <num>       View PR details
+  /pr create <t>  Create new PR
+  /pr diff <num>  Show PR diff
+  /pr checkout <n> Checkout PR branch
+  /issue          List open issues
+  /issue <num>    View issue details
+  /issue create   Create new issue
+  /runs           List workflow runs
+
 ═══ Files ═══
   /ls [path]      List files
   /find <pattern> Find files (glob)
@@ -721,6 +818,10 @@ fn slash_help_full() -> SlashResult {
   /improve        Generate improvement suggestions
   /deps           Show module dependency graph
   /selftest       Run cargo test and parse results
+
+═══ Environment ═══
+  /map            Environment map (tools, projects, access)
+  /env            Alias for /map
 
 ═══ Prompt Library ═══
   /toolbelt       Development phase commands
@@ -791,6 +892,239 @@ fn run_commit(msg: &str) -> SlashResult {
         }
     } else {
         git::commit(msg).into()
+    }
+}
+
+// === GitHub Commands ===
+
+fn run_pr(args: &str) -> SlashResult {
+    use crate::github;
+
+    if !github::is_gh_available() {
+        return SlashResult {
+            output: "GitHub CLI (gh) not installed. Install from https://cli.github.com".into(),
+            success: false,
+        };
+    }
+
+    let work_dir = std::env::current_dir().unwrap_or_default();
+    let parts: Vec<&str> = args.splitn(2, ' ').collect();
+
+    match parts.first().copied().unwrap_or("") {
+        "" | "list" => {
+            // /pr or /pr list - list open PRs
+            match github::list_prs(&work_dir, "open", 10) {
+                Ok(prs) => {
+                    if prs.is_empty() {
+                        SlashResult {
+                            output: "No open pull requests".into(),
+                            success: true,
+                        }
+                    } else {
+                        let output = prs.iter()
+                            .map(|pr| pr.display())
+                            .collect::<Vec<_>>()
+                            .join("\n\n");
+                        SlashResult { output, success: true }
+                    }
+                }
+                Err(e) => SlashResult {
+                    output: format!("Failed to list PRs: {}", e),
+                    success: false,
+                },
+            }
+        }
+        "create" => {
+            // /pr create <title>
+            let title = parts.get(1).copied().unwrap_or("").trim();
+            if title.is_empty() {
+                SlashResult {
+                    output: "Usage: /pr create <title>".into(),
+                    success: false,
+                }
+            } else {
+                match github::create_pr(&work_dir, title, "", None, false) {
+                    Ok(url) => SlashResult {
+                        output: format!("Created PR: {}", url),
+                        success: true,
+                    },
+                    Err(e) => SlashResult {
+                        output: format!("Failed to create PR: {}", e),
+                        success: false,
+                    },
+                }
+            }
+        }
+        "diff" => {
+            // /pr diff <number>
+            let num = parts.get(1).and_then(|s| s.trim().parse::<u64>().ok());
+            match num {
+                Some(n) => match github::pr_diff(&work_dir, n) {
+                    Ok(diff) => SlashResult { output: diff, success: true },
+                    Err(e) => SlashResult {
+                        output: format!("Failed to get PR diff: {}", e),
+                        success: false,
+                    },
+                },
+                None => SlashResult {
+                    output: "Usage: /pr diff <number>".into(),
+                    success: false,
+                },
+            }
+        }
+        "checkout" => {
+            // /pr checkout <number>
+            let num = parts.get(1).and_then(|s| s.trim().parse::<u64>().ok());
+            match num {
+                Some(n) => match github::checkout_pr(&work_dir, n) {
+                    Ok(()) => SlashResult {
+                        output: format!("Checked out PR #{}", n),
+                        success: true,
+                    },
+                    Err(e) => SlashResult {
+                        output: format!("Failed to checkout PR: {}", e),
+                        success: false,
+                    },
+                },
+                None => SlashResult {
+                    output: "Usage: /pr checkout <number>".into(),
+                    success: false,
+                },
+            }
+        }
+        s => {
+            // /pr <number> - view specific PR
+            if let Ok(num) = s.parse::<u64>() {
+                match github::view_pr(&work_dir, num) {
+                    Ok(info) => SlashResult { output: info, success: true },
+                    Err(e) => SlashResult {
+                        output: format!("Failed to view PR: {}", e),
+                        success: false,
+                    },
+                }
+            } else {
+                SlashResult {
+                    output: "Usage: /pr [list|create|diff|checkout|<number>]".into(),
+                    success: false,
+                }
+            }
+        }
+    }
+}
+
+fn run_issue(args: &str) -> SlashResult {
+    use crate::github;
+
+    if !github::is_gh_available() {
+        return SlashResult {
+            output: "GitHub CLI (gh) not installed. Install from https://cli.github.com".into(),
+            success: false,
+        };
+    }
+
+    let work_dir = std::env::current_dir().unwrap_or_default();
+    let parts: Vec<&str> = args.splitn(2, ' ').collect();
+
+    match parts.first().copied().unwrap_or("") {
+        "" | "list" => {
+            // /issue or /issue list - list open issues
+            match github::list_issues(&work_dir, "open", 10) {
+                Ok(issues) => {
+                    if issues.is_empty() {
+                        SlashResult {
+                            output: "No open issues".into(),
+                            success: true,
+                        }
+                    } else {
+                        let output = issues.iter()
+                            .map(|i| i.display())
+                            .collect::<Vec<_>>()
+                            .join("\n\n");
+                        SlashResult { output, success: true }
+                    }
+                }
+                Err(e) => SlashResult {
+                    output: format!("Failed to list issues: {}", e),
+                    success: false,
+                },
+            }
+        }
+        "create" => {
+            // /issue create <title>
+            let title = parts.get(1).copied().unwrap_or("").trim();
+            if title.is_empty() {
+                SlashResult {
+                    output: "Usage: /issue create <title>".into(),
+                    success: false,
+                }
+            } else {
+                match github::create_issue(&work_dir, title, "", &[]) {
+                    Ok(url) => SlashResult {
+                        output: format!("Created issue: {}", url),
+                        success: true,
+                    },
+                    Err(e) => SlashResult {
+                        output: format!("Failed to create issue: {}", e),
+                        success: false,
+                    },
+                }
+            }
+        }
+        s => {
+            // /issue <number> - view specific issue
+            if let Ok(num) = s.parse::<u64>() {
+                match github::view_issue(&work_dir, num) {
+                    Ok(info) => SlashResult { output: info, success: true },
+                    Err(e) => SlashResult {
+                        output: format!("Failed to view issue: {}", e),
+                        success: false,
+                    },
+                }
+            } else {
+                SlashResult {
+                    output: "Usage: /issue [list|create|<number>]".into(),
+                    success: false,
+                }
+            }
+        }
+    }
+}
+
+fn run_actions(args: &str) -> SlashResult {
+    use crate::github;
+
+    if !github::is_gh_available() {
+        return SlashResult {
+            output: "GitHub CLI (gh) not installed. Install from https://cli.github.com".into(),
+            success: false,
+        };
+    }
+
+    let work_dir = std::env::current_dir().unwrap_or_default();
+
+    if args.is_empty() {
+        // /runs - list recent runs
+        match github::list_runs(&work_dir, 10) {
+            Ok(runs) => SlashResult { output: runs, success: true },
+            Err(e) => SlashResult {
+                output: format!("Failed to list runs: {}", e),
+                success: false,
+            },
+        }
+    } else if let Ok(run_id) = args.parse::<u64>() {
+        // /runs <id> - view specific run
+        match github::view_run(&work_dir, run_id) {
+            Ok(info) => SlashResult { output: info, success: true },
+            Err(e) => SlashResult {
+                output: format!("Failed to view run: {}", e),
+                success: false,
+            },
+        }
+    } else {
+        SlashResult {
+            output: "Usage: /runs [<run_id>]".into(),
+            success: false,
+        }
     }
 }
 
@@ -1054,6 +1388,14 @@ fn run_selftest() -> SlashResult {
             output: format!("Failed to run tests: {}", e),
             success: false,
         }
+    }
+}
+
+fn run_map() -> SlashResult {
+    let map = crate::environ::EnvironmentMap::gather();
+    SlashResult {
+        output: map.display(),
+        success: true,
     }
 }
 

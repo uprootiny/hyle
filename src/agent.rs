@@ -281,6 +281,7 @@ pub struct AgentResult {
     pub final_response: String,
     pub success: bool,
     pub error: Option<String>,
+    pub tokens_used: usize,
 }
 
 /// Execute tool calls from a parsed response
@@ -482,6 +483,7 @@ pub async fn run_agent_loop(
                     final_response: response,
                     success: false,
                     error: Some(e.to_string()),
+                    tokens_used: 0,
                 };
             }
         };
@@ -504,6 +506,7 @@ pub async fn run_agent_loop(
                         final_response: response,
                         success: false,
                         error: Some(e),
+                        tokens_used: 0,
                     };
                 }
             }
@@ -526,6 +529,7 @@ pub async fn run_agent_loop(
                 final_response,
                 success: false,
                 error: Some("Agent reported fatal error".into()),
+                tokens_used: 0,
             };
         }
 
@@ -545,6 +549,7 @@ pub async fn run_agent_loop(
                 final_response,
                 success: true,
                 error: None,
+                tokens_used: 0,
             };
         }
 
@@ -615,6 +620,7 @@ pub async fn run_agent_loop(
                 final_response,
                 success: false,
                 error: Some("Agent stuck".into()),
+                tokens_used: 0,
             };
         }
 
@@ -638,6 +644,7 @@ pub async fn run_agent_loop(
         final_response,
         success: false,
         error: Some("Max iterations reached".into()),
+        tokens_used: 0,
     }
 }
 
@@ -706,6 +713,7 @@ impl AgentCore {
             final_response: String::new(),
             success: false,
             error: Some(e.to_string()),
+            tokens_used: 0,
         })
     }
 
@@ -728,6 +736,7 @@ impl AgentCore {
             final_response: String::new(),
             success: false,
             error: Some(e.to_string()),
+            tokens_used: 0,
         })
     }
 }
@@ -777,6 +786,7 @@ where
         final_response: String::new(),
         success: false,
         error: Some(e.to_string()),
+        tokens_used: 0,
     })
 }
 

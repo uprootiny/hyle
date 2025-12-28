@@ -212,11 +212,17 @@ impl Session {
         Ok(())
     }
 
-    /// Save metadata
+    /// Save metadata atomically (temp file + rename to prevent corruption)
     pub fn save_meta(&self) -> Result<()> {
         let meta_path = self.session_dir.join("meta.json");
+        let tmp_path = self.session_dir.join(".meta.json.tmp");
         let content = serde_json::to_string_pretty(&self.meta)?;
-        fs::write(&meta_path, content)?;
+
+        // Write to temp file first
+        fs::write(&tmp_path, &content)?;
+
+        // Atomic rename (POSIX guarantees this is atomic)
+        fs::rename(&tmp_path, &meta_path)?;
         Ok(())
     }
 
@@ -271,10 +277,14 @@ pub fn sessions_dir() -> Result<PathBuf> {
     Ok(dir)
 }
 
-/// Generate a unique session ID
+/// Generate a unique session ID with random suffix to prevent collisions
 fn generate_session_id() -> String {
     let now = Utc::now();
-    format!("{}", now.format("%Y%m%d-%H%M%S"))
+    // Use nanoseconds + process ID for uniqueness without external crate
+    let nanos = now.timestamp_subsec_nanos();
+    let pid = std::process::id();
+    let suffix = (nanos ^ pid) % 10000;
+    format!("{}-{:04}", now.format("%Y%m%d-%H%M%S"), suffix)
 }
 
 /// List all sessions, sorted by updated_at (newest first)
