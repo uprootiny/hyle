@@ -177,7 +177,7 @@ impl IntentStack {
             self.transition(active_id.as_deref(), "Pop completed");
         }
 
-        self.active().map(|i| i)
+        self.active()
     }
 
     /// Abandon current intent without completing
@@ -200,7 +200,7 @@ impl IntentStack {
             self.transition(active_id.as_deref(), "Abandon");
         }
 
-        self.active().map(|i| i)
+        self.active()
     }
 
     /// Get active intent

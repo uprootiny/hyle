@@ -478,7 +478,7 @@ impl ContextLayers {
             let facts_section = format!(
                 "<facts>\n{}\n</facts>\n",
                 self.facts.iter()
-                    .map(|f| format!("- [{}] {}", format!("{:?}", f.category), f.content))
+                    .map(|f| format!("- [{:?}] {}", f.category, f.content))
                     .collect::<Vec<_>>()
                     .join("\n")
             );

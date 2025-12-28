@@ -108,6 +108,7 @@ fn parse_function_calls(text: &str) -> Vec<ParsedToolCall> {
 
         // Parse key="value" pairs
         let mut args = serde_json::Map::new();
+        #[allow(clippy::regex_creation_in_loops)] // Not a hot path, called once per LLM response
         let arg_re = regex::Regex::new(r#"(\w+)\s*=\s*"([^"]*)""#).unwrap();
 
         for arg_cap in arg_re.captures_iter(args_str) {

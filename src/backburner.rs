@@ -54,6 +54,7 @@ pub struct TestResults {
     pub passed: usize,
     pub failed: usize,
     pub ignored: usize,
+    #[allow(dead_code)] // Available for test timing display
     pub duration_secs: f64,
     pub failed_tests: Vec<String>,
 }
@@ -500,6 +501,7 @@ impl Backburner {
     }
 
     /// Run cargo test and parse results
+    #[allow(dead_code)] // Available for future self-development loop
     pub fn run_cargo_tests(&mut self) -> TestResults {
         let now = self.timestamp();
 

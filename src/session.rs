@@ -114,7 +114,7 @@ impl Session {
             let file = File::open(&messages_path)?;
             let reader = BufReader::new(file);
             reader.lines()
-                .filter_map(|line| line.ok())
+                .map_while(|line| line.ok())
                 .filter_map(|line| serde_json::from_str(&line).ok())
                 .collect()
         } else {
@@ -319,6 +319,121 @@ pub fn cleanup_sessions(keep: usize) -> Result<usize> {
     }
 
     Ok(removed)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Claude Code Session Import
+// ═══════════════════════════════════════════════════════════════
+
+/// Claude Code history entry (from ~/.claude/history.jsonl)
+#[derive(Debug, Deserialize)]
+struct ClaudeHistoryEntry {
+    display: String,
+    timestamp: i64,
+    project: Option<String>,
+    #[serde(rename = "sessionId")]
+    #[allow(dead_code)] // For future session linking
+    session_id: Option<String>,
+    #[serde(rename = "pastedContents")]
+    #[allow(dead_code)]
+    pasted_contents: Option<serde_json::Value>,
+}
+
+/// Import context from Claude Code session history
+/// Returns recent prompts from the same project directory
+pub fn import_claude_context(project_dir: &str, limit: usize) -> Result<Vec<Message>> {
+    let claude_history = dirs::home_dir()
+        .ok_or_else(|| anyhow::anyhow!("No home directory"))?
+        .join(".claude")
+        .join("history.jsonl");
+
+    if !claude_history.exists() {
+        return Ok(vec![]);
+    }
+
+    let file = File::open(&claude_history)?;
+    let reader = BufReader::new(file);
+
+    // Parse all entries for this project
+    let mut entries: Vec<ClaudeHistoryEntry> = reader.lines()
+        .map_while(|line| line.ok())
+        .filter_map(|line| serde_json::from_str(&line).ok())
+        .filter(|e: &ClaudeHistoryEntry| {
+            e.project.as_deref() == Some(project_dir)
+        })
+        .collect();
+
+    // Sort by timestamp (newest first) and take recent ones
+    entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    entries.truncate(limit);
+
+    // Convert to hyle messages (reverse to get chronological order)
+    let messages: Vec<Message> = entries.into_iter().rev().map(|e| {
+        let ts = DateTime::from_timestamp_millis(e.timestamp)
+            .unwrap_or_else(Utc::now);
+        Message {
+            role: "user".into(),
+            content: e.display,
+            timestamp: ts,
+            tokens: None,
+        }
+    }).collect();
+
+    Ok(messages)
+}
+
+/// Detect if there's recent Claude Code activity in this directory
+pub fn has_recent_claude_session(project_dir: &str, max_age_hours: i64) -> Result<bool> {
+    let claude_history = dirs::home_dir()
+        .ok_or_else(|| anyhow::anyhow!("No home directory"))?
+        .join(".claude")
+        .join("history.jsonl");
+
+    if !claude_history.exists() {
+        return Ok(false);
+    }
+
+    let file = File::open(&claude_history)?;
+    let reader = BufReader::new(file);
+    let now = Utc::now().timestamp_millis();
+    let max_age_ms = max_age_hours * 3600 * 1000;
+
+    // Look for recent entries in this project
+    let has_recent = reader.lines()
+        .map_while(|line| line.ok())
+        .filter_map(|line| serde_json::from_str::<ClaudeHistoryEntry>(&line).ok())
+        .any(|e| {
+            e.project.as_deref() == Some(project_dir) &&
+            (now - e.timestamp) < max_age_ms
+        });
+
+    Ok(has_recent)
+}
+
+/// Get the most recent Claude session ID for this project
+#[allow(dead_code)] // For future session linking
+pub fn get_claude_session_id(project_dir: &str) -> Result<Option<String>> {
+    let claude_history = dirs::home_dir()
+        .ok_or_else(|| anyhow::anyhow!("No home directory"))?
+        .join(".claude")
+        .join("history.jsonl");
+
+    if !claude_history.exists() {
+        return Ok(None);
+    }
+
+    let file = File::open(&claude_history)?;
+    let reader = BufReader::new(file);
+
+    // Find most recent entry with a session ID
+    let session_id = reader.lines()
+        .map_while(|line| line.ok())
+        .filter_map(|line| serde_json::from_str::<ClaudeHistoryEntry>(&line).ok())
+        .filter(|e| e.project.as_deref() == Some(project_dir))
+        .filter_map(|e| e.session_id)
+        .last();
+
+    Ok(session_id)
 }
 
 #[cfg(test)]

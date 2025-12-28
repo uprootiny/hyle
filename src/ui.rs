@@ -1062,9 +1062,16 @@ impl TuiState {
 }
 
 /// Run the main TUI
-pub async fn run_tui(api_key: &str, model: &str, paths: Vec<PathBuf>, resume: bool, project: Option<Project>) -> Result<()> {
+pub async fn run_tui(
+    api_key: &str,
+    model: &str,
+    paths: Vec<PathBuf>,
+    resume: bool,
+    project: Option<Project>,
+    claude_context: Option<Vec<crate::session::Message>>,
+) -> Result<()> {
     let mut terminal = setup_terminal()?;
-    let result = run_tui_loop(&mut terminal, api_key, model, paths, resume, project).await;
+    let result = run_tui_loop(&mut terminal, api_key, model, paths, resume, project, claude_context).await;
     restore_terminal(terminal)?;
     result
 }
@@ -1076,6 +1083,7 @@ async fn run_tui_loop(
     _paths: Vec<PathBuf>,
     resume: bool,
     project: Option<Project>,
+    claude_context: Option<Vec<crate::session::Message>>,
 ) -> Result<()> {
     // Get context window for this model
     let context_window = crate::models::get_context_window(model);
@@ -1110,6 +1118,27 @@ async fn run_tui_loop(
     } else {
         Session::new(model)?
     };
+
+    // Inject Claude Code context if available
+    if let Some(claude_msgs) = claude_context {
+        if !claude_msgs.is_empty() {
+            state.log(format!("Imported {} prompts from Claude Code session", claude_msgs.len()));
+            state.output.push("─── Imported Claude Context ───".into());
+            for msg in claude_msgs {
+                // Add to session for API context
+                session.add_message(msg.clone())?;
+                // Show in output (truncated)
+                let display = if msg.content.len() > 60 {
+                    format!("> {}...", &msg.content[..60])
+                } else {
+                    format!("> {}", msg.content)
+                };
+                state.output.push(display);
+            }
+            state.output.push("───────────────────────────────".into());
+            state.mark_dirty();
+        }
+    }
 
     state.log(format!("Model: {} ({}k ctx)", model, context_window / 1000));
     state.model_tracker.set_model(model);
@@ -1438,7 +1467,7 @@ async fn run_tui_loop(
         }
 
         // Render
-        terminal.draw(|f| render_tui(f, &state, model))?;
+        terminal.draw(|f| render_tui(f, &state))?;
 
         // Handle input
         if event::poll(Duration::from_millis(50))? {
@@ -1804,7 +1833,7 @@ async fn run_tui_loop(
     Ok(())
 }
 
-fn render_tui(f: &mut Frame, state: &TuiState, model: &str) {
+fn render_tui(f: &mut Frame, state: &TuiState) {
     let area = f.size();
 
     let chunks = Layout::default()
@@ -1839,7 +1868,7 @@ fn render_tui(f: &mut Frame, state: &TuiState, model: &str) {
     // Context usage indicator
     let context_pct = state.traces.context.usage.last().unwrap_or(0.0);
     let context_indicator = if state.traces.context.is_full() {
-        format!(" | CTX:FULL")
+        " | CTX:FULL".to_string()
     } else if context_pct > 0.0 {
         format!(" | CTX:{:.0}%", context_pct)
     } else {

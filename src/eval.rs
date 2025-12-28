@@ -96,14 +96,20 @@ impl ResponseEvaluator {
 
     /// Evaluate a response given the prompt
     pub fn evaluate(&self, prompt: &str, response: &str) -> QualityScore {
-        let mut score = QualityScore::default();
+        let coherence = self.score_coherence(response);
+        let completeness = self.score_completeness(prompt, response);
+        let tool_validity = self.score_tool_validity(response);
+        let code_quality = self.score_code_quality(response);
+        let relevance = self.score_relevance(prompt, response);
 
-        score.coherence = self.score_coherence(response);
-        score.completeness = self.score_completeness(prompt, response);
-        score.tool_validity = self.score_tool_validity(response);
-        score.code_quality = self.score_code_quality(response);
-        score.relevance = self.score_relevance(prompt, response);
-
+        let mut score = QualityScore {
+            coherence,
+            completeness,
+            tool_validity,
+            code_quality,
+            relevance,
+            overall: 0.0,
+        };
         score.calculate_overall();
         score
     }

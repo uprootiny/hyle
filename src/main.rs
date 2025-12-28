@@ -25,6 +25,7 @@ mod project;
 mod bootstrap;
 mod intent;
 mod prompt;
+mod prompts;
 mod tmux;
 mod cognitive;
 mod docs;
@@ -456,10 +457,25 @@ async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<Path
 
     // Detect project context
     let cwd = std::env::current_dir()?;
+    let cwd_str = cwd.display().to_string();
     let project = project::Project::detect(&cwd);
     if let Some(ref p) = project {
         println!("Project: {} ({:?}, {} files)", p.name, p.project_type, p.files.len());
     }
+
+    // Check for recent Claude Code session in this directory
+    let claude_context = if session::has_recent_claude_session(&cwd_str, 24).unwrap_or(false) {
+        println!("Detected recent Claude Code session in this directory");
+        match session::import_claude_context(&cwd_str, 10) {
+            Ok(msgs) if !msgs.is_empty() => {
+                println!("  → Importing {} recent prompts as context", msgs.len());
+                Some(msgs)
+            }
+            _ => None
+        }
+    } else {
+        None
+    };
 
     // Load or fetch models
     let models = models::load_or_fetch(&api_key).await?;
@@ -483,8 +499,8 @@ async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<Path
 
     println!("Using model: {}", selected_model);
 
-    // Run TUI with session and project context
-    ui::run_tui(&api_key, &selected_model, paths, resume, project).await
+    // Run TUI with session, project context, and optional Claude import
+    ui::run_tui(&api_key, &selected_model, paths, resume, project, claude_context).await
 }
 
 async fn run_backburner(paths: &[PathBuf]) -> Result<()> {

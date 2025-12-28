@@ -11,7 +11,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::bootstrap::SelfAnalyzer;
-use crate::backburner::{Backburner, parse_test_output};
+use crate::backburner::parse_test_output;
+use crate::prompts::{PromptLibrary, Toolbelt};
 
 // ═══════════════════════════════════════════════════════════════
 // TOOL DEFINITIONS
@@ -606,6 +607,10 @@ pub fn execute_slash_command_with_context(
         "apply" => Some(run_apply(args)),
         "revert" => Some(run_revert(args)),
 
+        // === Prompt Library ===
+        "toolbelt" => Some(run_toolbelt(args)),
+        "prompts" => Some(run_prompts()),
+
         _ => None, // Unknown command, let LLM handle
     }
 }
@@ -710,6 +715,10 @@ fn slash_help_full() -> SlashResult {
   /improve        Generate improvement suggestions
   /deps           Show module dependency graph
   /selftest       Run cargo test and parse results
+
+═══ Prompt Library ═══
+  /toolbelt       Development phase commands
+  /prompts        Saved prompts and mappings
 
 ═══ Patch Operations ═══
   /apply <file>   Apply unified diff to file
@@ -1011,13 +1020,13 @@ fn run_selftest() -> SlashResult {
 
             let mut out = String::new();
             out.push_str(&format!("Test Results ({:.1}s)\n", duration.as_secs_f64()));
-            out.push_str(&format!("═══════════════════════════\n"));
+            out.push_str("═══════════════════════════\n");
             out.push_str(&format!("Passed:  {}\n", results.passed));
             out.push_str(&format!("Failed:  {}\n", results.failed));
             out.push_str(&format!("Ignored: {}\n", results.ignored));
 
             if !results.failed_tests.is_empty() {
-                out.push_str(&format!("\nFailed Tests:\n"));
+                out.push_str("\nFailed Tests:\n");
                 for name in &results.failed_tests {
                     out.push_str(&format!("  ✗ {}\n", name));
                 }
@@ -1025,7 +1034,7 @@ fn run_selftest() -> SlashResult {
 
             // Add summary
             if results.success() {
-                out.push_str(&format!("\n✓ All tests passed!"));
+                out.push_str("\n✓ All tests passed!");
             } else {
                 out.push_str(&format!("\n✗ {} tests failed", results.failed));
             }
@@ -1134,6 +1143,72 @@ fn run_doctor() -> SlashResult {
 /// Check if input is a slash command
 pub fn is_slash_command(input: &str) -> bool {
     input.trim().starts_with('/')
+}
+
+/// Show development toolbelt
+fn run_toolbelt(args: &str) -> SlashResult {
+    let belt = Toolbelt::default();
+
+    // If specific command requested, show its prompt
+    if !args.is_empty() {
+        if let Some(cmd) = belt.commands.iter().find(|c| c.name == args) {
+            return SlashResult {
+                output: format!("{}: {}\n\nPrompt: {}", cmd.name, cmd.description, cmd.prompt),
+                success: true,
+            };
+        }
+        return SlashResult {
+            output: format!("Unknown toolbelt command: {}", args),
+            success: false,
+        };
+    }
+
+    // Show all commands
+    let mut lines = vec!["Development Toolbelt:".to_string(), String::new()];
+
+    for cmd in &belt.commands {
+        lines.push(format!("  {:12} {:?} - {}", cmd.name, cmd.phase, cmd.description));
+    }
+
+    lines.push(String::new());
+    lines.push("Use /toolbelt <name> for full prompt".to_string());
+
+    SlashResult {
+        output: lines.join("\n"),
+        success: true,
+    }
+}
+
+/// Show saved prompts and command mappings
+fn run_prompts() -> SlashResult {
+    let lib = PromptLibrary::load().unwrap_or_default();
+
+    let mut lines = vec!["Command Mappings:".to_string(), String::new()];
+
+    for mapping in lib.mappings() {
+        lines.push(format!("  \"{}\" → {}", mapping.general, mapping.description));
+    }
+
+    lines.push(String::new());
+    lines.push("Top Saved Prompts:".to_string());
+
+    for prompt in lib.top_prompts(10) {
+        let preview = if prompt.text.len() > 40 {
+            format!("{}...", &prompt.text[..40])
+        } else {
+            prompt.text.clone()
+        };
+        lines.push(format!("  [{}×] {}", prompt.count, preview));
+    }
+
+    if lib.top_prompts(10).is_empty() {
+        lines.push("  (none yet - prompts are auto-saved after 2+ uses)".to_string());
+    }
+
+    SlashResult {
+        output: lines.join("\n"),
+        success: true,
+    }
 }
 
 #[cfg(test)]

@@ -131,11 +131,11 @@ fn parse_status_output(output: &str) -> Result<GitStatus> {
     let mut status = GitStatus::default();
 
     for line in output.lines() {
-        if line.starts_with("# branch.head ") {
-            status.branch = Some(line[14..].to_string());
-        } else if line.starts_with("# branch.ab ") {
+        if let Some(branch) = line.strip_prefix("# branch.head ") {
+            status.branch = Some(branch.to_string());
+        } else if let Some(ab) = line.strip_prefix("# branch.ab ") {
             // Parse "+N -M" format
-            let parts: Vec<&str> = line[12..].split_whitespace().collect();
+            let parts: Vec<&str> = ab.split_whitespace().collect();
             if let Some(ahead) = parts.first() {
                 status.ahead = ahead.trim_start_matches('+').parse().unwrap_or(0);
             }
@@ -147,10 +147,10 @@ fn parse_status_output(output: &str) -> Result<GitStatus> {
             if let Some(change) = parse_change_line(line) {
                 status.changes.push(change);
             }
-        } else if line.starts_with("? ") {
+        } else if let Some(path) = line.strip_prefix("? ") {
             // Untracked file
             status.changes.push(FileChange {
-                path: line[2..].to_string(),
+                path: path.to_string(),
                 status: FileStatus::Untracked,
                 staged: false,
                 old_path: None,
