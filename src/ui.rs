@@ -199,27 +199,56 @@ fn run_picker(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, models: &[M
 // MAIN TUI
 // ═══════════════════════════════════════════════════════════════
 
-/// Tab selection
+/// Main view selection
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Tab {
+enum View {
     Chat,
     Telemetry,
     Log,
+    Sessions,   // Backburners + foreign sessions
+    Prompts,    // Prompt inventory
+    Git,        // Git navigation
+    Artifacts,  // Generated files, diffs
+    Plans,      // Task plans
 }
 
-impl Tab {
-    fn all() -> &'static [Tab] {
-        &[Tab::Chat, Tab::Telemetry, Tab::Log]
+impl View {
+    fn all() -> &'static [View] {
+        &[View::Chat, View::Telemetry, View::Log, View::Sessions, View::Prompts, View::Git, View::Artifacts, View::Plans]
+    }
+
+    fn main_views() -> &'static [View] {
+        &[View::Chat, View::Telemetry, View::Log, View::Sessions]
     }
 
     fn name(&self) -> &'static str {
         match self {
-            Tab::Chat => "Chat",
-            Tab::Telemetry => "Telemetry",
-            Tab::Log => "Log",
+            View::Chat => "Chat",
+            View::Telemetry => "Telem",
+            View::Log => "Log",
+            View::Sessions => "Sessions",
+            View::Prompts => "Prompts",
+            View::Git => "Git",
+            View::Artifacts => "Artifacts",
+            View::Plans => "Plans",
         }
     }
+
+    fn is_overlay(&self) -> bool {
+        matches!(self, View::Prompts | View::Git | View::Artifacts | View::Plans)
+    }
 }
+
+/// Exit state for Ctrl-C handling
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExitState {
+    Running,
+    WarnOnce,  // First Ctrl-C pressed, show warning
+    Exiting,   // Second Ctrl-C, actually exit
+}
+
+// Keep Tab as alias for backward compatibility in rendering
+type Tab = View;
 
 /// TUI messages from background tasks
 enum TuiMsg {
@@ -260,6 +289,70 @@ struct TuiState {
     prompt_history: Vec<String>,
     history_index: Option<usize>,
     saved_input: String, // Save current input when browsing history
+
+    // Exit state for Ctrl-C handling
+    exit_state: ExitState,
+    exit_warn_time: Option<std::time::Instant>,
+
+    // View navigation stack (for Esc zoom-out)
+    view_stack: Vec<View>,
+
+    // Data for overlay views
+    git_status: Vec<String>,
+    git_selected: usize,
+    artifacts: Vec<Artifact>,
+    artifact_selected: usize,
+    plans: Vec<Plan>,
+    plan_selected: usize,
+    prompt_selected: usize,
+
+    // Sessions view data
+    detected_sessions: Vec<DetectedSession>,
+    session_selected: usize,
+}
+
+/// An artifact (file, diff, etc.)
+#[derive(Debug, Clone)]
+struct Artifact {
+    name: String,
+    kind: String, // "file", "diff", "log"
+    path: Option<String>,
+    preview: String,
+}
+
+/// A plan/task
+#[derive(Debug, Clone)]
+struct Plan {
+    name: String,
+    status: String, // "pending", "done", "in_progress"
+    steps: Vec<String>,
+}
+
+/// A detected session (hyle or foreign)
+#[derive(Debug, Clone)]
+struct DetectedSession {
+    id: String,
+    tool: String,           // "hyle", "claude-code", "aider", "codex", etc.
+    status: SessionStatus,
+    age: String,
+    tokens: u64,
+    messages: usize,
+    integration: Integration,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum SessionStatus {
+    Active,      // Currently running
+    Backburner,  // Running in background
+    Cold,        // Stale, can be revived
+    Foreign,     // Different tool
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Integration {
+    Full,     // Full hyle integration
+    Partial,  // Some features work
+    ReadOnly, // Can view but not control
 }
 
 impl TuiState {
@@ -267,7 +360,7 @@ impl TuiState {
         Self {
             tab: Tab::Chat,
             input: String::new(),
-            output: vec!["Welcome to hyle. Type your request and press Enter.".into()],
+            output: vec!["Welcome to hyle. Press Ctrl-C twice to quit, Esc to zoom out.".into()],
             log: Vec::new(),
             telemetry: Telemetry::new(60, 4), // 60 second window, 4Hz
             traces: Traces::new(context_window),
@@ -287,6 +380,157 @@ impl TuiState {
             prompt_history: Vec::new(),
             history_index: None,
             saved_input: String::new(),
+            exit_state: ExitState::Running,
+            exit_warn_time: None,
+            view_stack: vec![],
+            git_status: vec![],
+            git_selected: 0,
+            artifacts: vec![],
+            artifact_selected: 0,
+            plans: vec![],
+            plan_selected: 0,
+            prompt_selected: 0,
+            detected_sessions: vec![],
+            session_selected: 0,
+        }
+    }
+
+    /// Scan for sessions (hyle and foreign)
+    fn refresh_sessions(&mut self) {
+        self.detected_sessions.clear();
+
+        // Scan hyle sessions
+        if let Ok(sessions) = crate::session::list_sessions() {
+            for s in sessions.iter().take(20) {
+                let age = chrono::Utc::now() - s.updated_at;
+                let age_str = if age.num_hours() < 1 {
+                    format!("{}m", age.num_minutes())
+                } else if age.num_days() < 1 {
+                    format!("{}h", age.num_hours())
+                } else {
+                    format!("{}d", age.num_days())
+                };
+
+                let status = if age.num_hours() < 1 {
+                    SessionStatus::Active
+                } else if age.num_days() < 1 {
+                    SessionStatus::Backburner
+                } else {
+                    SessionStatus::Cold
+                };
+
+                self.detected_sessions.push(DetectedSession {
+                    id: s.id.clone(),
+                    tool: "hyle".into(),
+                    status,
+                    age: age_str,
+                    tokens: s.total_tokens,
+                    messages: s.message_count,
+                    integration: Integration::Full,
+                });
+            }
+        }
+
+        // Scan for foreign sessions (claude code, aider, etc.)
+        self.scan_foreign_sessions();
+    }
+
+    fn scan_foreign_sessions(&mut self) {
+        // Claude Code sessions (~/.claude/)
+        if let Some(home) = dirs::home_dir() {
+            let claude_dir = home.join(".claude");
+            if claude_dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(&claude_dir) {
+                    for entry in entries.filter_map(|e| e.ok()).take(5) {
+                        if entry.path().is_dir() {
+                            self.detected_sessions.push(DetectedSession {
+                                id: entry.file_name().to_string_lossy().to_string(),
+                                tool: "claude-code".into(),
+                                status: SessionStatus::Foreign,
+                                age: "?".into(),
+                                tokens: 0,
+                                messages: 0,
+                                integration: Integration::ReadOnly,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Aider sessions
+            let aider_dir = home.join(".aider");
+            if aider_dir.exists() {
+                self.detected_sessions.push(DetectedSession {
+                    id: "aider-history".into(),
+                    tool: "aider".into(),
+                    status: SessionStatus::Foreign,
+                    age: "?".into(),
+                    tokens: 0,
+                    messages: 0,
+                    integration: Integration::ReadOnly,
+                });
+            }
+        }
+    }
+
+    /// Push a view onto the stack (for zoom-in navigation)
+    fn push_view(&mut self, view: View) {
+        self.view_stack.push(self.tab);
+        self.tab = view;
+    }
+
+    /// Pop view from stack (zoom-out with Esc)
+    fn pop_view(&mut self) -> bool {
+        if let Some(prev) = self.view_stack.pop() {
+            self.tab = prev;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check if we're in an overlay view
+    fn in_overlay(&self) -> bool {
+        self.tab.is_overlay()
+    }
+
+    /// Handle Ctrl-C - returns true if should exit
+    fn handle_ctrl_c(&mut self) -> bool {
+        match self.exit_state {
+            ExitState::Running => {
+                self.exit_state = ExitState::WarnOnce;
+                self.exit_warn_time = Some(std::time::Instant::now());
+                self.log("Press Ctrl-C again to quit (session will be saved)");
+                false
+            }
+            ExitState::WarnOnce => {
+                self.exit_state = ExitState::Exiting;
+                true
+            }
+            ExitState::Exiting => true,
+        }
+    }
+
+    /// Reset exit warning after timeout
+    fn check_exit_timeout(&mut self) {
+        if let Some(warn_time) = self.exit_warn_time {
+            if warn_time.elapsed() > Duration::from_secs(3) {
+                self.exit_state = ExitState::Running;
+                self.exit_warn_time = None;
+            }
+        }
+    }
+
+    /// Refresh git status
+    fn refresh_git_status(&mut self) {
+        if let Ok(output) = std::process::Command::new("git")
+            .args(["status", "--porcelain", "-b"])
+            .output()
+        {
+            self.git_status = String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(|s| s.to_string())
+                .collect();
         }
     }
 
@@ -530,13 +774,60 @@ async fn run_tui_loop(
                     continue;
                 }
 
+                // Check exit timeout
+                state.check_exit_timeout();
+
                 // Global controls
                 match key.code {
-                    KeyCode::Esc => break,
+                    // Ctrl-C: warn first, then exit
+                    KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        if state.handle_ctrl_c() {
+                            // Save session before exit
+                            if let Err(e) = session.save_meta() {
+                                state.log(format!("Session save error: {}", e));
+                            }
+                            break;
+                        }
+                    }
+                    // Esc: zoom out (context-dependent)
+                    KeyCode::Esc => {
+                        if state.in_overlay() {
+                            // Pop back from overlay view
+                            state.pop_view();
+                        } else if state.input.is_empty() {
+                            // Clear any selection state, but don't exit
+                            state.history_index = None;
+                            state.auto_scroll = true;
+                        } else {
+                            // Clear input
+                            state.input.clear();
+                            state.history_index = None;
+                        }
+                    }
+                    // Tab: cycle through main views
                     KeyCode::Tab => {
-                        let tabs = Tab::all();
-                        let idx = tabs.iter().position(|t| *t == state.tab).unwrap_or(0);
-                        state.tab = tabs[(idx + 1) % tabs.len()];
+                        let views = View::main_views();
+                        let idx = views.iter().position(|v| *v == state.tab).unwrap_or(0);
+                        state.tab = views[(idx + 1) % views.len()];
+                        state.view_stack.clear(); // Clear stack when switching tabs
+                    }
+                    // Shift+Tab: cycle backwards
+                    KeyCode::BackTab => {
+                        let views = View::main_views();
+                        let idx = views.iter().position(|v| *v == state.tab).unwrap_or(0);
+                        state.tab = views[(idx + views.len() - 1) % views.len()];
+                        state.view_stack.clear();
+                    }
+                    // Quick access to overlay views
+                    KeyCode::Char('p') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        state.push_view(View::Prompts);
+                    }
+                    KeyCode::Char('g') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        state.refresh_git_status();
+                        state.push_view(View::Git);
+                    }
+                    KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        state.push_view(View::Artifacts);
                     }
                     KeyCode::Char('k') if key.modifiers.is_empty() && state.is_generating => {
                         state.throttle = ThrottleMode::Killed;
@@ -657,19 +948,47 @@ fn render_tui(f: &mut Frame, state: &TuiState, model: &str) {
         ])
         .split(area);
 
-    // Header with tabs
-    let tabs = Tabs::new(Tab::all().iter().map(|t| t.name()))
-        .select(Tab::all().iter().position(|t| *t == state.tab).unwrap_or(0))
+    // Exit warning banner
+    let exit_warning = matches!(state.exit_state, ExitState::WarnOnce);
+
+    // Header with tabs and navigation hint
+    let nav_hint = if state.in_overlay() {
+        format!(" [Esc to go back]")
+    } else if !state.view_stack.is_empty() {
+        format!(" [{}→]", state.view_stack.len())
+    } else {
+        String::new()
+    };
+
+    let header_title = if exit_warning {
+        format!("hyle | {} | ⚠ Press Ctrl-C again to quit{}", model, nav_hint)
+    } else {
+        format!("hyle | {}{}", model, nav_hint)
+    };
+
+    let header_style = if exit_warning {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+
+    let tabs = Tabs::new(View::main_views().iter().map(|t| t.name()))
+        .select(View::main_views().iter().position(|v| *v == state.tab).unwrap_or(0))
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-        .block(Block::default().borders(Borders::ALL).title(format!("hyle | {}", model)));
+        .block(Block::default().borders(Borders::ALL).title(header_title).style(header_style));
     f.render_widget(tabs, chunks[0]);
 
-    // Main content based on tab
+    // Main content based on view
     match state.tab {
-        Tab::Chat => render_chat(f, state, chunks[1]),
-        Tab::Telemetry => render_telemetry(f, state, chunks[1]),
-        Tab::Log => render_log(f, state, chunks[1]),
+        View::Chat => render_chat(f, state, chunks[1]),
+        View::Telemetry => render_telemetry(f, state, chunks[1]),
+        View::Log => render_log(f, state, chunks[1]),
+        View::Sessions => render_sessions(f, state, chunks[1]),
+        View::Prompts => render_prompts(f, state, chunks[1]),
+        View::Git => render_git(f, state, chunks[1]),
+        View::Artifacts => render_artifacts(f, state, chunks[1]),
+        View::Plans => render_plans(f, state, chunks[1]),
     }
 
     // Input
@@ -690,18 +1009,34 @@ fn render_tui(f: &mut Frame, state: &TuiState, model: &str) {
 
     // Status bar
     let pressure = state.telemetry.pressure();
-    let sparkline = state.telemetry.cpu_sparkline(20);
+    let sparkline = state.telemetry.cpu_sparkline(16);
+
+    // Build contextual help based on current view
+    let help = if state.in_overlay() {
+        "Esc:back ↑↓:select Enter:use"
+    } else if exit_warning {
+        "Ctrl-C:QUIT NOW"
+    } else {
+        "^C:quit ^P:prompts ^G:git Tab:tabs"
+    };
+
     let status = format!(
-        " {} | CPU: {} {} | Throttle: {} | k:kill t:throttle f:full n:normal Tab:switch Esc:quit",
+        " {} | {} {} | {} | {}",
         if state.is_generating { spinner_char(state.tick) } else { ' ' },
         sparkline,
         pressure.symbol(),
         state.throttle.name(),
+        help,
     );
-    let status_style = match pressure {
-        PressureLevel::Critical => Style::default().fg(Color::Red),
-        PressureLevel::High => Style::default().fg(Color::Yellow),
-        _ => Style::default().fg(Color::DarkGray),
+
+    let status_style = if exit_warning {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        match pressure {
+            PressureLevel::Critical => Style::default().fg(Color::Red),
+            PressureLevel::High => Style::default().fg(Color::Yellow),
+            _ => Style::default().fg(Color::DarkGray),
+        }
     };
     let status = Paragraph::new(status).style(status_style);
     f.render_widget(status, chunks[3]);
@@ -792,6 +1127,169 @@ fn render_log(f: &mut Frame, state: &TuiState, area: Rect) {
     let text: String = state.log.iter().rev().take(50).cloned().collect::<Vec<_>>().join("\n");
     let para = Paragraph::new(text)
         .block(Block::default().borders(Borders::ALL).title("Log"));
+    f.render_widget(para, area);
+}
+
+fn render_sessions(f: &mut Frame, state: &TuiState, area: Rect) {
+    let mut lines = vec![
+        "Sessions (↑↓:select Enter:resume/view r:refresh)".into(),
+        "".into(),
+    ];
+
+    if state.detected_sessions.is_empty() {
+        lines.push("No sessions found. Start one with `hyle --new`".into());
+        lines.push("".into());
+        lines.push("Sessions from other tools will appear here:".into());
+        lines.push("  - claude-code, aider, codex, gemini".into());
+    } else {
+        // Group by status
+        let active: Vec<_> = state.detected_sessions.iter()
+            .filter(|s| matches!(s.status, SessionStatus::Active | SessionStatus::Backburner))
+            .collect();
+        let cold: Vec<_> = state.detected_sessions.iter()
+            .filter(|s| matches!(s.status, SessionStatus::Cold))
+            .collect();
+        let foreign: Vec<_> = state.detected_sessions.iter()
+            .filter(|s| matches!(s.status, SessionStatus::Foreign))
+            .collect();
+
+        if !active.is_empty() {
+            lines.push("── Active/Backburner ──".into());
+            for (i, s) in active.iter().enumerate() {
+                let marker = if i == state.session_selected { ">" } else { " " };
+                let status_icon = match s.status {
+                    SessionStatus::Active => "●",
+                    SessionStatus::Backburner => "◐",
+                    _ => "○",
+                };
+                let int_icon = match s.integration {
+                    Integration::Full => "★",
+                    Integration::Partial => "☆",
+                    Integration::ReadOnly => "○",
+                };
+                lines.push(format!("{} {} {} {} | {}msg {}tok | {} {}",
+                    marker, status_icon, s.tool, s.id,
+                    s.messages, s.tokens, s.age, int_icon));
+            }
+            lines.push("".into());
+        }
+
+        if !cold.is_empty() {
+            lines.push("── Cold (can revive) ──".into());
+            for s in cold.iter().take(5) {
+                lines.push(format!("  ○ {} {} | {}msg {}tok | {}",
+                    s.tool, s.id, s.messages, s.tokens, s.age));
+            }
+            lines.push("".into());
+        }
+
+        if !foreign.is_empty() {
+            lines.push("── Foreign Tools (read-only) ──".into());
+            for s in foreign.iter().take(5) {
+                lines.push(format!("  ◇ {} {}", s.tool, s.id));
+            }
+        }
+    }
+
+    let para = Paragraph::new(lines.join("\n"))
+        .block(Block::default().borders(Borders::ALL).title("Sessions"));
+    f.render_widget(para, area);
+}
+
+fn render_prompts(f: &mut Frame, state: &TuiState, area: Rect) {
+    let mut lines = vec![
+        "Prompt History (Up/Down to navigate, Enter to reuse, Esc to close)".into(),
+        "".into(),
+    ];
+
+    if state.prompt_history.is_empty() {
+        lines.push("No prompts yet.".into());
+    } else {
+        for (i, prompt) in state.prompt_history.iter().enumerate().rev() {
+            let marker = if i == state.prompt_selected { ">" } else { " " };
+            let truncated = if prompt.len() > 60 {
+                format!("{}...", &prompt[..60])
+            } else {
+                prompt.clone()
+            };
+            lines.push(format!("{} [{}] {}", marker, i + 1, truncated));
+        }
+    }
+
+    let para = Paragraph::new(lines.join("\n"))
+        .block(Block::default().borders(Borders::ALL).title("Prompt Inventory [Ctrl-P]"));
+    f.render_widget(para, area);
+}
+
+fn render_git(f: &mut Frame, state: &TuiState, area: Rect) {
+    let mut lines = vec![
+        "Git Status (Esc to close)".into(),
+        "".into(),
+    ];
+
+    if state.git_status.is_empty() {
+        lines.push("Not a git repository or git not available.".into());
+    } else {
+        for (i, line) in state.git_status.iter().enumerate() {
+            let marker = if i == state.git_selected { ">" } else { " " };
+            lines.push(format!("{} {}", marker, line));
+        }
+    }
+
+    let para = Paragraph::new(lines.join("\n"))
+        .block(Block::default().borders(Borders::ALL).title("Git [Ctrl-G]"));
+    f.render_widget(para, area);
+}
+
+fn render_artifacts(f: &mut Frame, state: &TuiState, area: Rect) {
+    let mut lines = vec![
+        "Generated Artifacts (Esc to close)".into(),
+        "".into(),
+    ];
+
+    if state.artifacts.is_empty() {
+        lines.push("No artifacts generated yet.".into());
+        lines.push("".into());
+        lines.push("Artifacts include:".into());
+        lines.push("  - Generated files".into());
+        lines.push("  - Diffs and patches".into());
+        lines.push("  - Code snippets".into());
+    } else {
+        for (i, artifact) in state.artifacts.iter().enumerate() {
+            let marker = if i == state.artifact_selected { ">" } else { " " };
+            lines.push(format!("{} [{}] {} - {}", marker, artifact.kind, artifact.name, artifact.preview));
+        }
+    }
+
+    let para = Paragraph::new(lines.join("\n"))
+        .block(Block::default().borders(Borders::ALL).title("Artifacts [Ctrl-A]"));
+    f.render_widget(para, area);
+}
+
+fn render_plans(f: &mut Frame, state: &TuiState, area: Rect) {
+    let mut lines = vec![
+        "Task Plans (Esc to close)".into(),
+        "".into(),
+    ];
+
+    if state.plans.is_empty() {
+        lines.push("No plans created yet.".into());
+        lines.push("".into());
+        lines.push("Ask the model to create a plan for complex tasks.".into());
+    } else {
+        for (i, plan) in state.plans.iter().enumerate() {
+            let marker = if i == state.plan_selected { ">" } else { " " };
+            let status_icon = match plan.status.as_str() {
+                "done" => "✓",
+                "in_progress" => "◐",
+                _ => "○",
+            };
+            lines.push(format!("{} {} {} ({} steps)", marker, status_icon, plan.name, plan.steps.len()));
+        }
+    }
+
+    let para = Paragraph::new(lines.join("\n"))
+        .block(Block::default().borders(Borders::ALL).title("Plans"));
     f.render_widget(para, area);
 }
 
