@@ -1,7 +1,14 @@
 //! hyle-api: HTTP server for sketch submission and job orchestration
 //!
 //! Accepts sketch submissions, queues builds, returns live URLs.
-//! Run with: HYLE_API_KEY=... cargo run --bin hyle-api
+//! Supports multi-model round-robin with automatic fallback on rate limits.
+//!
+//! Environment variables:
+//!   PORT                 - HTTP port (default: 3000)
+//!   OPENROUTER_API_KEY   - OpenRouter API key
+//!   HYLE_MODELS          - Comma-separated list of models to use
+//!   HYLE_PROJECTS_DIR    - Where to create projects (default: /var/www/drops)
+//!   HYLE_BINARY          - Path to hyle binary (default: /usr/local/bin/hyle)
 
 use axum::{
     extract::{Path, State},
@@ -15,17 +22,33 @@ use std::{
     env,
     path::PathBuf,
     process::Stdio,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
-use tokio::{
-    process::Command,
-    sync::RwLock,
-};
+use tokio::{process::Command, sync::RwLock, time::timeout};
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
+/// Default free models sorted by context length and quality
+const DEFAULT_MODELS: &[&str] = &[
+    "google/gemini-2.0-flash-exp:free",
+    "mistralai/devstral-2512:free",
+    "qwen/qwen3-coder:free",
+    "deepseek/deepseek-r1-0528:free",
+    "meta-llama/llama-3.1-8b-instruct:free",
+];
+
+/// Build timeout per model attempt (5 minutes)
+const MODEL_TIMEOUT_SECS: u64 = 300;
+
+/// Delay between model fallback attempts
+const FALLBACK_DELAY_MS: u64 = 2000;
+
 /// Job status
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 enum JobStatus {
     Queued,
@@ -44,6 +67,8 @@ struct Job {
     project_name: Option<String>,
     url: Option<String>,
     error: Option<String>,
+    model_used: Option<String>,
+    models_tried: Vec<String>,
     created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -53,6 +78,27 @@ struct AppState {
     projects_dir: PathBuf,
     hyle_binary: PathBuf,
     api_key: Option<String>,
+    models: Vec<String>,
+    /// Round-robin index for load balancing across models
+    model_index: AtomicUsize,
+}
+
+impl AppState {
+    /// Get next model in round-robin order
+    fn next_model(&self) -> &str {
+        let idx = self.model_index.fetch_add(1, Ordering::Relaxed) % self.models.len();
+        &self.models[idx]
+    }
+
+    /// Get all models starting from a random position for better distribution
+    fn get_model_rotation(&self) -> Vec<&str> {
+        let start = self.model_index.fetch_add(1, Ordering::Relaxed) % self.models.len();
+        let mut rotation = Vec::with_capacity(self.models.len());
+        for i in 0..self.models.len() {
+            rotation.push(self.models[(start + i) % self.models.len()].as_str());
+        }
+        rotation
+    }
 }
 
 /// Request to submit a sketch
@@ -75,11 +121,28 @@ struct JobResponse {
     status: String,
     url: Option<String>,
     error: Option<String>,
+    model_used: Option<String>,
+    models_tried: Vec<String>,
+}
+
+/// Models list response
+#[derive(Debug, Serialize)]
+struct ModelsResponse {
+    models: Vec<String>,
+    active_index: usize,
 }
 
 /// Health check
 async fn health() -> &'static str {
     "ok"
+}
+
+/// List available models
+async fn list_models(State(state): State<Arc<AppState>>) -> Json<ModelsResponse> {
+    Json(ModelsResponse {
+        models: state.models.clone(),
+        active_index: state.model_index.load(Ordering::Relaxed) % state.models.len(),
+    })
 }
 
 /// Submit a new sketch
@@ -89,10 +152,16 @@ async fn submit_sketch(
 ) -> Result<Json<SubmitResponse>, (StatusCode, String)> {
     let sketch = req.sketch.trim();
     if sketch.len() < 20 {
-        return Err((StatusCode::BAD_REQUEST, "Sketch too short".into()));
+        return Err((StatusCode::BAD_REQUEST, "Sketch too short (min 20 chars)".into()));
     }
 
-    // Generate job ID and project name
+    if state.api_key.is_none() {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "API key not configured".into(),
+        ));
+    }
+
     let job_id = Uuid::new_v4().to_string();
     let project_name = generate_project_name(sketch);
 
@@ -103,10 +172,11 @@ async fn submit_sketch(
         project_name: Some(project_name.clone()),
         url: None,
         error: None,
+        model_used: None,
+        models_tried: Vec::new(),
         created_at: chrono::Utc::now(),
     };
 
-    // Store job
     {
         let mut jobs = state.jobs.write().await;
         jobs.insert(job_id.clone(), job);
@@ -116,7 +186,7 @@ async fn submit_sketch(
     let state_clone = state.clone();
     let job_id_clone = job_id.clone();
     tokio::spawn(async move {
-        run_build(state_clone, job_id_clone).await;
+        run_build_with_fallback(state_clone, job_id_clone).await;
     });
 
     Ok(Json(SubmitResponse {
@@ -144,43 +214,39 @@ async fn get_job(
         },
         url: job.url.clone(),
         error: job.error.clone(),
+        model_used: job.model_used.clone(),
+        models_tried: job.models_tried.clone(),
     }))
 }
 
 /// Generate a project name from sketch
 fn generate_project_name(sketch: &str) -> String {
-    // Extract first significant word
     let words: Vec<&str> = sketch
         .split_whitespace()
-        .filter(|w| w.len() > 3)
+        .filter(|w| w.len() > 3 && w.chars().all(|c| c.is_alphanumeric()))
         .take(2)
         .collect();
 
-    let base = if words.is_empty() {
-        "project"
-    } else {
-        words[0]
-    };
+    let base = words.first().copied().unwrap_or("project");
 
-    // Sanitize
     let sanitized: String = base
         .chars()
         .filter(|c| c.is_alphanumeric())
         .take(12)
-        .collect();
+        .collect::<String>()
+        .to_lowercase();
 
     let name = if sanitized.is_empty() {
         "project".to_string()
     } else {
-        sanitized.to_lowercase()
+        sanitized
     };
 
-    // Add short random suffix
     format!("{}-{}", name, &Uuid::new_v4().to_string()[..4])
 }
 
-/// Run the build process
-async fn run_build(state: Arc<AppState>, job_id: String) {
+/// Run build with multi-model fallback
+async fn run_build_with_fallback(state: Arc<AppState>, job_id: String) {
     // Update status to building
     {
         let mut jobs = state.jobs.write().await;
@@ -191,8 +257,10 @@ async fn run_build(state: Arc<AppState>, job_id: String) {
 
     let (sketch, project_name) = {
         let jobs = state.jobs.read().await;
-        let job = jobs.get(&job_id).unwrap();
-        (job.sketch.clone(), job.project_name.clone().unwrap_or_default())
+        match jobs.get(&job_id) {
+            Some(job) => (job.sketch.clone(), job.project_name.clone().unwrap_or_default()),
+            None => return,
+        }
     };
 
     // Create project directory
@@ -209,50 +277,110 @@ async fn run_build(state: Arc<AppState>, job_id: String) {
         return;
     }
 
-    // Run hyle
-    let result = Command::new(&state.hyle_binary)
-        .arg("--trust")
-        .arg(&sketch_file)
-        .current_dir(&project_dir)
-        .env("HYLE_MODEL", env::var("HYLE_MODEL").unwrap_or_else(|_| "meta-llama/llama-3.1-8b-instruct:free".into()))
-        .env("OPENROUTER_API_KEY", state.api_key.clone().unwrap_or_default())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .await;
+    // Try each model in rotation
+    let models = state.get_model_rotation();
+    let mut last_error = String::new();
 
-    match result {
-        Ok(output) => {
-            if output.status.success() {
-                // Update status to deploying
-                {
-                    let mut jobs = state.jobs.write().await;
-                    if let Some(job) = jobs.get_mut(&job_id) {
-                        job.status = JobStatus::Deploying;
-                    }
-                }
+    for model in &models {
+        // Record that we tried this model
+        {
+            let mut jobs = state.jobs.write().await;
+            if let Some(job) = jobs.get_mut(&job_id) {
+                job.models_tried.push(model.to_string());
+            }
+        }
 
+        eprintln!("[{}] Trying model: {}", job_id, model);
+
+        match try_build_with_model(&state, &project_dir, &sketch_file, model).await {
+            Ok(()) => {
                 // Check if index.html was created
                 let index_path = project_dir.join("index.html");
                 if index_path.exists() {
-                    // Build succeeded - set live URL
+                    // Success!
                     let url = format!("https://{}.hyperstitious.org", project_name);
-                    let mut jobs = state.jobs.write().await;
-                    if let Some(job) = jobs.get_mut(&job_id) {
-                        job.status = JobStatus::Live;
-                        job.url = Some(url);
+                    {
+                        let mut jobs = state.jobs.write().await;
+                        if let Some(job) = jobs.get_mut(&job_id) {
+                            job.status = JobStatus::Live;
+                            job.url = Some(url);
+                            job.model_used = Some(model.to_string());
+                        }
                     }
-                } else {
-                    update_job_error(&state, &job_id, "Build completed but no index.html created").await;
+                    eprintln!("[{}] Success with model: {}", job_id, model);
+                    return;
                 }
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                update_job_error(&state, &job_id, &format!("Build failed: {}", stderr)).await;
+                last_error = "Build completed but no index.html created".to_string();
+            }
+            Err(e) => {
+                last_error = e;
+                eprintln!("[{}] Model {} failed: {}", job_id, model, last_error);
+
+                // Check if it's a rate limit error - if so, try next model
+                if last_error.contains("429")
+                    || last_error.contains("rate")
+                    || last_error.contains("throttl")
+                    || last_error.contains("limit")
+                {
+                    eprintln!("[{}] Rate limited, trying next model...", job_id);
+                    tokio::time::sleep(Duration::from_millis(FALLBACK_DELAY_MS)).await;
+                    continue;
+                }
+
+                // For other errors, still try next model but with delay
+                tokio::time::sleep(Duration::from_millis(FALLBACK_DELAY_MS)).await;
             }
         }
-        Err(e) => {
-            update_job_error(&state, &job_id, &format!("Failed to run hyle: {}", e)).await;
+    }
+
+    // All models exhausted
+    update_job_error(
+        &state,
+        &job_id,
+        &format!(
+            "All {} models failed. Last error: {}",
+            models.len(),
+            last_error
+        ),
+    )
+    .await;
+}
+
+/// Try to build with a specific model
+async fn try_build_with_model(
+    state: &Arc<AppState>,
+    project_dir: &PathBuf,
+    sketch_file: &PathBuf,
+    model: &str,
+) -> Result<(), String> {
+    let result = timeout(
+        Duration::from_secs(MODEL_TIMEOUT_SECS),
+        Command::new(&state.hyle_binary)
+            .arg("--trust")
+            .arg(sketch_file)
+            .current_dir(project_dir)
+            .env("HYLE_MODEL", model)
+            .env(
+                "OPENROUTER_API_KEY",
+                state.api_key.as_deref().unwrap_or(""),
+            )
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output(),
+    )
+    .await;
+
+    match result {
+        Ok(Ok(output)) => {
+            if output.status.success() {
+                Ok(())
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                Err(format!("Exit {}: {}", output.status, stderr.trim()))
+            }
         }
+        Ok(Err(e)) => Err(format!("Failed to execute hyle: {}", e)),
+        Err(_) => Err(format!("Timeout after {}s", MODEL_TIMEOUT_SECS)),
     }
 }
 
@@ -266,45 +394,81 @@ async fn update_job_error(state: &Arc<AppState>, job_id: &str, error: &str) {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Configuration from environment
     let port: u16 = env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
 
-    let projects_dir = PathBuf::from(
-        env::var("HYLE_PROJECTS_DIR").unwrap_or_else(|_| "/var/www/drops".into())
-    );
+    let projects_dir =
+        PathBuf::from(env::var("HYLE_PROJECTS_DIR").unwrap_or_else(|_| "/var/www/drops".into()));
 
-    let hyle_binary = PathBuf::from(
-        env::var("HYLE_BINARY").unwrap_or_else(|_| "/usr/local/bin/hyle".into())
-    );
+    let hyle_binary =
+        PathBuf::from(env::var("HYLE_BINARY").unwrap_or_else(|_| "/usr/local/bin/hyle".into()));
 
     let api_key = env::var("OPENROUTER_API_KEY").ok();
+
+    // Load models from env or use defaults
+    let models: Vec<String> = env::var("HYLE_MODELS")
+        .map(|s| s.split(',').map(|m| m.trim().to_string()).collect())
+        .unwrap_or_else(|_| DEFAULT_MODELS.iter().map(|s| s.to_string()).collect());
+
+    eprintln!("hyle-api starting...");
+    eprintln!("  Port: {}", port);
+    eprintln!("  Projects dir: {}", projects_dir.display());
+    eprintln!("  Hyle binary: {}", hyle_binary.display());
+    eprintln!("  API key: {}", if api_key.is_some() { "set" } else { "NOT SET" });
+    eprintln!("  Models ({}): {:?}", models.len(), models);
 
     let state = Arc::new(AppState {
         jobs: RwLock::new(HashMap::new()),
         projects_dir,
         hyle_binary,
         api_key,
+        models,
+        model_index: AtomicUsize::new(0),
     });
 
-    // CORS for cross-origin requests from hyle.lol
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST])
-        .allow_headers([header::CONTENT_TYPE]);
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
 
     let app = Router::new()
         .route("/health", get(health))
+        .route("/api/models", get(list_models))
         .route("/api/sketch", post(submit_sketch))
-        .route("/api/jobs/:job_id", get(get_job))
+        .route("/api/jobs/{job_id}", get(get_job))
         .layer(cors)
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
-    eprintln!("hyle-api listening on port {}", port);
+    eprintln!("hyle-api listening on http://0.0.0.0:{}", port);
 
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_project_name() {
+        let name = generate_project_name("build a simple calculator app");
+        assert!(name.starts_with("build-") || name.starts_with("simple-"));
+        assert!(name.len() < 20);
+    }
+
+    #[test]
+    fn test_generate_project_name_sanitizes() {
+        let name = generate_project_name("foo/bar/../baz evil");
+        assert!(!name.contains('/'));
+        assert!(!name.contains('.'));
+    }
+
+    #[test]
+    fn test_generate_project_name_handles_empty() {
+        let name = generate_project_name("a b c");
+        assert!(name.starts_with("project-"));
+    }
 }

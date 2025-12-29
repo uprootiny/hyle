@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
+User=uprootiny
+Group=uprootiny
 WorkingDirectory=/var/www/drops
 ExecStart=/usr/local/bin/hyle-api
 Restart=on-failure
@@ -13,6 +13,7 @@ RestartSec=5
 Environment=PORT=3000
 Environment=HYLE_PROJECTS_DIR=/var/www/drops
 Environment=HYLE_BINARY=/usr/local/bin/hyle
+Environment=HOME=/home/uprootiny
 EnvironmentFile=/etc/hyle/env
 
 [Install]
