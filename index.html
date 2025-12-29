@@ -9,28 +9,26 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
     <style>
         :root {
-            --bg: #111;
+            --bg: #0a0a0a;
             --fg: #e8e8e8;
-            --muted: #888;
+            --muted: #666;
             --accent: #6b9fff;
-            --accent-hover: #8bb4ff;
-            --border: #333;
-            --code-bg: #1a1a1a;
+            --accent-dim: #3d5a99;
+            --border: #222;
+            --code-bg: #141414;
             --success: #4a9;
             --sp-1: 0.5rem;
             --sp-2: 1rem;
             --sp-3: 1.5rem;
             --sp-4: 2rem;
             --sp-6: 3rem;
-            --text-sm: clamp(0.875rem, 0.8rem + 0.25vw, 0.9375rem);
-            --text-base: clamp(1rem, 0.9rem + 0.35vw, 1.125rem);
-            --text-lg: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem);
-            --text-xl: clamp(1.75rem, 1.4rem + 1vw, 2.5rem);
-            --measure: 65ch;
+            --text-sm: 0.875rem;
+            --text-base: 1rem;
+            --text-lg: 1.25rem;
+            --text-xl: 2rem;
         }
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html { -webkit-font-smoothing: antialiased; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -39,54 +37,195 @@
             color: var(--fg);
             background: var(--bg);
             min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
             padding: var(--sp-4);
         }
 
-        main {
-            max-width: var(--measure);
-            margin: 0 auto;
-            padding: var(--sp-4) 0;
+        header {
+            text-align: center;
+            padding: var(--sp-6) 0;
         }
 
         h1 {
             font-size: var(--text-xl);
-            font-weight: 400;
+            font-weight: 300;
             letter-spacing: -0.02em;
+            margin-bottom: var(--sp-1);
         }
 
         .tagline {
             font-size: var(--text-lg);
             color: var(--muted);
-            margin-bottom: var(--sp-4);
         }
 
-        section { margin-bottom: var(--sp-6); }
+        /* WORKFLOW EXAMPLES */
+        .workflows {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-6);
+            margin: var(--sp-6) 0;
+        }
 
-        section h2 {
+        .workflow {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .workflow-header {
+            padding: var(--sp-2) var(--sp-3);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: var(--sp-2);
+        }
+
+        .workflow-title {
             font-size: var(--text-sm);
             font-weight: 600;
             color: var(--muted);
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            margin-bottom: var(--sp-2);
         }
 
-        /* SKETCH INPUT */
-        .sketch-form {
+        .workflow-link {
+            margin-left: auto;
+            font-size: var(--text-sm);
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .workflow-link:hover {
+            text-decoration: underline;
+        }
+
+        .flow-steps {
             display: flex;
             flex-direction: column;
-            gap: var(--sp-2);
+        }
+
+        .flow-step {
+            padding: var(--sp-3);
+            border-bottom: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: var(--sp-3);
+            align-items: start;
+        }
+
+        .flow-step:last-child {
+            border-bottom: none;
+        }
+
+        .step-label {
+            font-size: var(--text-sm);
+            color: var(--muted);
+            font-weight: 500;
+            padding-top: 2px;
+        }
+
+        .step-content {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: var(--text-sm);
+            line-height: 1.5;
+        }
+
+        .prompt-text {
+            color: var(--fg);
+            white-space: pre-wrap;
+        }
+
+        .response-text {
+            color: var(--accent);
+        }
+
+        .hyle-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .hyle-step {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-1);
+            color: var(--muted);
+            font-size: var(--text-sm);
+        }
+
+        .hyle-step::before {
+            content: '→';
+            color: var(--accent-dim);
+        }
+
+        .hyle-step.done {
+            color: var(--success);
+        }
+
+        .hyle-step.done::before {
+            content: '✓';
+            color: var(--success);
+        }
+
+        .live-url {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--sp-1);
+            padding: 6px 12px;
+            background: rgba(107, 159, 255, 0.1);
+            border: 1px solid var(--accent-dim);
+            border-radius: 4px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: var(--text-sm);
+        }
+
+        .live-url:hover {
+            background: rgba(107, 159, 255, 0.2);
+        }
+
+        .live-indicator {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* INPUT SECTION */
+        .input-section {
+            margin: var(--sp-6) 0;
+            padding: var(--sp-4);
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .input-section h2 {
+            font-size: var(--text-base);
+            font-weight: 500;
+            margin-bottom: var(--sp-3);
         }
 
         .sketch-input {
             width: 100%;
-            min-height: 300px;
+            min-height: 200px;
             padding: var(--sp-2);
-            background: var(--code-bg);
+            background: var(--bg);
             border: 2px dashed var(--border);
             border-radius: 4px;
             color: var(--fg);
-            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-family: 'SF Mono', 'Fira Code', monospace;
             font-size: var(--text-sm);
             line-height: 1.5;
             resize: vertical;
@@ -102,14 +241,15 @@
             color: var(--muted);
         }
 
-        .sketch-input.dragover {
-            border-color: var(--accent);
-            background: rgba(107, 159, 255, 0.05);
+        .input-actions {
+            display: flex;
+            gap: var(--sp-2);
+            margin-top: var(--sp-2);
+            align-items: center;
         }
 
         .submit-btn {
-            align-self: flex-start;
-            padding: var(--sp-1) var(--sp-3);
+            padding: 10px 24px;
             background: var(--accent);
             color: var(--bg);
             border: none;
@@ -117,269 +257,305 @@
             font-size: var(--text-base);
             font-weight: 500;
             cursor: pointer;
-            transition: background 0.1s;
         }
 
-        .submit-btn:hover { background: var(--accent-hover); }
-        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .submit-btn:hover { background: #8bb4ff; }
 
         .status {
             padding: var(--sp-2);
             border-radius: 4px;
             font-size: var(--text-sm);
             display: none;
+            margin-top: var(--sp-2);
         }
 
         .status.visible { display: block; }
         .status.success { background: rgba(68, 170, 153, 0.15); border: 1px solid var(--success); }
         .status.error { background: rgba(255, 100, 100, 0.1); border: 1px solid #c66; }
 
-        /* LINKS */
-        a { color: var(--accent); text-decoration: none; }
-        a:hover { text-decoration: underline; }
-
-        /* EXAMPLE SKETCHES */
-        .examples {
-            display: flex;
-            gap: var(--sp-1);
-            flex-wrap: wrap;
-            margin-top: var(--sp-1);
-        }
-
-        .example-btn {
-            padding: 0.25rem 0.5rem;
-            background: var(--code-bg);
-            border: 1px solid var(--border);
-            border-radius: 3px;
-            color: var(--muted);
-            font-size: var(--text-sm);
-            cursor: pointer;
-        }
-
-        .example-btn:hover {
-            border-color: var(--accent);
-            color: var(--fg);
-        }
-
-        .muted { color: var(--muted); }
-        .small { font-size: var(--text-sm); }
-
+        /* FOOTER */
         footer {
-            margin-top: var(--sp-6);
-            padding-top: var(--sp-3);
-            border-top: 1px solid var(--border);
+            text-align: center;
+            padding: var(--sp-6) 0;
             color: var(--muted);
             font-size: var(--text-sm);
         }
 
+        footer a { color: var(--accent); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+
+        /* RESPONSIVE */
         @media (max-width: 600px) {
-            body { padding: var(--sp-2); }
-            .sketch-input { min-height: 200px; }
+            .flow-step {
+                grid-template-columns: 1fr;
+                gap: var(--sp-1);
+            }
+            .step-label {
+                font-size: 0.75rem;
+            }
         }
 
         @media (prefers-reduced-motion: reduce) {
-            * { transition: none !important; }
+            .live-indicator { animation: none; }
         }
     </style>
 </head>
 <body>
-    <main>
+    <div class="container">
         <header>
             <h1>hyle</h1>
-            <p class="tagline">paste a sketch, get a project</p>
+            <p class="tagline">paste a sketch, get a live project</p>
         </header>
 
-        <section>
-            <h2>Your Sketch</h2>
-            <form class="sketch-form" id="sketchForm">
+        <!-- WORKFLOW EXAMPLES -->
+        <section class="workflows">
+
+            <!-- Example 1: Generative Art -->
+            <article class="workflow">
+                <div class="workflow-header">
+                    <span class="workflow-title">Generative Art</span>
+                    <a href="https://dodeca.hyperstitious.org" class="workflow-link">view live →</a>
+                </div>
+                <div class="flow-steps">
+                    <div class="flow-step">
+                        <span class="step-label">prompt</span>
+                        <div class="step-content">
+                            <span class="prompt-text">spiky dodecahedron with perturbed surface using landscape generation algos. layered rotoscoped rendering floating over starry void. weather bursts of starfall where stars turn into crawling ants that settle on surface and build colonies via cellular automata</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">response</span>
+                        <div class="step-content">
+                            <span class="response-text">WebGL sketch with three.js. Perlin noise displacement on icosahedron geometry. Post-processing bloom + edge detection for rotoscope effect. Particle system for stars with attractor points. Ant colony CA runs on UV-mapped texture.</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">hyle</span>
+                        <div class="step-content">
+                            <div class="hyle-steps">
+                                <span class="hyle-step done">scaffold vite + three.js project</span>
+                                <span class="hyle-step done">implement geometry with noise displacement</span>
+                                <span class="hyle-step done">add particle system and attractors</span>
+                                <span class="hyle-step done">implement cellular automata on surface</span>
+                                <span class="hyle-step done">add post-processing pipeline</span>
+                                <span class="hyle-step done">build and deploy</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">live</span>
+                        <div class="step-content">
+                            <a href="https://dodeca.hyperstitious.org" class="live-url">
+                                <span class="live-indicator"></span>
+                                dodeca.hyperstitious.org
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Example 2: Data Sonification -->
+            <article class="workflow">
+                <div class="workflow-header">
+                    <span class="workflow-title">Data Sonification</span>
+                    <a href="https://seismic.hyperstitious.org" class="workflow-link">view live →</a>
+                </div>
+                <div class="flow-steps">
+                    <div class="flow-step">
+                        <span class="step-label">prompt</span>
+                        <div class="step-content">
+                            <span class="prompt-text">real-time seismic data sonification. fetch USGS earthquake feed, map magnitude to pitch, depth to reverb, location to stereo pan. visualize as expanding rings on mercator projection. dark mode, minimal UI</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">response</span>
+                        <div class="step-content">
+                            <span class="response-text">Web Audio API with Tone.js for synthesis. Fetch USGS GeoJSON feed every 30s. Canvas 2D for map rendering. Magnitude 0-10 maps to 80-800Hz. Depth 0-700km maps to reverb decay 0.1-3s.</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">hyle</span>
+                        <div class="step-content">
+                            <div class="hyle-steps">
+                                <span class="hyle-step done">create vite project with Tone.js</span>
+                                <span class="hyle-step done">implement USGS feed fetcher with CORS proxy</span>
+                                <span class="hyle-step done">build synthesizer with mapping functions</span>
+                                <span class="hyle-step done">render mercator map with earthquake rings</span>
+                                <span class="hyle-step done">add minimal dark UI with mute toggle</span>
+                                <span class="hyle-step done">deploy to subdomain</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">live</span>
+                        <div class="step-content">
+                            <a href="https://seismic.hyperstitious.org" class="live-url">
+                                <span class="live-indicator"></span>
+                                seismic.hyperstitious.org
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Example 3: Interactive Fiction -->
+            <article class="workflow">
+                <div class="workflow-header">
+                    <span class="workflow-title">Interactive Fiction</span>
+                    <a href="https://labyrinth.hyperstitious.org" class="workflow-link">view live →</a>
+                </div>
+                <div class="flow-steps">
+                    <div class="flow-step">
+                        <span class="step-label">prompt</span>
+                        <div class="step-content">
+                            <span class="prompt-text">procedural labyrinth crawler. text-based with ASCII map. rooms generated from markov chains trained on borges. inventory system. time moves only when you move. save state to URL hash</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">response</span>
+                        <div class="step-content">
+                            <span class="response-text">ClojureScript SPA. Markov chain from Library of Babel corpus. Maze gen with recursive backtracking. Game state in single atom, serialized to base64 URL hash. Reagent for reactive UI.</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">hyle</span>
+                        <div class="step-content">
+                            <div class="hyle-steps">
+                                <span class="hyle-step done">scaffold shadow-cljs + reagent</span>
+                                <span class="hyle-step done">implement markov chain text generator</span>
+                                <span class="hyle-step done">build maze generation algorithm</span>
+                                <span class="hyle-step done">create game state management</span>
+                                <span class="hyle-step done">add URL hash serialization</span>
+                                <span class="hyle-step done">build and deploy static bundle</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">live</span>
+                        <div class="step-content">
+                            <a href="https://labyrinth.hyperstitious.org" class="live-url">
+                                <span class="live-indicator"></span>
+                                labyrinth.hyperstitious.org
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Example 4: API Tool -->
+            <article class="workflow">
+                <div class="workflow-header">
+                    <span class="workflow-title">Developer Tool</span>
+                    <a href="https://jsonl.hyperstitious.org" class="workflow-link">view live →</a>
+                </div>
+                <div class="flow-steps">
+                    <div class="flow-step">
+                        <span class="step-label">prompt</span>
+                        <div class="step-content">
+                            <span class="prompt-text">JSONL viewer and query tool. paste or drag jsonl file. render as scrollable table with sticky headers. support jq-style path queries. highlight matching rows. export filtered results. all client-side, no server</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">response</span>
+                        <div class="step-content">
+                            <span class="response-text">Vanilla JS with virtual scrolling for large files. Parse JSONL line by line. Implement subset of jq path syntax (.foo.bar, .[0], .[] | select). CSS grid for table layout. Blob download for export.</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">hyle</span>
+                        <div class="step-content">
+                            <div class="hyle-steps">
+                                <span class="hyle-step done">create static HTML/CSS/JS structure</span>
+                                <span class="hyle-step done">implement JSONL parser with streaming</span>
+                                <span class="hyle-step done">build virtual scroll for 100k+ rows</span>
+                                <span class="hyle-step done">add jq path query engine</span>
+                                <span class="hyle-step done">implement drag-drop and export</span>
+                                <span class="hyle-step done">deploy static files</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <span class="step-label">live</span>
+                        <div class="step-content">
+                            <a href="https://jsonl.hyperstitious.org" class="live-url">
+                                <span class="live-indicator"></span>
+                                jsonl.hyperstitious.org
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+        </section>
+
+        <!-- INPUT SECTION -->
+        <section class="input-section">
+            <h2>Your turn</h2>
+            <form id="sketchForm">
                 <textarea
                     class="sketch-input"
                     id="sketchInput"
-                    placeholder="Describe your project here. Be specific about:
-
-- What it should do
-- What language/framework (or let hyle decide)
-- Any constraints or preferences
-
-Example:
-# todo-api
-
-A REST API for todos in Rust using axum.
-
-Endpoints:
-- GET /todos - list all
-- POST /todos - create
-- DELETE /todos/:id - delete
-
-Use SQLite for storage. Include tests."
+                    placeholder="describe what you want to build..."
                     required
                 ></textarea>
-                <div class="examples">
-                    <span class="muted small">Try:</span>
-                    <button type="button" class="example-btn" data-example="rust-cli">Rust CLI</button>
-                    <button type="button" class="example-btn" data-example="clj-api">Clojure API</button>
-                    <button type="button" class="example-btn" data-example="static-site">Static Site</button>
+                <div class="input-actions">
+                    <button type="submit" class="submit-btn" id="submitBtn">Build</button>
+                    <span style="color: var(--muted); font-size: var(--text-sm);">opens GitHub issue → workflow builds → you get a URL</span>
                 </div>
-                <button type="submit" class="submit-btn" id="submitBtn">Build Project</button>
                 <div class="status" id="status"></div>
             </form>
         </section>
 
-        <section>
-            <h2>How it works</h2>
-            <p class="muted">
-                Your sketch is submitted to a GitHub Actions workflow.
-                hyle reads it, scaffolds the project, writes code, runs tests,
-                and deploys to a subdomain. You get a link when it's done.
-            </p>
-            <p class="muted small">
-                Powered by free LLMs via OpenRouter. No API key needed.
-                <a href="https://github.com/uprootiny/hyle">Source code</a>.
-            </p>
-        </section>
-
-        <section>
-            <h2>Run locally</h2>
-            <pre style="background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: var(--sp-2); font-family: monospace; font-size: var(--text-sm); overflow-x: auto;"><code>cargo install --git https://github.com/uprootiny/hyle
-hyle "add error handling to src/main.rs"</code></pre>
-        </section>
-
         <footer>
             <p>
-                MIT licensed.
-                <a href="https://github.com/uprootiny/hyle">GitHub</a> ·
+                <a href="https://github.com/uprootiny/hyle">source</a> ·
+                <a href="https://github.com/uprootiny/hyle/issues">projects</a> ·
                 <a href="https://hyperstitious.org">hyperstitious.org</a>
             </p>
         </footer>
-    </main>
+    </div>
 
     <script>
-    const examples = {
-        'rust-cli': `# wordcount
-
-A command-line word counter in Rust.
-
-Usage: wordcount <file>
-       wordcount --stdin
-
-Features:
-- Count words, lines, characters
-- Support multiple files
-- JSON output with --json flag
-
-Use clap for argument parsing.
-Include unit tests.`,
-
-        'clj-api': `# link-shortener
-
-A URL shortener API in Clojure.
-
-Endpoints:
-- POST /shorten {url: "..."} -> {short: "abc123", url: "..."}
-- GET /:code -> 302 redirect to original URL
-
-Use ring + compojure.
-Store links in an atom (in-memory is fine).
-Include a simple HTML form at GET /.`,
-
-        'static-site': `# portfolio
-
-A minimal portfolio site.
-
-Sections:
-- Hero with name and one-liner
-- 3 project cards with title, description, link
-- Contact section with email
-
-Design:
-- Dark mode
-- System font stack
-- Mobile-first
-- No JavaScript required`
-    };
-
-    // Example buttons
-    document.querySelectorAll('.example-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const key = btn.dataset.example;
-            if (examples[key]) {
-                document.getElementById('sketchInput').value = examples[key];
-            }
-        });
-    });
-
-    // Drag and drop
-    const input = document.getElementById('sketchInput');
-
-    ['dragenter', 'dragover'].forEach(e => {
-        input.addEventListener(e, (ev) => {
-            ev.preventDefault();
-            input.classList.add('dragover');
-        });
-    });
-
-    ['dragleave', 'drop'].forEach(e => {
-        input.addEventListener(e, () => {
-            input.classList.remove('dragover');
-        });
-    });
-
-    input.addEventListener('drop', (ev) => {
-        ev.preventDefault();
-        const file = ev.dataTransfer.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                input.value = e.target.result;
-            };
-            reader.readAsText(file);
-        }
-    });
-
-    // Form submission
-    document.getElementById('sketchForm').addEventListener('submit', async (e) => {
+    document.getElementById('sketchForm').addEventListener('submit', (e) => {
         e.preventDefault();
 
         const sketch = document.getElementById('sketchInput').value.trim();
-        const btn = document.getElementById('submitBtn');
         const status = document.getElementById('status');
 
-        if (sketch.length < 50) {
-            status.textContent = 'Sketch too short. Please provide more detail (at least 50 characters).';
+        if (sketch.length < 20) {
+            status.textContent = 'Please describe your project in more detail.';
             status.className = 'status visible error';
             return;
         }
 
-        btn.disabled = true;
-        btn.textContent = 'Submitting...';
-        status.className = 'status';
-
-        // Create GitHub issue with the sketch
-        // The issue title is extracted from the first line or generated
         const lines = sketch.split('\n');
-        let title = lines[0].replace(/^#\s*/, '').trim();
-        if (!title || title.length > 100) {
-            title = 'New project sketch';
-        }
+        let title = lines[0].slice(0, 80);
+        if (title.length < 3) title = 'New project';
 
-        // URL-encode for GitHub issue creation
         const issueUrl = `https://github.com/uprootiny/hyle/issues/new?` +
             `title=${encodeURIComponent('[sketch] ' + title)}&` +
             `body=${encodeURIComponent(sketch)}&` +
             `labels=sketch`;
 
-        // Open GitHub issue page
-        status.innerHTML = `Opening GitHub to create your project request...<br><br>` +
-            `<a href="${issueUrl}" target="_blank">Click here if not redirected</a>`;
+        status.innerHTML = `<a href="${issueUrl}" target="_blank">Click to submit on GitHub →</a>`;
         status.className = 'status visible success';
 
-        btn.disabled = false;
-        btn.textContent = 'Build Project';
+        setTimeout(() => window.open(issueUrl, '_blank'), 300);
+    });
 
-        // Redirect after short delay so user sees the message
-        setTimeout(() => {
-            window.open(issueUrl, '_blank');
-        }, 500);
+    // Drag and drop
+    const input = document.getElementById('sketchInput');
+    input.addEventListener('dragover', (e) => { e.preventDefault(); input.style.borderColor = 'var(--accent)'; });
+    input.addEventListener('dragleave', () => { input.style.borderColor = ''; });
+    input.addEventListener('drop', (e) => {
+        e.preventDefault();
+        input.style.borderColor = '';
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (ev) => { input.value = ev.target.result; };
+            reader.readAsText(file);
+        }
     });
     </script>
 </body>
