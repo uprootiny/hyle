@@ -374,12 +374,30 @@ async fn try_build_with_model(
         Err(e) => return Err(format!("Failed to read sketch: {}", e)),
     };
 
-    // Wrap sketch with explicit instructions to write files
+    // Wrap sketch with the hyle philosophy: internet artpieces
     let task_prompt = format!(
-        "Create a web project based on this sketch. You MUST use the write() tool to create files. \
-         Create at minimum an index.html file. Use modern HTML/CSS/JS.\n\n\
-         Sketch:\n{}\n\n\
-         IMPORTANT: Use write(path=\"index.html\", content=\"...\") to create the files.",
+        r#"You are creating an INTERNET ARTPIECE — a self-contained, interactive browser experience.
+
+This is NOT a static webpage. This is something people open in their browser and INTERACT with.
+Think: generative art, data visualizations, audio toys, interactive fiction, creative tools.
+
+Requirements:
+- Single index.html file (all CSS/JS inline or embedded)
+- Responsive: works on any screen size
+- Smooth: 60fps animations, no jank
+- Dynamic: responds to user input (mouse, touch, keyboard)
+- Self-contained: no external dependencies, no build step
+- Delightful: surprising, playful, aesthetically considered
+
+The sketch describes what to build:
+---
+{}
+---
+
+Use the write() tool to create index.html with the complete artpiece.
+IMPORTANT: write(path="index.html", content="<!DOCTYPE html>...")
+
+Make it something people want to share. Make it memorable."#,
         sketch_content
     );
 
