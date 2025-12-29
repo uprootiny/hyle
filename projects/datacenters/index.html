@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datacenter Impact Visualization</title>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --text: #e0e0e0;
+            --accent: #00d4ff;
+            --warning: #ff6b35;
+            --danger: #ff3366;
+            --water: #3498db;
+            --power: #f1c40f;
+            --fire: #e74c3c;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'SF Mono', 'Consolas', monospace;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .panel {
+            position: fixed;
+            background: rgba(10, 10, 15, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 16px;
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+        }
+
+        .stats-panel {
+            top: 20px;
+            left: 20px;
+            min-width: 240px;
+        }
+
+        .token-panel {
+            top: 20px;
+            right: 20px;
+            text-align: right;
+        }
+
+        .legend-panel {
+            bottom: 20px;
+            left: 20px;
+        }
+
+        .detail-panel {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 400px;
+            display: none;
+            z-index: 100;
+        }
+
+        .detail-panel.visible { display: block; }
+
+        h2 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--accent);
+            margin-bottom: 12px;
+            font-weight: 400;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+            font-size: 12px;
+        }
+
+        .stat-label { color: #888; }
+        .stat-value { color: var(--text); font-weight: 600; }
+        .stat-value.water { color: var(--water); }
+        .stat-value.power { color: var(--power); }
+        .stat-value.fire { color: var(--fire); }
+
+        .token-counter {
+            font-size: 32px;
+            font-weight: 200;
+            color: var(--accent);
+            letter-spacing: -1px;
+        }
+
+        .token-label {
+            font-size: 10px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+            font-size: 11px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .close-btn:hover { color: var(--text); }
+
+        .impact-meter {
+            height: 4px;
+            background: #222;
+            border-radius: 2px;
+            margin: 8px 0;
+            overflow: hidden;
+        }
+
+        .impact-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        .hint {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 11px;
+            color: #444;
+            pointer-events: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="overlay">
+        <div class="panel stats-panel">
+            <h2>Global Impact</h2>
+            <div class="stat-row">
+                <span class="stat-label">Active Datacenters</span>
+                <span class="stat-value" id="dcCount">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Water Usage</span>
+                <span class="stat-value water" id="waterUsage">0 ML/day</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Power Draw</span>
+                <span class="stat-value power" id="powerDraw">0 GW</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Fire Risk Zones</span>
+                <span class="stat-value fire" id="fireRisk">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Drought Index</span>
+                <span class="stat-value" id="droughtIdx">0.0</span>
+            </div>
+        </div>
+
+        <div class="panel token-panel">
+            <div class="token-counter" id="tokenCount">0</div>
+            <div class="token-label">tokens generated</div>
+            <div class="stat-row" style="margin-top: 12px;">
+                <span class="stat-label">Est. Water</span>
+                <span class="stat-value water" id="tokenWater">0 L</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Est. CO2</span>
+                <span class="stat-value" id="tokenCO2">0 g</span>
+            </div>
+        </div>
+
+        <div class="panel legend-panel">
+            <h2>Legend</h2>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--accent);"></div>
+                <span>Cloud Datacenter</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--fire);"></div>
+                <span>High Fire Risk</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--water);"></div>
+                <span>Water Stress Zone</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--power);"></div>
+                <span>Grid Strain</span>
+            </div>
+        </div>
+
+        <div class="panel detail-panel" id="detailPanel">
+            <button class="close-btn" onclick="closeDetail()">&times;</button>
+            <h2 id="dcName">Datacenter</h2>
+            <div class="stat-row">
+                <span class="stat-label">Provider</span>
+                <span class="stat-value" id="dcProvider">-</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Capacity</span>
+                <span class="stat-value" id="dcCapacity">-</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Water/day</span>
+                <span class="stat-value water" id="dcWater">-</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Power</span>
+                <span class="stat-value power" id="dcPower">-</span>
+            </div>
+            <h2 style="margin-top: 16px;">Environmental Impact</h2>
+            <div class="stat-row">
+                <span class="stat-label">Fire Risk</span>
+            </div>
+            <div class="impact-meter">
+                <div class="impact-fill" id="dcFireBar" style="background: var(--fire); width: 0%;"></div>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Drought Contribution</span>
+            </div>
+            <div class="impact-meter">
+                <div class="impact-fill" id="dcDroughtBar" style="background: var(--warning); width: 0%;"></div>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Grid Load</span>
+            </div>
+            <div class="impact-meter">
+                <div class="impact-fill" id="dcGridBar" style="background: var(--power); width: 0%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="hint">click datacenter to inspect | scroll to zoom</div>
+
+    <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let width, height, centerX, centerY, scale;
+    let rotation = 0;
+    let targetRotation = 0;
+    let zoom = 1;
+    let time = 0;
+    let tokens = 0;
+    let selectedDC = null;
+
+    // Major cloud datacenter locations (lat, lon, provider, name, capacity MW)
+    const datacenters = [
+        // AWS
+        { lat: 38.95, lon: -77.45, provider: 'AWS', name: 'us-east-1 (N. Virginia)', capacity: 500, water: 4.2, fire: 0.3 },
+        { lat: 45.52, lon: -122.68, provider: 'AWS', name: 'us-west-2 (Oregon)', capacity: 400, water: 2.8, fire: 0.7 },
+        { lat: 37.77, lon: -122.42, provider: 'AWS', name: 'us-west-1 (N. California)', capacity: 200, water: 3.5, fire: 0.85 },
+        { lat: 51.51, lon: -0.13, provider: 'AWS', name: 'eu-west-2 (London)', capacity: 250, water: 1.5, fire: 0.1 },
+        { lat: 50.11, lon: 8.68, provider: 'AWS', name: 'eu-central-1 (Frankfurt)', capacity: 350, water: 2.0, fire: 0.2 },
+        { lat: 35.68, lon: 139.69, provider: 'AWS', name: 'ap-northeast-1 (Tokyo)', capacity: 300, water: 2.5, fire: 0.15 },
+        { lat: 1.35, lon: 103.82, provider: 'AWS', name: 'ap-southeast-1 (Singapore)', capacity: 280, water: 3.0, fire: 0.05 },
+        // Google
+        { lat: 33.45, lon: -111.95, provider: 'Google', name: 'us-west-phoenix', capacity: 450, water: 5.0, fire: 0.9 },
+        { lat: 35.23, lon: -80.84, provider: 'Google', name: 'us-east-charlotte', capacity: 380, water: 3.2, fire: 0.4 },
+        { lat: 45.59, lon: -121.18, provider: 'Google', name: 'us-west-dalles', capacity: 600, water: 1.8, fire: 0.6 },
+        { lat: 53.55, lon: -6.27, provider: 'Google', name: 'eu-west-dublin', capacity: 320, water: 1.2, fire: 0.1 },
+        { lat: 52.37, lon: 4.90, provider: 'Google', name: 'eu-west-amsterdam', capacity: 280, water: 1.0, fire: 0.05 },
+        { lat: 25.20, lon: 55.27, provider: 'Google', name: 'me-dubai', capacity: 200, water: 6.0, fire: 0.95 },
+        // Azure
+        { lat: 41.88, lon: -87.63, provider: 'Azure', name: 'us-central-chicago', capacity: 420, water: 2.5, fire: 0.2 },
+        { lat: 47.61, lon: -122.33, provider: 'Azure', name: 'us-west-seattle', capacity: 380, water: 1.5, fire: 0.5 },
+        { lat: 32.78, lon: -96.80, provider: 'Azure', name: 'us-south-dallas', capacity: 350, water: 4.0, fire: 0.75 },
+        { lat: -33.87, lon: 151.21, provider: 'Azure', name: 'au-east-sydney', capacity: 250, water: 3.5, fire: 0.8 },
+        { lat: 19.08, lon: 72.88, provider: 'Azure', name: 'in-west-mumbai', capacity: 300, water: 4.5, fire: 0.3 },
+        // Meta
+        { lat: 35.77, lon: -78.64, provider: 'Meta', name: 'us-east-raleigh', capacity: 500, water: 3.8, fire: 0.35 },
+        { lat: 41.26, lon: -95.94, provider: 'Meta', name: 'us-central-omaha', capacity: 400, water: 2.2, fire: 0.25 },
+        { lat: 64.15, lon: -21.94, provider: 'Meta', name: 'eu-north-iceland', capacity: 200, water: 0.2, fire: 0.01 },
+    ];
+
+    // Dymaxion/Fuller projection approximation
+    function project(lat, lon) {
+        // Simplified icosahedral projection
+        const phi = (90 - lat) * Math.PI / 180;
+        const theta = (lon + rotation) * Math.PI / 180;
+
+        // Convert to 3D
+        const x3 = Math.sin(phi) * Math.cos(theta);
+        const y3 = Math.sin(phi) * Math.sin(theta);
+        const z3 = Math.cos(phi);
+
+        // Orthographic with slight perspective
+        const perspective = 1 / (1 - z3 * 0.3);
+        const x = x3 * perspective;
+        const y = y3 * perspective;
+
+        return {
+            x: centerX + x * scale * zoom,
+            y: centerY - y * scale * zoom * 0.6, // Flatten slightly
+            visible: z3 > -0.2 // Allow some backface visibility
+        };
+    }
+
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        centerX = width / 2;
+        centerY = height / 2;
+        scale = Math.min(width, height) * 0.35;
+    }
+
+    function drawGlobe() {
+        // Draw latitude lines
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.lineWidth = 1;
+
+        for (let lat = -60; lat <= 60; lat += 30) {
+            ctx.beginPath();
+            let first = true;
+            for (let lon = -180; lon <= 180; lon += 5) {
+                const p = project(lat, lon);
+                if (p.visible) {
+                    if (first) {
+                        ctx.moveTo(p.x, p.y);
+                        first = false;
+                    } else {
+                        ctx.lineTo(p.x, p.y);
+                    }
+                } else {
+                    first = true;
+                }
+            }
+            ctx.stroke();
+        }
+
+        // Draw longitude lines
+        for (let lon = -180; lon < 180; lon += 30) {
+            ctx.beginPath();
+            let first = true;
+            for (let lat = -90; lat <= 90; lat += 5) {
+                const p = project(lat, lon);
+                if (p.visible) {
+                    if (first) {
+                        ctx.moveTo(p.x, p.y);
+                        first = false;
+                    } else {
+                        ctx.lineTo(p.x, p.y);
+                    }
+                } else {
+                    first = true;
+                }
+            }
+            ctx.stroke();
+        }
+
+        // Draw simplified continents
+        drawContinentOutlines();
+    }
+
+    function drawContinentOutlines() {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+
+        // Simplified continent polygons (just key coastline points)
+        const continents = [
+            // North America
+            [[70, -170], [60, -140], [55, -130], [40, -125], [25, -110], [20, -100], [30, -85], [25, -80], [45, -65], [50, -55], [60, -75], [70, -100]],
+            // South America
+            [[10, -75], [5, -80], [-5, -80], [-15, -75], [-25, -70], [-35, -65], [-55, -70], [-55, -65], [-45, -65], [-35, -55], [-25, -45], [-5, -35], [5, -55]],
+            // Europe
+            [[70, 30], [60, 10], [45, -10], [35, -10], [35, 5], [45, 15], [50, 20], [55, 25], [60, 40]],
+            // Africa
+            [[35, -5], [30, 30], [10, 45], [-5, 40], [-25, 35], [-35, 20], [-35, 15], [-20, 10], [5, -5], [10, -15], [35, -5]],
+            // Asia
+            [[70, 180], [60, 160], [55, 140], [35, 140], [20, 120], [10, 100], [25, 90], [40, 75], [45, 50], [55, 60], [70, 80], [75, 100], [70, 140]],
+            // Australia
+            [[-10, 140], [-20, 150], [-35, 150], [-40, 145], [-35, 115], [-20, 115], [-10, 130]]
+        ];
+
+        continents.forEach(points => {
+            ctx.beginPath();
+            let first = true;
+            points.forEach(([lat, lon]) => {
+                const p = project(lat, lon);
+                if (p.visible) {
+                    if (first) {
+                        ctx.moveTo(p.x, p.y);
+                        first = false;
+                    } else {
+                        ctx.lineTo(p.x, p.y);
+                    }
+                }
+            });
+            ctx.stroke();
+        });
+    }
+
+    function drawFireRiskZones() {
+        // Draw fire risk zones with animated glow
+        datacenters.filter(dc => dc.fire > 0.5).forEach(dc => {
+            const p = project(dc.lat, dc.lon);
+            if (!p.visible) return;
+
+            const radius = 20 + dc.fire * 40;
+            const intensity = 0.1 + Math.sin(time * 0.003 + dc.lat) * 0.05;
+
+            const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius * zoom);
+            gradient.addColorStop(0, `rgba(231, 76, 60, ${intensity * dc.fire})`);
+            gradient.addColorStop(0.5, `rgba(231, 76, 60, ${intensity * dc.fire * 0.3})`);
+            gradient.addColorStop(1, 'rgba(231, 76, 60, 0)');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, radius * zoom, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    function drawWaterStress() {
+        // Draw water stress indicators
+        datacenters.filter(dc => dc.water > 3).forEach(dc => {
+            const p = project(dc.lat, dc.lon);
+            if (!p.visible) return;
+
+            const radius = 15 + dc.water * 8;
+            const intensity = 0.1 + Math.sin(time * 0.002 + dc.lon) * 0.03;
+
+            ctx.strokeStyle = `rgba(52, 152, 219, ${intensity * (dc.water / 6)})`;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, radius * zoom, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        });
+    }
+
+    function drawDatacenters() {
+        datacenters.forEach((dc, idx) => {
+            const p = project(dc.lat, dc.lon);
+            if (!p.visible) return;
+
+            const isSelected = selectedDC === idx;
+            const baseRadius = 4 + (dc.capacity / 150);
+            const radius = (isSelected ? baseRadius * 1.5 : baseRadius) * zoom;
+
+            // Provider colors
+            const colors = {
+                'AWS': '#ff9900',
+                'Google': '#4285f4',
+                'Azure': '#00a1f1',
+                'Meta': '#1877f2'
+            };
+
+            // Glow effect
+            const glowRadius = radius * 3;
+            const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowRadius);
+            gradient.addColorStop(0, `${colors[dc.provider]}66`);
+            gradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, glowRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Core dot
+            ctx.fillStyle = colors[dc.provider];
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pulse ring
+            const pulsePhase = (time * 0.002 + idx * 0.5) % (Math.PI * 2);
+            const pulseRadius = radius + Math.sin(pulsePhase) * 5;
+            const pulseOpacity = 0.5 - (pulsePhase / (Math.PI * 2)) * 0.5;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${pulseOpacity})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, pulseRadius * zoom, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Store click region
+            dc._screenX = p.x;
+            dc._screenY = p.y;
+            dc._radius = radius * 2;
+        });
+    }
+
+    function drawImpactRadius() {
+        if (selectedDC === null) return;
+
+        const dc = datacenters[selectedDC];
+        const p = project(dc.lat, dc.lon);
+        if (!p.visible) return;
+
+        // Animated expanding rings showing impact
+        for (let i = 0; i < 3; i++) {
+            const phase = ((time * 0.001 + i * 0.33) % 1);
+            const radius = (50 + phase * 150) * zoom;
+            const opacity = 0.3 * (1 - phase);
+
+            ctx.strokeStyle = `rgba(255, 107, 53, ${opacity})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
+
+    function updateStats() {
+        const totalWater = datacenters.reduce((sum, dc) => sum + dc.water, 0);
+        const totalPower = datacenters.reduce((sum, dc) => sum + dc.capacity, 0) / 1000;
+        const highFireRisk = datacenters.filter(dc => dc.fire > 0.5).length;
+        const avgDrought = datacenters.reduce((sum, dc) => sum + dc.water * dc.fire, 0) / datacenters.length;
+
+        document.getElementById('dcCount').textContent = datacenters.length;
+        document.getElementById('waterUsage').textContent = `${totalWater.toFixed(1)} ML/day`;
+        document.getElementById('powerDraw').textContent = `${totalPower.toFixed(1)} GW`;
+        document.getElementById('fireRisk').textContent = highFireRisk;
+        document.getElementById('droughtIdx').textContent = avgDrought.toFixed(2);
+
+        // Token counter (simulated)
+        tokens += Math.random() * 50;
+        document.getElementById('tokenCount').textContent = Math.floor(tokens).toLocaleString();
+        document.getElementById('tokenWater').textContent = `${(tokens * 0.0005).toFixed(2)} L`;
+        document.getElementById('tokenCO2').textContent = `${(tokens * 0.002).toFixed(1)} g`;
+    }
+
+    function showDetail(idx) {
+        selectedDC = idx;
+        const dc = datacenters[idx];
+        const panel = document.getElementById('detailPanel');
+
+        document.getElementById('dcName').textContent = dc.name;
+        document.getElementById('dcProvider').textContent = dc.provider;
+        document.getElementById('dcCapacity').textContent = `${dc.capacity} MW`;
+        document.getElementById('dcWater').textContent = `${dc.water} ML`;
+        document.getElementById('dcPower').textContent = `${dc.capacity} MW`;
+
+        document.getElementById('dcFireBar').style.width = `${dc.fire * 100}%`;
+        document.getElementById('dcDroughtBar').style.width = `${(dc.water / 6) * 100}%`;
+        document.getElementById('dcGridBar').style.width = `${(dc.capacity / 600) * 100}%`;
+
+        panel.classList.add('visible');
+    }
+
+    function closeDetail() {
+        selectedDC = null;
+        document.getElementById('detailPanel').classList.remove('visible');
+    }
+
+    function handleClick(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        for (let i = 0; i < datacenters.length; i++) {
+            const dc = datacenters[i];
+            if (dc._screenX && dc._screenY) {
+                const dist = Math.sqrt((x - dc._screenX) ** 2 + (y - dc._screenY) ** 2);
+                if (dist < dc._radius) {
+                    showDetail(i);
+                    return;
+                }
+            }
+        }
+        closeDetail();
+    }
+
+    function handleScroll(e) {
+        e.preventDefault();
+        zoom = Math.max(0.5, Math.min(3, zoom - e.deltaY * 0.001));
+    }
+
+    function handleMouseMove(e) {
+        if (e.buttons === 1) {
+            targetRotation += e.movementX * 0.5;
+        }
+    }
+
+    function draw() {
+        time++;
+        rotation += (targetRotation - rotation) * 0.1;
+        targetRotation *= 0.99; // Slow down
+
+        ctx.fillStyle = 'rgba(10, 10, 15, 0.1)';
+        ctx.fillRect(0, 0, width, height);
+
+        drawFireRiskZones();
+        drawWaterStress();
+        drawGlobe();
+        drawDatacenters();
+        drawImpactRadius();
+
+        if (time % 30 === 0) updateStats();
+
+        requestAnimationFrame(draw);
+    }
+
+    // Initialize
+    resize();
+    window.addEventListener('resize', resize);
+    canvas.addEventListener('click', handleClick);
+    canvas.addEventListener('wheel', handleScroll, { passive: false });
+    canvas.addEventListener('mousemove', handleMouseMove);
+
+    // Auto-rotate slowly
+    setInterval(() => {
+        if (!document.hasFocus()) return;
+        targetRotation += 0.1;
+    }, 50);
+
+    draw();
+    </script>
+</body>
+</html>

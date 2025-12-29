@@ -2,6 +2,8 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unused_variables)]
+#![allow(unknown_lints)]
+#![allow(clippy::manual_is_multiple_of)]
 
 //! hyle - Rust-native code assistant
 //!
