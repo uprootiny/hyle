@@ -1,5 +1,45 @@
 # hyle Development Journal
 
+## 2025-12-29 (Part 3): Frontend Progress Visualization
+
+### Problem
+The hyle.lol form submission UI showed minimal progress during builds. Users complained about:
+- No visibility into which models were being tried
+- No feedback during rate limiting (429 fallbacks)
+- Lack of animated progress indicators
+- No elapsed time tracking
+
+### Solution
+Replaced the simple step text with a comprehensive progress visualization:
+
+1. **Process Graph**: Visual pipeline with 5 nodes (submit→queue→build→deploy→live)
+   - Nodes pulse when active, turn green when done
+   - Edges animate with flowing gradient during transitions
+
+2. **Model Tracker**: Scrollable log showing LLM model attempts
+   - Shows model name with status icon (◎ trying, ✓ success, ✗ failed)
+   - Rate-limited models marked with "(429)"
+   - Auto-scrolls to latest entry
+
+3. **Stats Bar**: Real-time metrics
+   - Elapsed time (auto-updating every second)
+   - Models tried count (with animation on increment)
+   - Poll count
+
+### CSS Animations
+- `node-pulse`: Pulsing box-shadow on active nodes
+- `edge-flow`: Gradient flowing along edges
+- `entry-appear`: Slide-in animation for log entries
+- `counter-tick`: Scale+color flash on counter updates
+
+### Files Changed
+- `index.html`: Added progress-viz HTML structure, CSS animations, JavaScript state management
+
+### Git Commit
+- `99494fc`: ux: add animated progress visualization to hyle.lol
+
+---
+
 ## 2025-12-29 (Part 2): --watch-docs Implementation
 
 ### Problem
