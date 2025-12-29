@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jsonl - viewer and query tool</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #e8e8e8;
+            font-family: system-ui;
+            font-size: 14px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            padding: 1rem;
+            border-bottom: 1px solid #222;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        h1 { font-size: 1rem; font-weight: 400; color: #666; }
+        h1 a { color: #6b9fff; text-decoration: none; }
+        #drop-zone {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.75rem 1rem;
+            background: #111;
+            border: 2px dashed #333;
+            border-radius: 4px;
+            text-align: center;
+            color: #666;
+            cursor: pointer;
+        }
+        #drop-zone.dragover { border-color: #6b9fff; background: rgba(107,159,255,0.05); }
+        #drop-zone input { display: none; }
+        #query-box {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        #query {
+            background: #111;
+            border: 1px solid #333;
+            color: #e8e8e8;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-family: 'SF Mono', monospace;
+            font-size: 13px;
+            width: 300px;
+        }
+        #query:focus { outline: none; border-color: #6b9fff; }
+        button {
+            background: #1a1a1a;
+            color: #e8e8e8;
+            border: 1px solid #333;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { border-color: #6b9fff; }
+        #stats { color: #666; font-size: 12px; }
+        main {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #table-header {
+            display: flex;
+            background: #111;
+            border-bottom: 1px solid #333;
+            font-weight: 600;
+            font-size: 12px;
+            color: #888;
+            position: sticky;
+            top: 0;
+        }
+        #table-body {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .row {
+            display: flex;
+            border-bottom: 1px solid #1a1a1a;
+        }
+        .row:hover { background: #111; }
+        .row.highlight { background: rgba(107,159,255,0.1); }
+        .cell {
+            padding: 0.5rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            border-right: 1px solid #1a1a1a;
+            font-family: 'SF Mono', monospace;
+            font-size: 12px;
+        }
+        .cell:last-child { border-right: none; }
+        .line-num {
+            width: 60px;
+            min-width: 60px;
+            color: #444;
+            text-align: right;
+        }
+        .header-cell {
+            padding: 0.75rem 0.5rem;
+            cursor: pointer;
+            user-select: none;
+        }
+        .header-cell:hover { color: #e8e8e8; }
+        #empty {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #444;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1><a href="https://hyle.lol">hyle</a> / jsonl</h1>
+        <div id="drop-zone">
+            <input type="file" id="file-input" accept=".jsonl,.json,.ndjson">
+            drop jsonl file or click to browse
+        </div>
+        <div id="query-box">
+            <input type="text" id="query" placeholder=".path.to.field or .[] | select(.x > 0)">
+            <button onclick="applyQuery()">query</button>
+            <button onclick="clearQuery()">clear</button>
+            <button onclick="exportData()">export</button>
+        </div>
+        <div id="stats"></div>
+    </header>
+    <main>
+        <div id="table-header"></div>
+        <div id="table-body"></div>
+        <div id="empty">paste or drop a .jsonl file</div>
+    </main>
+
+    <script>
+        let data = [];
+        let filtered = [];
+        let columns = [];
+        let columnWidths = {};
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const tableHeader = document.getElementById('table-header');
+        const tableBody = document.getElementById('table-body');
+        const empty = document.getElementById('empty');
+        const stats = document.getElementById('stats');
+        const queryInput = document.getElementById('query');
+
+        // File handling
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) loadFile(file);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) loadFile(e.target.files[0]);
+        });
+
+        // Paste handling
+        document.addEventListener('paste', (e) => {
+            const text = e.clipboardData.getData('text');
+            if (text) parseJsonl(text);
+        });
+
+        function loadFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => parseJsonl(e.target.result);
+            reader.readAsText(file);
+            dropZone.textContent = file.name;
+        }
+
+        function parseJsonl(text) {
+            const lines = text.trim().split('\n');
+            data = [];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                try {
+                    data.push(JSON.parse(line));
+                } catch (e) {
+                    console.warn(`Line ${i+1}: parse error`);
+                }
+            }
+
+            // Detect columns from first 100 rows
+            const allKeys = new Set();
+            for (let i = 0; i < Math.min(data.length, 100); i++) {
+                if (typeof data[i] === 'object' && data[i] !== null) {
+                    Object.keys(data[i]).forEach(k => allKeys.add(k));
+                }
+            }
+            columns = Array.from(allKeys);
+
+            // Calculate column widths
+            columnWidths = {};
+            columns.forEach(c => columnWidths[c] = Math.max(100, c.length * 10));
+
+            filtered = [...data];
+            render();
+            updateStats();
+        }
+
+        function render() {
+            if (data.length === 0) {
+                empty.classList.remove('hidden');
+                tableHeader.innerHTML = '';
+                tableBody.innerHTML = '';
+                return;
+            }
+            empty.classList.add('hidden');
+
+            // Render header
+            let headerHtml = `<div class="cell line-num header-cell">#</div>`;
+            for (const col of columns) {
+                headerHtml += `<div class="cell header-cell" style="width:${columnWidths[col]}px" title="${col}">${col}</div>`;
+            }
+            tableHeader.innerHTML = headerHtml;
+
+            // Render body (virtual scroll simplified - just render visible)
+            const maxRows = 1000; // Limit for performance
+            const toRender = filtered.slice(0, maxRows);
+
+            let bodyHtml = '';
+            for (let i = 0; i < toRender.length; i++) {
+                const row = toRender[i];
+                const lineNum = data.indexOf(row) + 1;
+                bodyHtml += `<div class="row" data-idx="${i}">`;
+                bodyHtml += `<div class="cell line-num">${lineNum}</div>`;
+                for (const col of columns) {
+                    const val = row && row[col] !== undefined ? JSON.stringify(row[col]) : '';
+                    const display = val.length > 100 ? val.slice(0, 100) + '...' : val;
+                    bodyHtml += `<div class="cell" style="width:${columnWidths[col]}px" title="${escapeHtml(val)}">${escapeHtml(display)}</div>`;
+                }
+                bodyHtml += '</div>';
+            }
+            tableBody.innerHTML = bodyHtml;
+
+            if (filtered.length > maxRows) {
+                stats.textContent += ` (showing ${maxRows} of ${filtered.length})`;
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function updateStats() {
+            stats.textContent = `${filtered.length} rows, ${columns.length} columns`;
+        }
+
+        // Simple jq-like query engine
+        function applyQuery() {
+            const q = queryInput.value.trim();
+            if (!q) {
+                filtered = [...data];
+            } else {
+                filtered = data.filter(row => matchesQuery(row, q));
+            }
+            render();
+            updateStats();
+        }
+
+        function matchesQuery(obj, query) {
+            // Simple path query: .foo.bar
+            if (query.startsWith('.') && !query.includes('|')) {
+                const val = getPath(obj, query);
+                return val !== undefined && val !== null;
+            }
+
+            // Select query: .[] | select(.x > 0)
+            const selectMatch = query.match(/\.\[\]\s*\|\s*select\((.+)\)/);
+            if (selectMatch) {
+                return evalSelect(obj, selectMatch[1]);
+            }
+
+            // Contains query: .field contains "text"
+            const containsMatch = query.match(/\.(\w+)\s+contains\s+"([^"]+)"/);
+            if (containsMatch) {
+                const val = obj[containsMatch[1]];
+                return val && String(val).includes(containsMatch[2]);
+            }
+
+            // Default: check if any field contains query text
+            return JSON.stringify(obj).toLowerCase().includes(query.toLowerCase());
+        }
+
+        function getPath(obj, path) {
+            const parts = path.replace(/^\./,'').split('.').filter(p => p);
+            let val = obj;
+            for (const p of parts) {
+                if (val && typeof val === 'object') {
+                    // Handle array index
+                    const arrMatch = p.match(/^(\w+)\[(\d+)\]$/);
+                    if (arrMatch) {
+                        val = val[arrMatch[1]];
+                        if (Array.isArray(val)) val = val[parseInt(arrMatch[2])];
+                    } else {
+                        val = val[p];
+                    }
+                } else {
+                    return undefined;
+                }
+            }
+            return val;
+        }
+
+        function evalSelect(obj, condition) {
+            // Simple comparison: .x > 0, .name == "foo"
+            const compMatch = condition.match(/\.(\w+)\s*(==|!=|>|<|>=|<=)\s*(.+)/);
+            if (compMatch) {
+                const [_, field, op, rawVal] = compMatch;
+                const fieldVal = obj[field];
+                let cmpVal = rawVal.trim();
+
+                // Parse comparison value
+                if (cmpVal.startsWith('"') && cmpVal.endsWith('"')) {
+                    cmpVal = cmpVal.slice(1, -1);
+                } else if (!isNaN(cmpVal)) {
+                    cmpVal = parseFloat(cmpVal);
+                }
+
+                switch (op) {
+                    case '==': return fieldVal == cmpVal;
+                    case '!=': return fieldVal != cmpVal;
+                    case '>': return fieldVal > cmpVal;
+                    case '<': return fieldVal < cmpVal;
+                    case '>=': return fieldVal >= cmpVal;
+                    case '<=': return fieldVal <= cmpVal;
+                }
+            }
+            return true;
+        }
+
+        function clearQuery() {
+            queryInput.value = '';
+            filtered = [...data];
+            render();
+            updateStats();
+        }
+
+        function exportData() {
+            if (filtered.length === 0) return;
+            const jsonl = filtered.map(r => JSON.stringify(r)).join('\n');
+            const blob = new Blob([jsonl], { type: 'application/jsonl' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'filtered.jsonl';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Keyboard shortcut
+        queryInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') applyQuery();
+            if (e.key === 'Escape') clearQuery();
+        });
+    </script>
+</body>
+</html>

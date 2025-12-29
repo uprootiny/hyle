@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>seismic - earthquake sonification</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a0a; color: #e8e8e8; font-family: system-ui; overflow: hidden; }
+        #map { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+        #ui {
+            position: fixed;
+            bottom: 1rem;
+            left: 1rem;
+            right: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #info { font-size: 12px; color: #666; }
+        #info a { color: #6b9fff; pointer-events: auto; }
+        #controls { display: flex; gap: 1rem; align-items: center; }
+        button {
+            background: #222;
+            color: #e8e8e8;
+            border: 1px solid #333;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        button:hover { border-color: #6b9fff; }
+        button.active { background: #6b9fff; color: #000; }
+        #status { font-size: 12px; color: #666; }
+        #legend {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(0,0,0,0.7);
+            padding: 1rem;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 0.5rem; margin: 0.25rem 0; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+    </style>
+</head>
+<body>
+    <canvas id="map"></canvas>
+    <div id="ui">
+        <div id="info">
+            <a href="https://hyle.lol">hyle</a> · seismic<br>
+            data: <a href="https://earthquake.usgs.gov">USGS</a>
+        </div>
+        <div id="controls">
+            <span id="status">loading...</span>
+            <button id="sound" onclick="toggleSound()">sound off</button>
+        </div>
+    </div>
+    <div id="legend">
+        <div><strong>magnitude → pitch</strong></div>
+        <div class="legend-item"><span class="legend-dot" style="background:#4a9"></span> M &lt; 3</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#6b9fff"></span> M 3-5</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#f80"></span> M 5-7</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#f00"></span> M &gt; 7</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('map');
+        const ctx = canvas.getContext('2d');
+        let earthquakes = [];
+        let rings = [];
+        let soundEnabled = false;
+        let audioCtx = null;
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Mercator projection
+        function project(lat, lon) {
+            const x = (lon + 180) / 360 * canvas.width;
+            const latRad = lat * Math.PI / 180;
+            const mercN = Math.log(Math.tan(Math.PI/4 + latRad/2));
+            const y = canvas.height/2 - mercN * canvas.height / (2 * Math.PI);
+            return { x, y };
+        }
+
+        // Magnitude to color
+        function magColor(mag) {
+            if (mag < 3) return '#4a9';
+            if (mag < 5) return '#6b9fff';
+            if (mag < 7) return '#f80';
+            return '#f00';
+        }
+
+        // Magnitude to frequency (Hz)
+        function magFreq(mag) {
+            return 80 + (mag / 10) * 720; // 80Hz to 800Hz
+        }
+
+        // Depth to reverb (not actual reverb, just duration)
+        function depthDuration(depth) {
+            return 0.1 + (depth / 700) * 2.9; // 0.1s to 3s
+        }
+
+        // Play sound for earthquake
+        function playQuake(eq) {
+            if (!soundEnabled || !audioCtx) return;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.value = magFreq(eq.mag);
+
+            // Stereo pan based on longitude
+            const pan = audioCtx.createStereoPanner();
+            pan.pan.value = (eq.lon / 180); // -1 to 1
+
+            const duration = depthDuration(eq.depth);
+            const now = audioCtx.currentTime;
+
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            osc.connect(gain);
+            gain.connect(pan);
+            pan.connect(audioCtx.destination);
+
+            osc.start(now);
+            osc.stop(now + duration);
+        }
+
+        function toggleSound() {
+            const btn = document.getElementById('sound');
+            soundEnabled = !soundEnabled;
+            btn.textContent = soundEnabled ? 'sound on' : 'sound off';
+            btn.classList.toggle('active', soundEnabled);
+
+            if (soundEnabled && !audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Fetch earthquakes from USGS
+        async function fetchQuakes() {
+            try {
+                const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson');
+                const data = await res.json();
+                const newQuakes = data.features.map(f => ({
+                    id: f.id,
+                    lat: f.geometry.coordinates[1],
+                    lon: f.geometry.coordinates[0],
+                    depth: f.geometry.coordinates[2] || 0,
+                    mag: f.properties.mag || 0,
+                    place: f.properties.place,
+                    time: f.properties.time
+                }));
+
+                // Find new earthquakes (ones we haven't seen)
+                const oldIds = new Set(earthquakes.map(e => e.id));
+                for (const eq of newQuakes) {
+                    if (!oldIds.has(eq.id)) {
+                        // New earthquake - add ring and play sound
+                        const pos = project(eq.lat, eq.lon);
+                        rings.push({
+                            x: pos.x,
+                            y: pos.y,
+                            radius: 0,
+                            maxRadius: 50 + eq.mag * 20,
+                            color: magColor(eq.mag),
+                            alpha: 1
+                        });
+                        playQuake(eq);
+                    }
+                }
+
+                earthquakes = newQuakes;
+                document.getElementById('status').textContent = `${earthquakes.length} quakes (24h)`;
+            } catch (e) {
+                document.getElementById('status').textContent = 'fetch error';
+            }
+        }
+
+        // Draw frame
+        function draw() {
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw simple world outline (just continents approximation)
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            // Simplified coastlines - just grid lines for now
+            for (let lat = -60; lat <= 80; lat += 30) {
+                const { y } = project(lat, -180);
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+            }
+            for (let lon = -180; lon <= 180; lon += 30) {
+                const { x } = project(0, lon);
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+            }
+            ctx.stroke();
+
+            // Draw earthquakes as dots
+            for (const eq of earthquakes) {
+                const { x, y } = project(eq.lat, eq.lon);
+                const radius = 2 + eq.mag;
+
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = magColor(eq.mag);
+                ctx.globalAlpha = 0.7;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+
+            // Draw and update rings
+            for (let i = rings.length - 1; i >= 0; i--) {
+                const ring = rings[i];
+                ring.radius += 2;
+                ring.alpha -= 0.02;
+
+                if (ring.alpha <= 0) {
+                    rings.splice(i, 1);
+                    continue;
+                }
+
+                ctx.beginPath();
+                ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = ring.color;
+                ctx.globalAlpha = ring.alpha;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        // Initial fetch and start
+        fetchQuakes();
+        setInterval(fetchQuakes, 30000); // Refresh every 30s
+        draw();
+    </script>
+</body>
+</html>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>labyrinth - procedural text crawler</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #e8e8e8;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 1rem;
+            min-height: 100vh;
+        }
+        #game {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #map {
+            background: #111;
+            padding: 1rem;
+            border-radius: 4px;
+            white-space: pre;
+            font-size: 16px;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+            overflow-x: auto;
+        }
+        #description {
+            padding: 1rem;
+            background: #141414;
+            border-left: 2px solid #333;
+            margin-bottom: 1rem;
+            min-height: 100px;
+        }
+        #inventory {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 1rem;
+        }
+        #inventory span { color: #6b9fff; }
+        #controls {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        button {
+            background: #1a1a1a;
+            color: #e8e8e8;
+            border: 1px solid #333;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        button:hover { border-color: #6b9fff; }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
+        #footer {
+            margin-top: 2rem;
+            color: #444;
+            font-size: 12px;
+        }
+        #footer a { color: #6b9fff; }
+        .player { color: #6b9fff; }
+        .wall { color: #444; }
+        .door { color: #f80; }
+        .item { color: #4a9; }
+    </style>
+</head>
+<body>
+    <div id="game">
+        <div id="map"></div>
+        <div id="description"></div>
+        <div id="inventory">inventory: <span id="inv">empty</span></div>
+        <div id="controls">
+            <button onclick="move('n')" id="btn-n">↑ north</button>
+            <button onclick="move('s')" id="btn-s">↓ south</button>
+            <button onclick="move('w')" id="btn-w">← west</button>
+            <button onclick="move('e')" id="btn-e">→ east</button>
+            <button onclick="take()">take</button>
+            <button onclick="look()">look</button>
+        </div>
+        <div id="footer">
+            <a href="https://hyle.lol">hyle</a> · labyrinth · time moves when you move
+        </div>
+    </div>
+
+    <script>
+        // Markov chain text generator (simplified Borges-style)
+        const corpus = [
+            "The library is unlimited and cyclical",
+            "In the vast library there are no two identical books",
+            "The universe which others call the Library",
+            "Mirrors and fatherhood are abominable",
+            "The labyrinth of symbols",
+            "Infinite corridors of hexagonal galleries",
+            "Books of apologies and prophecies",
+            "The faithless say that nonsense is normal in the Library",
+            "Perhaps my old age and fearfulness deceive me",
+            "I have wandered in search of a book",
+            "The certainty that everything has been written",
+            "A lamp illuminated the stairway",
+            "The spiral staircase sinks and soars",
+            "Every hexagon has twenty shelves",
+            "The Library exists ab aeterno",
+            "Blasphemous rumor spoke of the Man of the Book",
+            "In some shelf in some hexagon there exists a book",
+            "The universe suddenly usurped the unlimited dimensions of hope",
+            "There are official searchers, inquisitors",
+            "I know of districts where the young prostrate themselves before books"
+        ];
+
+        function buildMarkov(texts) {
+            const chain = {};
+            for (const text of texts) {
+                const words = text.toLowerCase().split(/\s+/);
+                for (let i = 0; i < words.length - 1; i++) {
+                    if (!chain[words[i]]) chain[words[i]] = [];
+                    chain[words[i]].push(words[i + 1]);
+                }
+            }
+            return chain;
+        }
+
+        function generate(chain, length = 20) {
+            const keys = Object.keys(chain);
+            let word = keys[Math.floor(Math.random() * keys.length)];
+            let result = [word];
+            for (let i = 0; i < length; i++) {
+                const next = chain[word];
+                if (!next || next.length === 0) {
+                    word = keys[Math.floor(Math.random() * keys.length)];
+                } else {
+                    word = next[Math.floor(Math.random() * next.length)];
+                }
+                result.push(word);
+            }
+            return result.join(' ') + '.';
+        }
+
+        const markov = buildMarkov(corpus);
+
+        // Maze generation (recursive backtracking)
+        const W = 21, H = 21;
+        let maze = [];
+        let player = { x: 1, y: 1 };
+        let items = [];
+        let inventory = [];
+        let rooms = {};
+        let moves = 0;
+
+        function initMaze() {
+            maze = Array(H).fill(null).map(() => Array(W).fill('#'));
+
+            function carve(x, y) {
+                maze[y][x] = '.';
+                const dirs = [[0,-2], [0,2], [-2,0], [2,0]].sort(() => Math.random() - 0.5);
+                for (const [dx, dy] of dirs) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx > 0 && nx < W-1 && ny > 0 && ny < H-1 && maze[ny][nx] === '#') {
+                        maze[y + dy/2][x + dx/2] = '.';
+                        carve(nx, ny);
+                    }
+                }
+            }
+
+            carve(1, 1);
+
+            // Add items
+            items = [];
+            const itemNames = ['key', 'lamp', 'book', 'compass', 'scroll', 'mirror'];
+            for (let i = 0; i < 5; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * (W-2)) + 1;
+                    y = Math.floor(Math.random() * (H-2)) + 1;
+                } while (maze[y][x] !== '.' || (x === 1 && y === 1));
+                items.push({ x, y, name: itemNames[i % itemNames.length] });
+            }
+
+            // Generate room descriptions
+            rooms = {};
+            for (let y = 1; y < H-1; y++) {
+                for (let x = 1; x < W-1; x++) {
+                    if (maze[y][x] === '.') {
+                        rooms[`${x},${y}`] = generate(markov, 15 + Math.floor(Math.random() * 10));
+                    }
+                }
+            }
+
+            player = { x: 1, y: 1 };
+            inventory = [];
+            moves = 0;
+            saveState();
+        }
+
+        function render() {
+            let out = '';
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    if (x === player.x && y === player.y) {
+                        out += '<span class="player">@</span>';
+                    } else if (items.some(i => i.x === x && i.y === y)) {
+                        out += '<span class="item">*</span>';
+                    } else if (maze[y][x] === '#') {
+                        out += '<span class="wall">█</span>';
+                    } else {
+                        out += ' ';
+                    }
+                }
+                out += '\n';
+            }
+            document.getElementById('map').innerHTML = out;
+
+            const roomKey = `${player.x},${player.y}`;
+            let desc = rooms[roomKey] || 'An empty passage.';
+
+            const here = items.filter(i => i.x === player.x && i.y === player.y);
+            if (here.length) {
+                desc += `\n\nYou see: ${here.map(i => i.name).join(', ')}`;
+            }
+
+            document.getElementById('description').textContent = desc;
+            document.getElementById('inv').textContent = inventory.length ? inventory.join(', ') : 'empty';
+
+            // Update button states
+            document.getElementById('btn-n').disabled = !canMove(0, -1);
+            document.getElementById('btn-s').disabled = !canMove(0, 1);
+            document.getElementById('btn-w').disabled = !canMove(-1, 0);
+            document.getElementById('btn-e').disabled = !canMove(1, 0);
+        }
+
+        function canMove(dx, dy) {
+            const nx = player.x + dx, ny = player.y + dy;
+            return nx >= 0 && nx < W && ny >= 0 && ny < H && maze[ny][nx] !== '#';
+        }
+
+        function move(dir) {
+            const dirs = { n: [0,-1], s: [0,1], w: [-1,0], e: [1,0] };
+            const [dx, dy] = dirs[dir];
+            if (canMove(dx, dy)) {
+                player.x += dx;
+                player.y += dy;
+                moves++;
+                saveState();
+                render();
+            }
+        }
+
+        function take() {
+            const idx = items.findIndex(i => i.x === player.x && i.y === player.y);
+            if (idx >= 0) {
+                inventory.push(items[idx].name);
+                items.splice(idx, 1);
+                saveState();
+                render();
+            }
+        }
+
+        function look() {
+            const roomKey = `${player.x},${player.y}`;
+            rooms[roomKey] = generate(markov, 15 + Math.floor(Math.random() * 10));
+            render();
+        }
+
+        // State serialization to URL hash
+        function saveState() {
+            const state = {
+                p: [player.x, player.y],
+                i: inventory,
+                it: items.map(i => [i.x, i.y, i.name]),
+                m: moves
+            };
+            const encoded = btoa(JSON.stringify(state));
+            history.replaceState(null, '', '#' + encoded);
+        }
+
+        function loadState() {
+            if (window.location.hash.length > 1) {
+                try {
+                    const state = JSON.parse(atob(window.location.hash.slice(1)));
+                    player = { x: state.p[0], y: state.p[1] };
+                    inventory = state.i || [];
+                    items = (state.it || []).map(([x, y, name]) => ({ x, y, name }));
+                    moves = state.m || 0;
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            const map = { ArrowUp: 'n', ArrowDown: 's', ArrowLeft: 'w', ArrowRight: 'e', w: 'n', s: 's', a: 'w', d: 'e' };
+            if (map[e.key]) {
+                e.preventDefault();
+                move(map[e.key]);
+            }
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                take();
+            }
+        });
+
+        // Initialize
+        initMaze();
+        if (!loadState()) {
+            // Fresh start
+        }
+        render();
+    </script>
+</body>
+</html>

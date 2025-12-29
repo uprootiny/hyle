@@ -314,40 +314,37 @@
             <article class="workflow">
                 <div class="workflow-header">
                     <span class="workflow-title">Generative Art</span>
-                    <a href="https://dodeca.hyperstitious.org" class="workflow-link">view live →</a>
+                    <a href="projects/dodeca/" class="workflow-link">view live →</a>
                 </div>
                 <div class="flow-steps">
                     <div class="flow-step">
                         <span class="step-label">prompt</span>
                         <div class="step-content">
-                            <span class="prompt-text">spiky dodecahedron with perturbed surface using landscape generation algos. layered rotoscoped rendering floating over starry void. weather bursts of starfall where stars turn into crawling ants that settle on surface and build colonies via cellular automata</span>
+                            <span class="prompt-text">spiky dodecahedron with perturbed surface using landscape generation algos. layered rotoscoped rendering floating over starry void</span>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">response</span>
                         <div class="step-content">
-                            <span class="response-text">WebGL sketch with three.js. Perlin noise displacement on icosahedron geometry. Post-processing bloom + edge detection for rotoscope effect. Particle system for stars with attractor points. Ant colony CA runs on UV-mapped texture.</span>
+                            <span class="response-text">WebGL sketch. Simplex noise displacement on subdivided icosahedron. Edge detection shader for rotoscope effect.</span>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">hyle</span>
                         <div class="step-content">
                             <div class="hyle-steps">
-                                <span class="hyle-step done">scaffold vite + three.js project</span>
                                 <span class="hyle-step done">implement geometry with noise displacement</span>
-                                <span class="hyle-step done">add particle system and attractors</span>
-                                <span class="hyle-step done">implement cellular automata on surface</span>
-                                <span class="hyle-step done">add post-processing pipeline</span>
-                                <span class="hyle-step done">build and deploy</span>
+                                <span class="hyle-step done">add rotation and lighting</span>
+                                <span class="hyle-step done">deploy static HTML</span>
                             </div>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">live</span>
                         <div class="step-content">
-                            <a href="https://dodeca.hyperstitious.org" class="live-url">
+                            <a href="projects/dodeca/" class="live-url">
                                 <span class="live-indicator"></span>
-                                dodeca.hyperstitious.org
+                                /projects/dodeca
                             </a>
                         </div>
                     </div>
@@ -358,40 +355,38 @@
             <article class="workflow">
                 <div class="workflow-header">
                     <span class="workflow-title">Data Sonification</span>
-                    <a href="https://seismic.hyperstitious.org" class="workflow-link">view live →</a>
+                    <a href="projects/seismic/" class="workflow-link">view live →</a>
                 </div>
                 <div class="flow-steps">
                     <div class="flow-step">
                         <span class="step-label">prompt</span>
                         <div class="step-content">
-                            <span class="prompt-text">real-time seismic data sonification. fetch USGS earthquake feed, map magnitude to pitch, depth to reverb, location to stereo pan. visualize as expanding rings on mercator projection. dark mode, minimal UI</span>
+                            <span class="prompt-text">real-time seismic data sonification. fetch USGS earthquake feed, map magnitude to pitch, depth to reverb, location to stereo pan. visualize as expanding rings on mercator</span>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">response</span>
                         <div class="step-content">
-                            <span class="response-text">Web Audio API with Tone.js for synthesis. Fetch USGS GeoJSON feed every 30s. Canvas 2D for map rendering. Magnitude 0-10 maps to 80-800Hz. Depth 0-700km maps to reverb decay 0.1-3s.</span>
+                            <span class="response-text">Web Audio API for synthesis. Fetch USGS GeoJSON every 30s. Canvas 2D for map. Magnitude → frequency, depth → duration.</span>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">hyle</span>
                         <div class="step-content">
                             <div class="hyle-steps">
-                                <span class="hyle-step done">create vite project with Tone.js</span>
-                                <span class="hyle-step done">implement USGS feed fetcher with CORS proxy</span>
-                                <span class="hyle-step done">build synthesizer with mapping functions</span>
-                                <span class="hyle-step done">render mercator map with earthquake rings</span>
-                                <span class="hyle-step done">add minimal dark UI with mute toggle</span>
-                                <span class="hyle-step done">deploy to subdomain</span>
+                                <span class="hyle-step done">implement USGS feed fetcher</span>
+                                <span class="hyle-step done">build Web Audio synthesizer</span>
+                                <span class="hyle-step done">render mercator map with rings</span>
+                                <span class="hyle-step done">deploy</span>
                             </div>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">live</span>
                         <div class="step-content">
-                            <a href="https://seismic.hyperstitious.org" class="live-url">
+                            <a href="projects/seismic/" class="live-url">
                                 <span class="live-indicator"></span>
-                                seismic.hyperstitious.org
+                                /projects/seismic
                             </a>
                         </div>
                     </div>
@@ -402,84 +397,80 @@
             <article class="workflow">
                 <div class="workflow-header">
                     <span class="workflow-title">Interactive Fiction</span>
-                    <a href="https://labyrinth.hyperstitious.org" class="workflow-link">view live →</a>
+                    <a href="projects/labyrinth/" class="workflow-link">view live →</a>
                 </div>
                 <div class="flow-steps">
                     <div class="flow-step">
                         <span class="step-label">prompt</span>
                         <div class="step-content">
-                            <span class="prompt-text">procedural labyrinth crawler. text-based with ASCII map. rooms generated from markov chains trained on borges. inventory system. time moves only when you move. save state to URL hash</span>
+                            <span class="prompt-text">procedural labyrinth crawler. text-based with ASCII map. rooms from markov chains on borges. inventory. time moves when you move. state in URL hash</span>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">response</span>
                         <div class="step-content">
-                            <span class="response-text">ClojureScript SPA. Markov chain from Library of Babel corpus. Maze gen with recursive backtracking. Game state in single atom, serialized to base64 URL hash. Reagent for reactive UI.</span>
+                            <span class="response-text">Vanilla JS. Markov chain from Borges corpus. Recursive backtracking maze. State serialized to base64 URL hash.</span>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">hyle</span>
                         <div class="step-content">
                             <div class="hyle-steps">
-                                <span class="hyle-step done">scaffold shadow-cljs + reagent</span>
-                                <span class="hyle-step done">implement markov chain text generator</span>
-                                <span class="hyle-step done">build maze generation algorithm</span>
-                                <span class="hyle-step done">create game state management</span>
-                                <span class="hyle-step done">add URL hash serialization</span>
-                                <span class="hyle-step done">build and deploy static bundle</span>
+                                <span class="hyle-step done">implement markov text generator</span>
+                                <span class="hyle-step done">build maze algorithm</span>
+                                <span class="hyle-step done">add URL hash persistence</span>
+                                <span class="hyle-step done">deploy</span>
                             </div>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">live</span>
                         <div class="step-content">
-                            <a href="https://labyrinth.hyperstitious.org" class="live-url">
+                            <a href="projects/labyrinth/" class="live-url">
                                 <span class="live-indicator"></span>
-                                labyrinth.hyperstitious.org
+                                /projects/labyrinth
                             </a>
                         </div>
                     </div>
                 </div>
             </article>
 
-            <!-- Example 4: API Tool -->
+            <!-- Example 4: Developer Tool -->
             <article class="workflow">
                 <div class="workflow-header">
                     <span class="workflow-title">Developer Tool</span>
-                    <a href="https://jsonl.hyperstitious.org" class="workflow-link">view live →</a>
+                    <a href="projects/jsonl/" class="workflow-link">view live →</a>
                 </div>
                 <div class="flow-steps">
                     <div class="flow-step">
                         <span class="step-label">prompt</span>
                         <div class="step-content">
-                            <span class="prompt-text">JSONL viewer and query tool. paste or drag jsonl file. render as scrollable table with sticky headers. support jq-style path queries. highlight matching rows. export filtered results. all client-side, no server</span>
+                            <span class="prompt-text">JSONL viewer and query tool. paste or drag file. scrollable table. jq-style queries. export filtered results. client-side only</span>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">response</span>
                         <div class="step-content">
-                            <span class="response-text">Vanilla JS with virtual scrolling for large files. Parse JSONL line by line. Implement subset of jq path syntax (.foo.bar, .[0], .[] | select). CSS grid for table layout. Blob download for export.</span>
+                            <span class="response-text">Vanilla JS. Parse JSONL line by line. Subset of jq syntax (.foo.bar, select). CSS grid table. Blob export.</span>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">hyle</span>
                         <div class="step-content">
                             <div class="hyle-steps">
-                                <span class="hyle-step done">create static HTML/CSS/JS structure</span>
-                                <span class="hyle-step done">implement JSONL parser with streaming</span>
-                                <span class="hyle-step done">build virtual scroll for 100k+ rows</span>
-                                <span class="hyle-step done">add jq path query engine</span>
-                                <span class="hyle-step done">implement drag-drop and export</span>
-                                <span class="hyle-step done">deploy static files</span>
+                                <span class="hyle-step done">implement JSONL parser</span>
+                                <span class="hyle-step done">build query engine</span>
+                                <span class="hyle-step done">add drag-drop and export</span>
+                                <span class="hyle-step done">deploy</span>
                             </div>
                         </div>
                     </div>
                     <div class="flow-step">
                         <span class="step-label">live</span>
                         <div class="step-content">
-                            <a href="https://jsonl.hyperstitious.org" class="live-url">
+                            <a href="projects/jsonl/" class="live-url">
                                 <span class="live-indicator"></span>
-                                jsonl.hyperstitious.org
+                                /projects/jsonl
                             </a>
                         </div>
                     </div>
