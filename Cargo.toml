@@ -9,6 +9,10 @@ license = "MIT"
 name = "hyle"
 path = "src/main.rs"
 
+[[bin]]
+name = "hyle-api"
+path = "src/api/main.rs"
+
 [dependencies]
 # Core
 anyhow = "1"
@@ -27,6 +31,12 @@ serde_json = "1"
 reqwest = { version = "0.11", features = ["json", "rustls-tls", "stream"], default-features = false }
 reqwest-eventsource = "0.5"
 eventsource-stream = "0.2"
+
+# HTTP server (for hyle-api)
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+uuid = { version = "1", features = ["v4"] }
 
 # File operations
 globwalk = "0.8"  # Pin to 0.8 for Rust 1.75 compat
