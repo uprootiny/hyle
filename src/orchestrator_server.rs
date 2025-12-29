@@ -220,6 +220,7 @@ async fn handle_create_project(state: &Arc<RwLock<OrchestratorState>>, body: &st
     // Extract values we need before getting mutable project reference
     let hyle_binary = state.orchestrator.hyle_binary.clone();
     let domain = state.domain.clone();
+    let projects_root = state.orchestrator.projects_root.clone();
 
     // Submit project to orchestrator
     let project_id = match state.orchestrator.submit_project(&req.sketch) {
@@ -235,7 +236,8 @@ async fn handle_create_project(state: &Arc<RwLock<OrchestratorState>>, body: &st
     let project_clone = project.clone();
 
     // Scaffold project synchronously (fast)
-    if let Err(e) = scaffold_project(&project_clone) {
+    // INVARIANT: projects_root must exist and project_dir must be under it
+    if let Err(e) = scaffold_project(&project_clone, &projects_root) {
         project.status = ProjectStatus::Failed;
         project.log.push(crate::orchestrator::ProjectEvent {
             timestamp: chrono::Utc::now(),

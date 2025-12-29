@@ -273,6 +273,11 @@ fn extract_subdomain(sketch: &str) -> Option<String> {
     None
 }
 
+/// Minimum allowed port (above privileged range)
+const MIN_PORT: u16 = 1024;
+/// Maximum allowed port
+const MAX_PORT: u16 = 65535;
+
 fn extract_port(sketch: &str) -> Option<u16> {
     // Simple pattern: port = 3000 or port: 3000
     for line in sketch.lines() {
@@ -281,12 +286,26 @@ fn extract_port(sketch: &str) -> Option<u16> {
             if let Some(idx) = line.find('=').or_else(|| line.find(':')) {
                 let value = line[idx + 1..].trim();
                 if let Ok(port) = value.parse::<u16>() {
-                    return Some(port);
+                    // INVARIANT: Only allow unprivileged ports
+                    if port >= MIN_PORT && port <= MAX_PORT {
+                        return Some(port);
+                    }
                 }
             }
         }
     }
     None
+}
+
+/// Validate that a port is in the allowed range
+pub fn validate_port(port: u16) -> Result<u16> {
+    if port < MIN_PORT {
+        anyhow::bail!("Port {} is privileged (must be >= {})", port, MIN_PORT);
+    }
+    if port > MAX_PORT {
+        anyhow::bail!("Port {} exceeds maximum ({})", port, MAX_PORT);
+    }
+    Ok(port)
 }
 
 fn extract_features(sketch: &str) -> Vec<String> {
@@ -311,9 +330,30 @@ fn extract_features(sketch: &str) -> Vec<String> {
 // ═══════════════════════════════════════════════════════════════
 
 /// Scaffold a new project directory
-pub fn scaffold_project(project: &Project) -> Result<()> {
+///
+/// INVARIANT: project_dir must be a direct child of a known projects_root.
+/// This function validates that the path doesn't escape via traversal.
+pub fn scaffold_project(project: &Project, projects_root: &Path) -> Result<()> {
     let dir = &project.project_dir;
+
+    // SECURITY: Validate path is under projects_root
+    let canonical_root = projects_root.canonicalize()
+        .context("projects_root must exist")?;
+
+    // Create the directory first so we can canonicalize it
     fs::create_dir_all(dir)?;
+
+    let canonical_dir = dir.canonicalize()
+        .context("Failed to canonicalize project directory")?;
+
+    if !canonical_dir.starts_with(&canonical_root) {
+        // Clean up the directory we just created
+        let _ = fs::remove_dir_all(dir);
+        anyhow::bail!(
+            "Path traversal detected: {:?} is not under {:?}",
+            canonical_dir, canonical_root
+        );
+    }
 
     match project.spec.project_type {
         ProjectType::Rust => scaffold_rust(dir, &project.spec)?,
@@ -733,7 +773,13 @@ fn main() {
     fn test_extract_code_block() {
         let sketch = "```rust\nfn main() {}\n```";
         let code = extract_code_block(sketch, "rust").unwrap();
-        assert_eq!(code, "fn main() {}\n");
+        // Note: extract_code_block joins lines without trailing newline
+        assert_eq!(code, "fn main() {}");
+
+        // Multi-line code block
+        let sketch2 = "```rust\nfn main() {\n    println!(\"hello\");\n}\n```";
+        let code2 = extract_code_block(sketch2, "rust").unwrap();
+        assert_eq!(code2, "fn main() {\n    println!(\"hello\");\n}");
     }
 
     #[test]
@@ -741,5 +787,41 @@ fn main() {
         let config = generate_nginx_config("myapp", "example.com", 3000);
         assert!(config.contains("server_name myapp.example.com"));
         assert!(config.contains("proxy_pass http://127.0.0.1:3000"));
+    }
+
+    #[test]
+    fn test_port_validation() {
+        // Valid ports
+        assert!(validate_port(3000).is_ok());
+        assert!(validate_port(8080).is_ok());
+        assert!(validate_port(1024).is_ok());  // minimum
+        assert!(validate_port(65535).is_ok()); // maximum
+
+        // Invalid ports
+        assert!(validate_port(80).is_err());   // privileged
+        assert!(validate_port(443).is_err());  // privileged
+        assert!(validate_port(1023).is_err()); // just below minimum
+    }
+
+    #[test]
+    fn test_extract_port_rejects_privileged() {
+        // Should NOT extract privileged port
+        assert_eq!(extract_port("port = 80"), None);
+        assert_eq!(extract_port("port = 443"), None);
+
+        // Should extract valid port
+        assert_eq!(extract_port("port = 3000"), Some(3000));
+        assert_eq!(extract_port("port: 8080"), Some(8080));
+    }
+
+    #[test]
+    fn test_subdomain_validation() {
+        // Valid subdomains
+        assert_eq!(extract_subdomain("subdomain = foo"), Some("foo".into()));
+        assert_eq!(extract_subdomain("subdomain = my-app"), Some("my-app".into()));
+
+        // Reject path traversal attempts in subdomain
+        assert_eq!(extract_subdomain("subdomain = ../etc"), None);
+        assert_eq!(extract_subdomain("subdomain = foo/bar"), None);
     }
 }
