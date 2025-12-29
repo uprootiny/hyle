@@ -1,5 +1,38 @@
 # hyle Development Journal
 
+## 2025-12-29 (Part 2): --watch-docs Implementation
+
+### Problem
+README claimed `hyle --backburner --watch-docs` existed, but it wasn't implemented.
+The `--watch-docs` flag was being parsed as a path argument.
+
+### Solution
+Implemented proper `--watch-docs` mode in backburner:
+
+1. Added `watch_docs: bool` field to `Command::Backburner`
+2. Added `--watch-docs` flag parsing in `parse_args()`
+3. Created `run_docs_mode()` in backburner.rs with:
+   - `scan_codebase()` - finds documentation files
+   - `analyze_readme()` - analyzes README structure with LLM
+   - `generate_docs()` - creates README if missing
+   - `check_doc_staleness()` - compares file timestamps
+
+### Usage
+```bash
+hyle --backburner --watch-docs
+```
+
+Shows:
+```
+HYLE DOCS WATCHER - Documentation Maintenance Daemon
+[timestamp] Scanning codebase for documentation needs...
+  Found 43 relevant files
+  [x] README.md exists
+  [x] Cargo.toml found (Rust project)
+```
+
+---
+
 ## 2025-12-29: API Server Deployment and Bug Fixes
 
 ### Summary
