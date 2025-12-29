@@ -6,6 +6,7 @@ on:
     paths:
       - 'index.html'
       - 'CNAME'
+      - 'projects/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -26,10 +27,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            index.html
-            CNAME
+
+      - name: Prepare site
+        run: |
+          # Create site directory with only what we need
+          mkdir -p _site
+          cp index.html _site/
+          cp CNAME _site/ 2>/dev/null || true
+
+          # Copy projects if they exist
+          if [ -d projects ]; then
+            cp -r projects _site/
+          fi
+
+          # Create 404 page
+          cat > _site/404.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>404 - hyle</title>
+            <style>body{font-family:system-ui;background:#111;color:#e8e8e8;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}a{color:#6b9fff}</style>
+          </head>
+          <body>
+            <div style="text-align:center">
+              <h1>404</h1>
+              <p>Not found. <a href="/">Go home</a></p>
+            </div>
+          </body>
+          </html>
+          EOF
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -39,7 +66,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment
