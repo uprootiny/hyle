@@ -10,6 +10,15 @@ permissions:
   pages: write
   id-token: write
 
+env:
+  # Free models to cycle through (in order of preference)
+  FREE_MODELS: |
+    meta-llama/llama-3.1-8b-instruct:free
+    google/gemma-2-9b-it:free
+    mistralai/mistral-7b-instruct:free
+    huggingfaceh4/zephyr-7b-beta:free
+    openchat/openchat-7b:free
+
 jobs:
   build:
     # Only run for issues with 'sketch' label
@@ -61,26 +70,68 @@ jobs:
         run: |
           mkdir -p projects/${{ steps.sketch.outputs.name }}
 
-      - name: Run hyle on sketch
+      - name: Run hyle with model fallback
+        id: hyle
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          HYLE_MODEL: "meta-llama/llama-3.1-8b-instruct:free"
         run: |
           cd projects/${{ steps.sketch.outputs.name }}
 
-          # Run hyle with the sketch
-          # Using --trust to auto-approve tool calls in CI
-          ../../target/release/hyle --trust "$(cat ../../sketch.md)" 2>&1 | tee build.log || true
+          # Models to try (free tier)
+          MODELS=(
+            "meta-llama/llama-3.1-8b-instruct:free"
+            "google/gemma-2-9b-it:free"
+            "mistralai/mistral-7b-instruct:free"
+            "huggingfaceh4/zephyr-7b-beta:free"
+            "openchat/openchat-7b:free"
+          )
 
-          # If hyle created files, we're good
-          if [ "$(ls -A . 2>/dev/null)" ]; then
-            echo "Project files created successfully"
+          SKETCH=$(cat ../../sketch.md)
+          SUCCESS=false
+          USED_MODEL=""
+
+          for MODEL in "${MODELS[@]}"; do
+            echo "=============================================="
+            echo "Trying model: $MODEL"
+            echo "=============================================="
+
+            export HYLE_MODEL="$MODEL"
+
+            # Run hyle with timeout per model attempt
+            if timeout 300 ../../target/release/hyle --trust "$SKETCH" 2>&1 | tee -a build.log; then
+              # Check if we got actual output (not just errors)
+              if [ "$(ls -A . 2>/dev/null | grep -v build.log | head -1)" ]; then
+                echo "Success with model: $MODEL"
+                SUCCESS=true
+                USED_MODEL="$MODEL"
+                break
+              fi
+            fi
+
+            echo "Model $MODEL failed or rate limited, trying next..."
+            sleep 2
+          done
+
+          if [ "$SUCCESS" = true ]; then
+            echo "model=$USED_MODEL" >> $GITHUB_OUTPUT
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "Project files created:"
             ls -la
           else
-            echo "No files created, creating placeholder"
-            echo "# ${{ steps.sketch.outputs.name }}" > README.md
-            echo "" >> README.md
-            echo "Build in progress. Check the [GitHub Action](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for status." >> README.md
+            echo "status=partial" >> $GITHUB_OUTPUT
+            echo "All models exhausted, creating placeholder"
+            cat > README.md << EOF
+          # ${{ steps.sketch.outputs.name }}
+
+          Build attempted but models were rate limited.
+          Check the [build log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+
+          ## Original Sketch
+
+          \`\`\`
+          $SKETCH
+          \`\`\`
+          EOF
           fi
 
       - name: Create project index page
@@ -89,7 +140,13 @@ jobs:
 
           # Create a simple index.html if none exists
           if [ ! -f index.html ] && [ ! -f public/index.html ]; then
-            cat > index.html << 'HTMLEOF'
+            MODEL="${{ steps.hyle.outputs.model }}"
+            MODEL_INFO=""
+            if [ -n "$MODEL" ]; then
+              MODEL_INFO="<p style=\"color:#666;font-size:0.9rem\">Built with $MODEL</p>"
+            fi
+
+            cat > index.html << HTMLEOF
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -97,17 +154,19 @@ jobs:
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>${{ steps.sketch.outputs.name }}</title>
             <style>
-              body { font-family: system-ui; background: #111; color: #e8e8e8; padding: 2rem; max-width: 65ch; margin: 0 auto; }
-              pre { background: #1a1a1a; padding: 1rem; overflow-x: auto; border-radius: 4px; }
+              body { font-family: system-ui; background: #111; color: #e8e8e8; padding: 2rem; max-width: 65ch; margin: 0 auto; line-height: 1.6; }
+              pre { background: #1a1a1a; padding: 1rem; overflow-x: auto; border-radius: 4px; font-size: 0.9rem; }
               a { color: #6b9fff; }
+              h1 { font-weight: 400; }
             </style>
           </head>
           <body>
             <h1>${{ steps.sketch.outputs.name }}</h1>
             <p>Built by <a href="https://hyle.lol">hyle</a> from <a href="https://github.com/${{ github.repository }}/issues/${{ github.event.issue.number }}">issue #${{ github.event.issue.number }}</a>.</p>
+            $MODEL_INFO
             <h2>Files</h2>
-            <pre>$(ls -la)</pre>
-            <p><a href="https://github.com/${{ github.repository }}/tree/main/projects/${{ steps.sketch.outputs.name }}">View source</a></p>
+            <pre>$(ls -la | grep -v index.html)</pre>
+            <p><a href="https://github.com/${{ github.repository }}/tree/master/projects/${{ steps.sketch.outputs.name }}">View source</a></p>
           </body>
           </html>
           HTMLEOF
@@ -126,19 +185,33 @@ jobs:
         with:
           script: |
             const projectName = '${{ steps.sketch.outputs.name }}';
+            const status = '${{ steps.hyle.outputs.status }}';
+            const model = '${{ steps.hyle.outputs.model }}' || 'unknown';
             const projectUrl = `https://uprootiny.github.io/hyle/projects/${projectName}/`;
-            const sourceUrl = `https://github.com/${{ github.repository }}/tree/main/projects/${projectName}`;
+            const sourceUrl = `https://github.com/${{ github.repository }}/tree/master/projects/${projectName}`;
+
+            let body;
+            if (status === 'success') {
+              body = `## Project Built ✓\n\n` +
+                     `Your project **${projectName}** has been created.\n\n` +
+                     `- [View deployed project](${projectUrl})\n` +
+                     `- [View source code](${sourceUrl})\n` +
+                     `- [Build log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n` +
+                     `Built with \`${model}\` via [hyle](https://hyle.lol).`;
+            } else {
+              body = `## Build Attempted\n\n` +
+                     `Project **${projectName}** was created with partial results.\n\n` +
+                     `All free models were rate limited. The sketch has been saved.\n\n` +
+                     `- [View project](${projectUrl})\n` +
+                     `- [Build log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n` +
+                     `Try again later or use a different model.`;
+            }
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## Project Built\n\n` +
-                    `Your project **${projectName}** has been created.\n\n` +
-                    `- [View deployed project](${projectUrl})\n` +
-                    `- [View source code](${sourceUrl})\n` +
-                    `- [Build log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n` +
-                    `Built by [hyle](https://hyle.lol) using free LLMs.`
+              body: body
             });
 
             // Close the issue
@@ -151,7 +224,6 @@ jobs:
 
       - name: Update projects index
         run: |
-          # Create/update projects index page
           cat > projects/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
@@ -161,30 +233,32 @@ jobs:
             <title>hyle projects</title>
             <style>
               body { font-family: system-ui; background: #111; color: #e8e8e8; padding: 2rem; max-width: 65ch; margin: 0 auto; }
-              a { color: #6b9fff; }
+              a { color: #6b9fff; text-decoration: none; }
+              a:hover { text-decoration: underline; }
               ul { list-style: none; padding: 0; }
-              li { padding: 0.5rem 0; border-bottom: 1px solid #333; }
+              li { padding: 0.75rem 0; border-bottom: 1px solid #222; }
+              li:last-child { border-bottom: none; }
+              h1 { font-weight: 400; }
             </style>
           </head>
           <body>
             <h1>hyle projects</h1>
-            <p>Projects built from <a href="https://hyle.lol">hyle.lol</a> sketches.</p>
+            <p style="color:#666">Projects built from <a href="/">hyle.lol</a> sketches.</p>
             <ul>
           EOF
 
-          # List all project directories
           for dir in projects/*/; do
             if [ -d "$dir" ]; then
               name=$(basename "$dir")
               if [ "$name" != "index.html" ]; then
-                echo "    <li><a href=\"$name/\">$name</a></li>" >> projects/index.html
+                echo "      <li><a href=\"$name/\">$name</a></li>" >> projects/index.html
               fi
             fi
           done
 
           cat >> projects/index.html << 'EOF'
             </ul>
-            <p><a href="/">Submit a new sketch</a></p>
+            <p style="margin-top:2rem"><a href="/">← Submit a new sketch</a></p>
           </body>
           </html>
           EOF
