@@ -57,6 +57,7 @@ enum Command {
     },
     Backburner {
         paths: Vec<PathBuf>,
+        watch_docs: bool,
     },
     Server {
         port: u16,
@@ -124,11 +125,12 @@ fn parse_args() -> Command {
 
     // Check for --backburner flag
     if args.iter().any(|a| a == "--backburner" || a == "-b") {
+        let watch_docs = args.iter().any(|a| a == "--watch-docs");
         let paths: Vec<PathBuf> = args.iter()
             .filter(|a| !a.starts_with('-'))
             .map(PathBuf::from)
             .collect();
-        return Command::Backburner { paths };
+        return Command::Backburner { paths, watch_docs };
     }
 
     // Check for --serve flag
@@ -327,9 +329,9 @@ async fn run_command() -> Result<()> {
             tmux::task_complete("Task", result.is_ok());
             result
         }
-        Command::Backburner { paths } => {
-            tmux::set_status("bg");
-            run_backburner(&paths).await
+        Command::Backburner { paths, watch_docs } => {
+            tmux::set_status(if watch_docs { "docs" } else { "bg" });
+            run_backburner(&paths, watch_docs).await
         }
         Command::Server { port } => {
             tmux::set_status("serve");
@@ -645,7 +647,7 @@ async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<Path
     ui::run_tui(&api_key, &selected_model, paths, resume, project, claude_context).await
 }
 
-async fn run_backburner(paths: &[PathBuf]) -> Result<()> {
+async fn run_backburner(paths: &[PathBuf], watch_docs: bool) -> Result<()> {
     let work_dir = if paths.is_empty() {
         std::env::current_dir()?
     } else {
@@ -653,5 +655,9 @@ async fn run_backburner(paths: &[PathBuf]) -> Result<()> {
     };
 
     let mut bb = backburner::Backburner::new(work_dir);
-    bb.run().await
+    if watch_docs {
+        bb.run_docs_mode().await
+    } else {
+        bb.run().await
+    }
 }

@@ -711,4 +711,288 @@ impl Backburner {
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
     }
+
+    /// Run in docs-watching mode - focused on documentation maintenance
+    pub async fn run_docs_mode(&mut self) -> Result<()> {
+        let running = self.running.clone();
+
+        ctrlc::set_handler(move || {
+            running.store(false, Ordering::SeqCst);
+        }).ok();
+
+        self.print_docs_header();
+
+        while self.running.load(Ordering::SeqCst) {
+            self.cycle += 1;
+
+            match self.cycle % 5 {
+                1 => self.scan_codebase().await,
+                2 => self.analyze_readme().await,
+                3 => self.generate_docs().await,
+                4 => self.check_doc_staleness().await,
+                _ => self.print_docs_heartbeat(),
+            }
+
+            // Sleep 30 seconds between tasks
+            self.interruptible_sleep(30).await;
+        }
+
+        self.print_docs_summary();
+        Ok(())
+    }
+
+    fn print_docs_header(&self) {
+        let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+        println!("\n{}", "=".repeat(60));
+        println!("HYLE DOCS WATCHER - Documentation Maintenance Daemon");
+        println!("{}", "=".repeat(60));
+        println!("Started: {}", now);
+        println!("Working dir: {}", self.work_dir.display());
+        println!("Model: {}", self.model);
+        println!("API Key: {}", if self.api_key.is_some() { "configured" } else { "missing" });
+        println!("{}", "-".repeat(60));
+        println!("Press Ctrl-C to stop\n");
+    }
+
+    async fn scan_codebase(&mut self) {
+        let now = self.timestamp();
+        println!("[{}] Scanning codebase for documentation needs...", now);
+
+        // Find key files
+        let patterns = ["README.md", "Cargo.toml", "package.json", "src/**/*.rs", "**/*.md"];
+        let mut found_files = Vec::new();
+
+        for pattern in patterns {
+            if let Ok(paths) = glob::glob(&self.work_dir.join(pattern).to_string_lossy()) {
+                for path in paths.flatten() {
+                    found_files.push(path);
+                }
+            }
+        }
+
+        println!("  Found {} relevant files", found_files.len());
+
+        // Check for README
+        let readme = self.work_dir.join("README.md");
+        if readme.exists() {
+            println!("  [x] README.md exists");
+        } else {
+            println!("  [ ] README.md missing - will generate");
+            self.observe("README.md missing".into());
+        }
+
+        // Check for Cargo.toml (Rust project)
+        let cargo = self.work_dir.join("Cargo.toml");
+        if cargo.exists() {
+            println!("  [x] Cargo.toml found (Rust project)");
+        }
+    }
+
+    async fn analyze_readme(&mut self) {
+        let now = self.timestamp();
+        let readme = self.work_dir.join("README.md");
+
+        if !readme.exists() {
+            println!("[{}] No README.md to analyze", now);
+            return;
+        }
+
+        println!("[{}] Analyzing README.md...", now);
+
+        let content = match std::fs::read_to_string(&readme) {
+            Ok(c) => c,
+            Err(e) => {
+                println!("  Error reading README: {}", e);
+                return;
+            }
+        };
+
+        // Basic analysis
+        let lines = content.lines().count();
+        let has_install = content.to_lowercase().contains("install");
+        let has_usage = content.to_lowercase().contains("usage");
+        let has_api = content.to_lowercase().contains("api") || content.contains("##");
+
+        println!("  Lines: {}", lines);
+        println!("  Has install section: {}", if has_install { "yes" } else { "no" });
+        println!("  Has usage section: {}", if has_usage { "yes" } else { "no" });
+        println!("  Has API/sections: {}", if has_api { "yes" } else { "no" });
+
+        // Use LLM to analyze if we have a key
+        if let Some(ref key) = self.api_key {
+            println!("  Requesting LLM analysis...");
+
+            let prompt = format!(
+                "Analyze this README.md for a software project. Identify:\n\
+                1. Missing sections (install, usage, API, examples)\n\
+                2. Outdated information (check for version mismatches)\n\
+                3. Suggested improvements\n\
+                Keep response under 200 words.\n\n\
+                README:\n```\n{}\n```",
+                &content[..content.len().min(4000)]
+            );
+
+            match self.quick_llm_query(key, &prompt).await {
+                Ok(response) => {
+                    println!("\n  LLM Analysis:");
+                    for line in response.lines().take(10) {
+                        println!("    {}", line);
+                    }
+                    self.observe(format!("README analyzed: {}", response.lines().next().unwrap_or("")));
+                }
+                Err(e) => {
+                    println!("  LLM error: {}", e);
+                }
+            }
+        }
+    }
+
+    async fn generate_docs(&mut self) {
+        let now = self.timestamp();
+        let readme = self.work_dir.join("README.md");
+
+        // Only generate if README is missing
+        if readme.exists() {
+            println!("[{}] README exists, skipping generation", now);
+            return;
+        }
+
+        println!("[{}] Generating README.md...", now);
+
+        let api_key = match &self.api_key {
+            Some(k) => k,
+            None => {
+                println!("  No API key, cannot generate");
+                return;
+            }
+        };
+
+        // Gather project info
+        let mut context = String::new();
+
+        // Read Cargo.toml if it exists
+        let cargo = self.work_dir.join("Cargo.toml");
+        if cargo.exists() {
+            if let Ok(content) = std::fs::read_to_string(&cargo) {
+                context.push_str("Cargo.toml:\n```toml\n");
+                context.push_str(&content);
+                context.push_str("\n```\n\n");
+            }
+        }
+
+        // Read main.rs if it exists
+        let main_rs = self.work_dir.join("src/main.rs");
+        if main_rs.exists() {
+            if let Ok(content) = std::fs::read_to_string(&main_rs) {
+                let preview: String = content.lines().take(100).collect::<Vec<_>>().join("\n");
+                context.push_str("src/main.rs (first 100 lines):\n```rust\n");
+                context.push_str(&preview);
+                context.push_str("\n```\n\n");
+            }
+        }
+
+        if context.is_empty() {
+            println!("  No project files found to analyze");
+            return;
+        }
+
+        let prompt = format!(
+            "Generate a README.md for this project. Include:\n\
+            - Project name and description\n\
+            - Installation instructions\n\
+            - Usage examples\n\
+            - Key features\n\
+            Use markdown format.\n\n\
+            Project files:\n{}",
+            context
+        );
+
+        match self.quick_llm_query(api_key, &prompt).await {
+            Ok(response) => {
+                // Write README
+                if let Err(e) = std::fs::write(&readme, &response) {
+                    println!("  Error writing README: {}", e);
+                } else {
+                    println!("  Generated README.md ({} bytes)", response.len());
+                    self.observe("Generated README.md".into());
+                }
+            }
+            Err(e) => {
+                println!("  LLM error: {}", e);
+            }
+        }
+    }
+
+    async fn check_doc_staleness(&mut self) {
+        let now = self.timestamp();
+        println!("[{}] Checking documentation staleness...", now);
+
+        let readme = self.work_dir.join("README.md");
+        let cargo = self.work_dir.join("Cargo.toml");
+
+        if !readme.exists() {
+            println!("  No README.md to check");
+            return;
+        }
+
+        // Compare timestamps
+        let readme_modified = std::fs::metadata(&readme)
+            .and_then(|m| m.modified())
+            .ok();
+        let cargo_modified = std::fs::metadata(&cargo)
+            .and_then(|m| m.modified())
+            .ok();
+
+        match (readme_modified, cargo_modified) {
+            (Some(r), Some(c)) if c > r => {
+                println!("  [!] README.md is older than Cargo.toml - may need update");
+                self.observe("README may be stale".into());
+            }
+            (Some(_), Some(_)) => {
+                println!("  [x] README.md is up to date");
+            }
+            _ => {
+                println!("  Could not compare timestamps");
+            }
+        }
+    }
+
+    fn print_docs_heartbeat(&self) {
+        let now = self.timestamp();
+        println!("[{}] Docs watcher heartbeat (cycle {})", now, self.cycle);
+    }
+
+    fn print_docs_summary(&self) {
+        println!("\n{}", "=".repeat(60));
+        println!("DOCS WATCHER SESSION SUMMARY");
+        println!("{}", "=".repeat(60));
+        println!("Total cycles: {}", self.cycle);
+        println!("Observations: {}", self.observations.len());
+
+        if !self.observations.is_empty() {
+            println!("\nKey observations:");
+            for obs in self.observations.iter().take(10) {
+                println!("  - {}", obs);
+            }
+        }
+        println!();
+    }
+
+    /// Quick LLM query for docs analysis - collects streaming response
+    async fn quick_llm_query(&self, api_key: &str, prompt: &str) -> Result<String> {
+        use client::StreamEvent;
+
+        let mut rx = client::stream_completion(api_key, &self.model, prompt).await?;
+
+        let mut response = String::new();
+        while let Some(event) = rx.recv().await {
+            match event {
+                StreamEvent::Token(t) => response.push_str(&t),
+                StreamEvent::Error(e) => return Err(anyhow::anyhow!("Stream error: {}", e)),
+                StreamEvent::Done(_) => break,
+            }
+        }
+
+        Ok(response)
+    }
 }
