@@ -1,0 +1,19 @@
+[Unit]
+Description=hyle API server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/drops
+ExecStart=/usr/local/bin/hyle-api
+Restart=on-failure
+RestartSec=5
+Environment=PORT=3000
+Environment=HYLE_PROJECTS_DIR=/var/www/drops
+Environment=HYLE_BINARY=/usr/local/bin/hyle
+EnvironmentFile=/etc/hyle/env
+
+[Install]
+WantedBy=multi-user.target
