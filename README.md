@@ -1,6 +1,12 @@
 # hyle
 
-Rust-native code assistant. OpenRouter powered, no JS runtime.
+[![hyle.lol](https://img.shields.io/badge/web-hyle.lol-7aa2f7?style=flat-square)](https://hyle.lol)
+[![Rust](https://img.shields.io/badge/rust-1.75+-orange?style=flat-square)](https://www.rust-lang.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-9ece6a?style=flat-square)](LICENSE)
+
+**Rust-native autonomous code assistant.** Paste a sketch, get a project.
+
+OpenRouter powered. No JS runtime. Single binary.
 
 ## Prerequisites
 
@@ -56,6 +62,8 @@ hyle --new                    # start fresh session
 hyle --model <id> [PATHS...]  # use specific model
 hyle --task "..." [PATHS...]  # one-shot: produce diff, ask apply
 hyle --backburner             # background maintenance daemon
+hyle --serve [PORT]           # HTTP API server (default: 8420)
+hyle orchestrate              # project orchestrator web UI
 hyle doctor                   # check config, key, network
 hyle models --refresh         # refresh models cache
 hyle sessions --list          # list saved sessions
@@ -239,6 +247,30 @@ The bootstrap system supports:
 cargo test
 ```
 
+## Web Interface
+
+The orchestrator mode provides a web UI for submitting project sketches:
+
+```bash
+hyle orchestrate --port 8421 --domain hyperstitious.org
+```
+
+Open `http://localhost:8421` and paste a multi-thousand-line project sketch.
+hyle will:
+
+1. Parse the sketch and detect project type
+2. Create directory structure and git repo
+3. Scaffold appropriate boilerplate
+4. Generate nginx/systemd deployment configs
+5. Dispatch an autonomous hyle instance to build it out
+
 ## License
 
 MIT
+
+---
+
+<p align="center">
+  <a href="https://hyle.lol">hyle.lol</a> ·
+  <a href="https://hyperstitious.org">hyperstitious.org</a>
+</p>

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hyle - code that writes itself</title>
+    <meta name="description" content="Rust-native autonomous code assistant. Paste a sketch, get a project.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <style>
+        :root {
+            --bg: #0d0d0d;
+            --fg: #e0e0e0;
+            --accent: #7aa2f7;
+            --accent2: #9ece6a;
+            --dim: #565f89;
+            --glow: rgba(122, 162, 247, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+            background: var(--bg);
+            color: var(--fg);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: clamp(3rem, 10vw, 6rem);
+            font-weight: 300;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            font-size: 1.25rem;
+            color: var(--dim);
+            margin-bottom: 3rem;
+        }
+
+        .description {
+            font-size: 1.1rem;
+            color: var(--fg);
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 3rem 0;
+            text-align: left;
+        }
+
+        .feature {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 30px var(--glow);
+        }
+
+        .feature h3 {
+            color: var(--accent);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature p {
+            color: var(--dim);
+            font-size: 0.9rem;
+        }
+
+        .cta {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 2rem;
+        }
+
+        a.btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1.75rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg);
+        }
+
+        .btn-primary:hover {
+            background: #8fb3ff;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px var(--glow);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--fg);
+            border: 1px solid var(--dim);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .code-block {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: left;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            color: var(--dim);
+            font-size: 0.9rem;
+        }
+
+        .code-block .comment { color: #565f89; }
+        .code-block .cmd { color: var(--accent2); }
+        .code-block .arg { color: var(--accent); }
+
+        footer {
+            margin-top: 4rem;
+            color: var(--dim);
+            font-size: 0.8rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        @media (max-width: 600px) {
+            .features { grid-template-columns: 1fr; }
+            .stats { gap: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>hyle</h1>
+        <p class="tagline">code that writes itself</p>
+
+        <p class="description">
+            Rust-native autonomous code assistant. Paste a project sketch,
+            get a working codebase. No boilerplate, no busywork.
+        </p>
+
+        <div class="code-block">
+            <code>
+                <span class="comment"># install</span><br>
+                <span class="cmd">cargo</span> <span class="arg">install hyle</span><br><br>
+                <span class="comment"># run</span><br>
+                <span class="cmd">hyle</span> <span class="arg">"build me an API server with auth"</span><br><br>
+                <span class="comment"># or paste a multi-thousand-line sketch</span><br>
+                <span class="cmd">hyle</span> <span class="arg">orchestrate</span>
+            </code>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <h3>Autonomous</h3>
+                <p>Agent loop with tool execution. Builds, tests, iterates until done.</p>
+            </div>
+            <div class="feature">
+                <h3>Minimal</h3>
+                <p>Unix philosophy. Single binary. No daemon. Text in, code out.</p>
+            </div>
+            <div class="feature">
+                <h3>Fast</h3>
+                <p>Rust-native. Sub-second startup. Multi-model fallback.</p>
+            </div>
+            <div class="feature">
+                <h3>Open</h3>
+                <p>MIT licensed. OpenRouter-powered. Bring your own key.</p>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">~20k</div>
+                <div class="stat-label">Lines of Rust</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">200+</div>
+                <div class="stat-label">Tests</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">0</div>
+                <div class="stat-label">Runtime deps</div>
+            </div>
+        </div>
+
+        <div class="cta">
+            <a href="https://github.com/anthropics/claude-code" class="btn btn-primary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                View on GitHub
+            </a>
+            <a href="https://github.com/anthropics/claude-code#readme" class="btn btn-secondary">
+                Documentation
+            </a>
+        </div>
+
+        <footer>
+            <p>
+                Built with obsessive minimalism by
+                <a href="https://hyperstitious.org">hyperstitious.org</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

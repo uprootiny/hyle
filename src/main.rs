@@ -32,6 +32,9 @@ mod docs;
 mod environ;
 mod github;
 mod server;
+mod orchestrator;
+mod orchestrator_server;
+mod intake;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -57,6 +60,11 @@ enum Command {
     },
     Server {
         port: u16,
+    },
+    Orchestrate {
+        port: u16,
+        projects_root: PathBuf,
+        domain: String,
     },
     Doctor,
     Models {
@@ -133,6 +141,33 @@ fn parse_args() -> Command {
         return Command::Server { port };
     }
 
+    // Check for orchestrate command
+    if args.first().map(|s| s.as_str()) == Some("orchestrate") {
+        let port = args.iter()
+            .position(|a| a == "--port" || a == "-p")
+            .and_then(|i| args.get(i + 1))
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(8421);
+
+        let projects_root = args.iter()
+            .position(|a| a == "--root" || a == "-r")
+            .and_then(|i| args.get(i + 1))
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                dirs::home_dir()
+                    .map(|h| h.join("projects"))
+                    .unwrap_or_else(|| PathBuf::from("/tmp/hyle-projects"))
+            });
+
+        let domain = args.iter()
+            .position(|a| a == "--domain" || a == "-d")
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+            .unwrap_or_else(|| "hyperstitious.org".into());
+
+        return Command::Orchestrate { port, projects_root, domain };
+    }
+
     // Parse flags and paths
     let mut free_only = false;
     let mut model = None;
@@ -197,6 +232,7 @@ USAGE:
     hyle --task "..." [PATHS...]  # autonomous agent mode (no TUI)
     hyle --backburner [PATHS...]  # background maintenance daemon
     hyle --serve [PORT]           # HTTP API server (default: 8420)
+    hyle orchestrate              # project orchestrator (default: 8421)
     hyle doctor                   # check config, key, network
     hyle models --refresh         # refresh models cache
     hyle sessions --list          # list saved sessions
@@ -210,6 +246,10 @@ FLAGS:
     -t, --task <text>       One-shot task mode
     -b, --backburner        Run background maintenance daemon
     -s, --serve [port]      HTTP API server mode
+    orchestrate             Project orchestrator mode
+        -p, --port <port>   Orchestrator port (default: 8421)
+        -r, --root <path>   Projects root directory
+        -d, --domain <dom>  Domain for subdomains (default: hyperstitious.org)
     -y, --trust             Trust mode: auto-approve all tool operations
     -a, --ask               Ask mode: confirm before write/execute/git ops
     -h, --help              Show this help
@@ -294,6 +334,10 @@ async fn run_command() -> Result<()> {
         Command::Server { port } => {
             tmux::set_status("serve");
             server::run_server(port).await
+        }
+        Command::Orchestrate { port, projects_root, domain } => {
+            tmux::set_status("orch");
+            orchestrator_server::run_orchestrator(port, projects_root, domain).await
         }
         Command::Interactive { free_only, model, paths, resume } => {
             run_interactive(free_only, model, paths, resume).await
