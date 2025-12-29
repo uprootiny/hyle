@@ -978,18 +978,37 @@ impl Backburner {
         println!();
     }
 
-    /// Quick LLM query for docs analysis - collects streaming response
+    /// Quick LLM query for docs analysis - collects streaming response with progress
     async fn quick_llm_query(&self, api_key: &str, prompt: &str) -> Result<String> {
         use client::StreamEvent;
+        use std::io::Write;
 
         let mut rx = client::stream_completion(api_key, &self.model, prompt).await?;
 
         let mut response = String::new();
+        let mut token_count = 0;
+        let spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
         while let Some(event) = rx.recv().await {
             match event {
-                StreamEvent::Token(t) => response.push_str(&t),
-                StreamEvent::Error(e) => return Err(anyhow::anyhow!("Stream error: {}", e)),
-                StreamEvent::Done(_) => break,
+                StreamEvent::Token(t) => {
+                    response.push_str(&t);
+                    token_count += 1;
+                    // Show spinner every 5 tokens
+                    if token_count % 5 == 0 {
+                        print!("\r  {} generating... ({} tokens)",
+                               spinner[token_count % spinner.len()], token_count);
+                        let _ = std::io::stdout().flush();
+                    }
+                }
+                StreamEvent::Error(e) => {
+                    println!(); // Clear spinner line
+                    return Err(anyhow::anyhow!("Stream error: {}", e));
+                }
+                StreamEvent::Done(_) => {
+                    print!("\r  ✓ done ({} tokens)          \n", token_count);
+                    break;
+                }
             }
         }
 
