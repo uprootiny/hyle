@@ -294,8 +294,7 @@ fn path_matches(path: &str, pattern: &str) -> bool {
             let prefix_ok = prefix.is_empty() || path.starts_with(prefix);
             let suffix_ok = suffix.is_empty() || {
                 // Handle *.ext pattern in suffix
-                if suffix.starts_with('*') {
-                    let ext = &suffix[1..];
+                if let Some(ext) = suffix.strip_prefix('*') {
                     path.ends_with(ext)
                 } else {
                     path.ends_with(suffix)
@@ -426,14 +425,14 @@ impl Config {
                 .truncate(true)
                 .mode(0o600) // Secure from creation - no race window
                 .open(&tmp_path)
-                .with_context(|| format!("Failed to create temp file"))?;
+                .with_context(|| "Failed to create temp file".to_string())?;
             file.write_all(content.as_bytes())?;
             file.sync_all()?; // Ensure data is on disk before rename
         }
 
         // Atomic rename (POSIX guarantees)
         fs::rename(&tmp_path, &path)
-            .with_context(|| format!("Failed to rename config"))?;
+            .with_context(|| "Failed to rename config".to_string())?;
 
         Ok(())
     }

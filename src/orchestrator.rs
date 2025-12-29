@@ -9,8 +9,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use chrono::{DateTime, Utc};
 
 // ═══════════════════════════════════════════════════════════════
@@ -216,8 +214,8 @@ fn extract_project_name(sketch: &str) -> Option<String> {
         let trimmed = line.trim();
 
         // Check for markdown header: # Project-Name
-        if trimmed.starts_with("# ") {
-            let name = trimmed[2..].trim();
+        if let Some(name) = trimmed.strip_prefix("# ") {
+            let name = name.trim();
             if !name.is_empty() && name.len() <= 64 {
                 let clean: String = name.chars()
                     .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_' || *c == ' ')
@@ -287,7 +285,7 @@ fn extract_port(sketch: &str) -> Option<u16> {
                 let value = line[idx + 1..].trim();
                 if let Ok(port) = value.parse::<u16>() {
                     // INVARIANT: Only allow unprivileged ports
-                    if port >= MIN_PORT && port <= MAX_PORT {
+                    if (MIN_PORT..=MAX_PORT).contains(&port) {
                         return Some(port);
                     }
                 }
@@ -302,9 +300,7 @@ pub fn validate_port(port: u16) -> Result<u16> {
     if port < MIN_PORT {
         anyhow::bail!("Port {} is privileged (must be >= {})", port, MIN_PORT);
     }
-    if port > MAX_PORT {
-        anyhow::bail!("Port {} exceeds maximum ({})", port, MAX_PORT);
-    }
+    // MAX_PORT == u16::MAX, so no upper bound check needed
     Ok(port)
 }
 
@@ -630,7 +626,7 @@ pub fn generate_systemd_service(project: &Project) -> String {
     let exec_start = match project.spec.project_type {
         ProjectType::Rust => format!("{}/target/release/{}",
             project.project_dir.display(), project.spec.name),
-        ProjectType::Clojure => format!("clj -M:run"),
+        ProjectType::Clojure => "clj -M:run".to_string(),
         ProjectType::ClojureScript => "npx shadow-cljs server".into(),
         ProjectType::Node => "node src/index.js".into(),
         _ => "echo 'No start command'".into(),

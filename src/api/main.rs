@@ -1,3 +1,8 @@
+// Allow dead code during rapid development - clean up before v1.0
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
 //! hyle-api: HTTP server for sketch submission and job orchestration
 //!
 //! Accepts sketch submissions, queues builds, returns live URLs.
