@@ -312,8 +312,8 @@ async fn run_build_with_fallback(state: Arc<AppState>, job_id: String) {
                 // Check if index.html was created
                 let index_path = project_dir.join("index.html");
                 if index_path.exists() {
-                    // Success!
-                    let url = format!("https://{}.hyperstitious.org", project_name);
+                    // Success! Use HTTP until wildcard SSL is set up
+                    let url = format!("http://{}.hyperstitious.org", project_name);
                     {
                         let mut jobs = state.jobs.write().await;
                         if let Some(job) = jobs.get_mut(&job_id) {
