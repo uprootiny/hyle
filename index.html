@@ -298,6 +298,232 @@
         @media (prefers-reduced-motion: reduce) {
             .live-indicator { animation: none; }
         }
+
+        /* PROGRESS VISUALIZATION */
+        .progress-viz {
+            margin-top: var(--sp-3);
+            padding: var(--sp-3);
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: none;
+        }
+
+        .progress-viz.active { display: block; }
+
+        .process-graph {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--sp-3);
+            position: relative;
+        }
+
+        .process-graph::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            right: 20px;
+            height: 2px;
+            background: var(--border);
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 0;
+        }
+
+        .graph-node {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--code-bg);
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            z-index: 1;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .graph-node.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px rgba(107, 159, 255, 0.4);
+            animation: node-pulse 1.5s infinite;
+        }
+
+        .graph-node.done {
+            background: var(--success);
+            border-color: var(--success);
+            color: var(--bg);
+        }
+
+        .graph-node .node-label {
+            position: absolute;
+            bottom: -20px;
+            font-size: 10px;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .graph-node.active .node-label,
+        .graph-node.done .node-label {
+            color: var(--fg);
+        }
+
+        @keyframes node-pulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(107, 159, 255, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(107, 159, 255, 0.7); }
+        }
+
+        .graph-edge {
+            flex: 1;
+            height: 2px;
+            background: var(--border);
+            margin: 0 -5px;
+            z-index: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .graph-edge.active::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 30%;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            animation: edge-flow 1s infinite linear;
+        }
+
+        .graph-edge.done {
+            background: var(--success);
+        }
+
+        @keyframes edge-flow {
+            0% { left: -30%; }
+            100% { left: 100%; }
+        }
+
+        .model-tracker {
+            margin-top: var(--sp-2);
+            padding: var(--sp-2);
+            background: var(--code-bg);
+            border-radius: 4px;
+            font-family: 'SF Mono', monospace;
+            font-size: 11px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .model-log {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .model-entry {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-1);
+            padding: 4px 8px;
+            border-radius: 3px;
+            animation: entry-appear 0.3s ease;
+        }
+
+        @keyframes entry-appear {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .model-entry.trying {
+            background: rgba(107, 159, 255, 0.1);
+            color: var(--accent);
+        }
+
+        .model-entry.success {
+            background: rgba(68, 170, 153, 0.1);
+            color: var(--success);
+        }
+
+        .model-entry.failed {
+            background: rgba(255, 100, 100, 0.05);
+            color: #966;
+        }
+
+        .model-entry .icon {
+            font-size: 12px;
+        }
+
+        .model-entry .model-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .model-entry .tokens {
+            color: var(--muted);
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: var(--sp-3);
+            margin-top: var(--sp-2);
+            padding-top: var(--sp-2);
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-value {
+            color: var(--fg);
+            font-family: 'SF Mono', monospace;
+        }
+
+        .token-counter {
+            animation: counter-tick 0.1s ease;
+        }
+
+        @keyframes counter-tick {
+            0% { transform: scale(1.1); color: var(--accent); }
+            100% { transform: scale(1); }
+        }
+
+        .shimmer {
+            background: linear-gradient(
+                90deg,
+                var(--code-bg) 0%,
+                rgba(107, 159, 255, 0.1) 50%,
+                var(--code-bg) 100%
+            );
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .collapse-toggle {
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-size: 11px;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .collapse-toggle:hover {
+            color: var(--fg);
+        }
     </style>
 </head>
 <body>
@@ -494,15 +720,49 @@
                     <span id="actionHint" style="color: var(--muted); font-size: var(--text-sm);">sketch → hyle → live URL</span>
                 </div>
                 <div class="status" id="status"></div>
-                <div id="progress" style="display:none; margin-top: var(--sp-2);">
-                    <div style="display:flex; gap: var(--sp-2); align-items:center; flex-wrap:wrap;">
-                        <span class="progress-step" data-step="submit">submitting</span>
-                        <span style="color:var(--muted);">→</span>
-                        <span class="progress-step" data-step="build">building</span>
-                        <span style="color:var(--muted);">→</span>
-                        <span class="progress-step" data-step="deploy">deploying</span>
-                        <span style="color:var(--muted);">→</span>
-                        <span class="progress-step" data-step="live">live</span>
+                <div class="progress-viz" id="progressViz">
+                    <div class="process-graph">
+                        <div class="graph-node" data-node="submit">
+                            <span>↑</span>
+                            <span class="node-label">submit</span>
+                        </div>
+                        <div class="graph-edge" data-edge="submit-queue"></div>
+                        <div class="graph-node" data-node="queue">
+                            <span>◎</span>
+                            <span class="node-label">queue</span>
+                        </div>
+                        <div class="graph-edge" data-edge="queue-build"></div>
+                        <div class="graph-node" data-node="build">
+                            <span>⚙</span>
+                            <span class="node-label">build</span>
+                        </div>
+                        <div class="graph-edge" data-edge="build-deploy"></div>
+                        <div class="graph-node" data-node="deploy">
+                            <span>▸</span>
+                            <span class="node-label">deploy</span>
+                        </div>
+                        <div class="graph-edge" data-edge="deploy-live"></div>
+                        <div class="graph-node" data-node="live">
+                            <span>✓</span>
+                            <span class="node-label">live</span>
+                        </div>
+                    </div>
+                    <div class="model-tracker" id="modelTracker">
+                        <div class="model-log" id="modelLog"></div>
+                    </div>
+                    <div class="stats-bar">
+                        <div class="stat">
+                            <span>elapsed:</span>
+                            <span class="stat-value" id="statElapsed">0s</span>
+                        </div>
+                        <div class="stat">
+                            <span>models tried:</span>
+                            <span class="stat-value" id="statModels">0</span>
+                        </div>
+                        <div class="stat">
+                            <span>polls:</span>
+                            <span class="stat-value" id="statPolls">0</span>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -522,12 +782,21 @@
     const HYLE_BASE = 'https://hyle.hyperstitious.org';
     const HYLE_API = HYLE_BASE + '/api/sketch';
 
+    // Progress state
+    let buildState = {
+        startTime: 0,
+        pollCount: 0,
+        modelsSeen: new Set(),
+        currentModel: null,
+        elapsedTimer: null
+    };
+
     document.getElementById('sketchForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const sketch = document.getElementById('sketchInput').value.trim();
         const status = document.getElementById('status');
-        const progress = document.getElementById('progress');
+        const progressViz = document.getElementById('progressViz');
         const submitBtn = document.getElementById('submitBtn');
         const hint = document.getElementById('actionHint');
 
@@ -537,14 +806,16 @@
             return;
         }
 
-        // Show progress UI
+        // Reset and show progress UI
+        resetProgressState();
         submitBtn.disabled = true;
         submitBtn.textContent = 'Building...';
         hint.style.display = 'none';
-        progress.style.display = 'block';
+        progressViz.classList.add('active');
         status.className = 'status';
 
-        setStep('submit');
+        setGraphNode('submit', 'active');
+        addModelEntry('system', 'Submitting sketch...', 'trying');
 
         try {
             // POST sketch directly to orchestrator
@@ -559,61 +830,190 @@
                 throw new Error(err || `HTTP ${res.status}`);
             }
 
-            setStep('build');
+            setGraphNode('submit', 'done');
+            setGraphEdge('submit-queue', 'done');
+            setGraphNode('queue', 'active');
+            updateModelEntry('system', 'Queued', 'success');
 
             const data = await res.json();
 
             if (data.status === 'queued' && data.poll_url) {
+                addModelEntry('queue', `Job ID: ${data.job_id || 'unknown'}`, 'success');
                 // Poll for completion - use full URL since poll_url is relative
                 await pollForCompletion(HYLE_BASE + data.poll_url);
             } else if (data.url) {
                 // Immediate result
-                setStep('live');
+                completeGraph();
                 showResult(data.url);
             } else {
                 throw new Error('Unexpected response');
             }
 
         } catch (err) {
+            addModelEntry('error', err.message, 'failed');
             status.textContent = `Error: ${err.message}`;
             status.className = 'status visible error';
             resetForm();
         }
     });
 
-    async function pollForCompletion(pollUrl, maxAttempts = 60) {
+    async function pollForCompletion(pollUrl, maxAttempts = 120) {
+        setGraphNode('queue', 'done');
+        setGraphEdge('queue-build', 'active');
+        setGraphNode('build', 'active');
+
         for (let i = 0; i < maxAttempts; i++) {
-            await sleep(2000);
+            await sleep(1500);
+            buildState.pollCount++;
+            document.getElementById('statPolls').textContent = buildState.pollCount;
+
             try {
                 const res = await fetch(pollUrl);
                 const data = await res.json();
 
-                if (data.status === 'building') {
-                    setStep('build');
+                // Update models tried
+                if (data.models_tried && Array.isArray(data.models_tried)) {
+                    updateModelsTried(data.models_tried);
+                }
+
+                if (data.status === 'queued') {
+                    setGraphNode('queue', 'active');
+                    setGraphNode('build', '');
+                    setGraphEdge('queue-build', '');
+                } else if (data.status === 'building') {
+                    setGraphNode('queue', 'done');
+                    setGraphEdge('queue-build', 'done');
+                    setGraphNode('build', 'active');
+                    setGraphEdge('build-deploy', 'active');
                 } else if (data.status === 'deploying') {
-                    setStep('deploy');
+                    setGraphNode('build', 'done');
+                    setGraphEdge('build-deploy', 'done');
+                    setGraphNode('deploy', 'active');
+                    setGraphEdge('deploy-live', 'active');
+                    addModelEntry('deploy', 'Writing files...', 'trying');
                 } else if (data.status === 'live' && data.url) {
-                    setStep('live');
+                    completeGraph();
+                    addModelEntry('live', data.url, 'success');
                     showResult(data.url);
                     return;
                 } else if (data.status === 'failed') {
+                    addModelEntry('error', data.error || 'Build failed', 'failed');
                     throw new Error(data.error || 'Build failed');
                 }
             } catch (err) {
-                if (i === maxAttempts - 1) throw err;
+                if (err.message.includes('Build failed') || i === maxAttempts - 1) throw err;
             }
         }
         throw new Error('Timeout waiting for build');
     }
 
-    function setStep(step) {
-        document.querySelectorAll('.progress-step').forEach(el => {
-            el.style.color = el.dataset.step === step ? 'var(--accent)' : 'var(--muted)';
-            el.style.fontWeight = el.dataset.step === step ? '600' : '400';
+    function updateModelsTried(models) {
+        const statModels = document.getElementById('statModels');
+
+        models.forEach((model, idx) => {
+            if (!buildState.modelsSeen.has(model)) {
+                buildState.modelsSeen.add(model);
+
+                // Mark previous model as failed (rate limited)
+                if (buildState.currentModel) {
+                    updateModelEntry(buildState.currentModel, buildState.currentModel + ' (429)', 'failed');
+                }
+
+                // Add new model entry
+                const shortName = model.split('/').pop().replace(':free', '');
+                addModelEntry(model, shortName, 'trying');
+                buildState.currentModel = model;
+
+                statModels.textContent = buildState.modelsSeen.size;
+                statModels.classList.remove('token-counter');
+                void statModels.offsetWidth; // Trigger reflow
+                statModels.classList.add('token-counter');
+            }
         });
+
+        // If we have models and still building, mark current as active
+        if (models.length > 0 && buildState.currentModel) {
+            const currentShort = buildState.currentModel.split('/').pop().replace(':free', '');
+            updateModelEntry(buildState.currentModel, currentShort + ' ⚙', 'trying');
+        }
+    }
+
+    function addModelEntry(id, text, status) {
+        const log = document.getElementById('modelLog');
+        const icons = { trying: '◎', success: '✓', failed: '✗' };
+
+        const entry = document.createElement('div');
+        entry.className = `model-entry ${status}`;
+        entry.id = `model-${id}`;
+        entry.innerHTML = `
+            <span class="icon">${icons[status]}</span>
+            <span class="model-name">${text}</span>
+        `;
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function updateModelEntry(id, text, status) {
+        const entry = document.getElementById(`model-${id}`);
+        const icons = { trying: '◎', success: '✓', failed: '✗' };
+        if (entry) {
+            entry.className = `model-entry ${status}`;
+            entry.querySelector('.icon').textContent = icons[status];
+            entry.querySelector('.model-name').textContent = text;
+        }
+    }
+
+    function setGraphNode(node, state) {
+        const el = document.querySelector(`[data-node="${node}"]`);
+        if (el) {
+            el.classList.remove('active', 'done');
+            if (state) el.classList.add(state);
+        }
+    }
+
+    function setGraphEdge(edge, state) {
+        const el = document.querySelector(`[data-edge="${edge}"]`);
+        if (el) {
+            el.classList.remove('active', 'done');
+            if (state) el.classList.add(state);
+        }
+    }
+
+    function completeGraph() {
+        ['submit', 'queue', 'build', 'deploy', 'live'].forEach(n => setGraphNode(n, 'done'));
+        ['submit-queue', 'queue-build', 'build-deploy', 'deploy-live'].forEach(e => setGraphEdge(e, 'done'));
+        if (buildState.currentModel) {
+            const shortName = buildState.currentModel.split('/').pop().replace(':free', '');
+            updateModelEntry(buildState.currentModel, shortName + ' ✓', 'success');
+        }
+    }
+
+    function resetProgressState() {
+        buildState = {
+            startTime: Date.now(),
+            pollCount: 0,
+            modelsSeen: new Set(),
+            currentModel: null,
+            elapsedTimer: setInterval(updateElapsed, 1000)
+        };
+        document.getElementById('modelLog').innerHTML = '';
+        document.getElementById('statElapsed').textContent = '0s';
+        document.getElementById('statModels').textContent = '0';
+        document.getElementById('statPolls').textContent = '0';
+        // Reset graph
+        document.querySelectorAll('.graph-node').forEach(n => n.classList.remove('active', 'done'));
+        document.querySelectorAll('.graph-edge').forEach(e => e.classList.remove('active', 'done'));
+    }
+
+    function updateElapsed() {
+        const elapsed = Math.floor((Date.now() - buildState.startTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        document.getElementById('statElapsed').textContent = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
     }
 
     function showResult(url) {
+        clearInterval(buildState.elapsedTimer);
         const status = document.getElementById('status');
         status.innerHTML = `<a href="${url}" target="_blank" class="live-url"><span class="live-indicator"></span>${url}</a>`;
         status.className = 'status visible success';
@@ -621,6 +1021,7 @@
     }
 
     function resetForm() {
+        clearInterval(buildState.elapsedTimer);
         const submitBtn = document.getElementById('submitBtn');
         const hint = document.getElementById('actionHint');
         submitBtn.disabled = false;
