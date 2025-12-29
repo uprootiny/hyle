@@ -204,23 +204,34 @@ async fn submit_sketch(
 async fn get_job(
     State(state): State<Arc<AppState>>,
     Path(job_id): Path<String>,
-) -> Result<Json<JobResponse>, StatusCode> {
+) -> Result<Json<JobResponse>, (StatusCode, Json<JobResponse>)> {
     let jobs = state.jobs.read().await;
-    let job = jobs.get(&job_id).ok_or(StatusCode::NOT_FOUND)?;
 
-    Ok(Json(JobResponse {
-        status: match job.status {
-            JobStatus::Queued => "queued".into(),
-            JobStatus::Building => "building".into(),
-            JobStatus::Deploying => "deploying".into(),
-            JobStatus::Live => "live".into(),
-            JobStatus::Failed => "failed".into(),
-        },
-        url: job.url.clone(),
-        error: job.error.clone(),
-        model_used: job.model_used.clone(),
-        models_tried: job.models_tried.clone(),
-    }))
+    match jobs.get(&job_id) {
+        Some(job) => Ok(Json(JobResponse {
+            status: match job.status {
+                JobStatus::Queued => "queued".into(),
+                JobStatus::Building => "building".into(),
+                JobStatus::Deploying => "deploying".into(),
+                JobStatus::Live => "live".into(),
+                JobStatus::Failed => "failed".into(),
+            },
+            url: job.url.clone(),
+            error: job.error.clone(),
+            model_used: job.model_used.clone(),
+            models_tried: job.models_tried.clone(),
+        })),
+        None => {
+            eprintln!("[{}] Job not found (may have completed and expired)", job_id);
+            Err((StatusCode::NOT_FOUND, Json(JobResponse {
+                status: "not_found".into(),
+                url: None,
+                error: Some(format!("Job {} not found - may have completed or expired", job_id)),
+                model_used: None,
+                models_tried: vec![],
+            })))
+        }
+    }
 }
 
 /// Generate a project name from sketch
@@ -457,7 +468,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", get(health))
         .route("/api/models", get(list_models))
         .route("/api/sketch", post(submit_sketch))
-        .route("/api/jobs/{job_id}", get(get_job))
+        .route("/api/jobs/:job_id", get(get_job))
         .layer(cors)
         .with_state(state);
 
