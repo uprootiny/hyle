@@ -32,13 +32,17 @@ use tokio::{process::Command, sync::RwLock, time::timeout};
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
-/// Default free models sorted by context length and quality
+/// Default free models sorted by context length and coding capability
+/// Verified against OpenRouter API 2025-12-29
 const DEFAULT_MODELS: &[&str] = &[
-    "google/gemini-2.0-flash-exp:free",
-    "mistralai/devstral-2512:free",
-    "qwen/qwen3-coder:free",
-    "deepseek/deepseek-r1-0528:free",
-    "meta-llama/llama-3.1-8b-instruct:free",
+    "google/gemini-2.0-flash-exp:free",      // 1M ctx - best for large projects
+    "qwen/qwen3-coder:free",                 // 262K ctx - coding-optimized
+    "mistralai/devstral-2512:free",          // 262K ctx - dev-focused
+    "kwaipilot/kat-coder-pro:free",          // 256K ctx - coding-specific
+    "meta-llama/llama-3.3-70b-instruct:free", // 131K ctx - large model
+    "google/gemma-3-27b-it:free",            // 131K ctx - good quality
+    "deepseek/deepseek-r1-0528:free",        // 164K ctx - reasoning model
+    "mistralai/mistral-small-3.1-24b-instruct:free", // 128K ctx
 ];
 
 /// Build timeout per model attempt (5 minutes)
@@ -353,11 +357,27 @@ async fn try_build_with_model(
     sketch_file: &PathBuf,
     model: &str,
 ) -> Result<(), String> {
+    // Read sketch content for --task mode
+    let sketch_content = match tokio::fs::read_to_string(sketch_file).await {
+        Ok(content) => content,
+        Err(e) => return Err(format!("Failed to read sketch: {}", e)),
+    };
+
+    // Wrap sketch with explicit instructions to write files
+    let task_prompt = format!(
+        "Create a web project based on this sketch. You MUST use the write() tool to create files. \
+         Create at minimum an index.html file. Use modern HTML/CSS/JS.\n\n\
+         Sketch:\n{}\n\n\
+         IMPORTANT: Use write(path=\"index.html\", content=\"...\") to create the files.",
+        sketch_content
+    );
+
     let result = timeout(
         Duration::from_secs(MODEL_TIMEOUT_SECS),
         Command::new(&state.hyle_binary)
+            .arg("--task")  // Headless mode - no TTY required
+            .arg(&task_prompt)
             .arg("--trust")
-            .arg(sketch_file)
             .current_dir(project_dir)
             .env("HYLE_MODEL", model)
             .env(

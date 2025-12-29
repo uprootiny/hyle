@@ -497,8 +497,10 @@ async fn run_task(task: &str, paths: &[PathBuf]) -> Result<()> {
     let api_key = config::get_api_key()?;
     let cfg = config::Config::load()?;
 
-    // Get model
-    let model = cfg.default_model.clone()
+    // Get model - prefer HYLE_MODEL env var, then config, then default
+    let model = std::env::var("HYLE_MODEL")
+        .ok()
+        .or(cfg.default_model.clone())
         .unwrap_or_else(|| "meta-llama/llama-3.2-3b-instruct:free".to_string());
 
     let work_dir = std::env::current_dir()?;
