@@ -314,7 +314,7 @@
             <article class="workflow">
                 <div class="workflow-header">
                     <span class="workflow-title">Generative Art</span>
-                    <a href="projects/dodeca/" class="workflow-link">view live →</a>
+                    <a href="https://uprootiny.github.io/hyle/projects/dodeca/" class="workflow-link">view live →</a>
                 </div>
                 <div class="flow-steps">
                     <div class="flow-step">
@@ -342,9 +342,9 @@
                     <div class="flow-step">
                         <span class="step-label">live</span>
                         <div class="step-content">
-                            <a href="projects/dodeca/" class="live-url">
+                            <a href="https://uprootiny.github.io/hyle/projects/dodeca/" class="live-url">
                                 <span class="live-indicator"></span>
-                                /projects/dodeca
+                                dodeca
                             </a>
                         </div>
                     </div>
@@ -355,7 +355,7 @@
             <article class="workflow">
                 <div class="workflow-header">
                     <span class="workflow-title">Data Sonification</span>
-                    <a href="projects/seismic/" class="workflow-link">view live →</a>
+                    <a href="https://uprootiny.github.io/hyle/projects/seismic/" class="workflow-link">view live →</a>
                 </div>
                 <div class="flow-steps">
                     <div class="flow-step">
@@ -384,9 +384,9 @@
                     <div class="flow-step">
                         <span class="step-label">live</span>
                         <div class="step-content">
-                            <a href="projects/seismic/" class="live-url">
+                            <a href="https://uprootiny.github.io/hyle/projects/seismic/" class="live-url">
                                 <span class="live-indicator"></span>
-                                /projects/seismic
+                                seismic
                             </a>
                         </div>
                     </div>
@@ -397,7 +397,7 @@
             <article class="workflow">
                 <div class="workflow-header">
                     <span class="workflow-title">Interactive Fiction</span>
-                    <a href="projects/labyrinth/" class="workflow-link">view live →</a>
+                    <a href="https://uprootiny.github.io/hyle/projects/labyrinth/" class="workflow-link">view live →</a>
                 </div>
                 <div class="flow-steps">
                     <div class="flow-step">
@@ -426,9 +426,9 @@
                     <div class="flow-step">
                         <span class="step-label">live</span>
                         <div class="step-content">
-                            <a href="projects/labyrinth/" class="live-url">
+                            <a href="https://uprootiny.github.io/hyle/projects/labyrinth/" class="live-url">
                                 <span class="live-indicator"></span>
-                                /projects/labyrinth
+                                labyrinth
                             </a>
                         </div>
                     </div>
@@ -439,7 +439,7 @@
             <article class="workflow">
                 <div class="workflow-header">
                     <span class="workflow-title">Developer Tool</span>
-                    <a href="projects/jsonl/" class="workflow-link">view live →</a>
+                    <a href="https://uprootiny.github.io/hyle/projects/jsonl/" class="workflow-link">view live →</a>
                 </div>
                 <div class="flow-steps">
                     <div class="flow-step">
@@ -468,9 +468,9 @@
                     <div class="flow-step">
                         <span class="step-label">live</span>
                         <div class="step-content">
-                            <a href="projects/jsonl/" class="live-url">
+                            <a href="https://uprootiny.github.io/hyle/projects/jsonl/" class="live-url">
                                 <span class="live-indicator"></span>
-                                /projects/jsonl
+                                jsonl
                             </a>
                         </div>
                     </div>
@@ -491,9 +491,20 @@
                 ></textarea>
                 <div class="input-actions">
                     <button type="submit" class="submit-btn" id="submitBtn">Build</button>
-                    <span style="color: var(--muted); font-size: var(--text-sm);">opens GitHub issue → workflow builds → you get a URL</span>
+                    <span id="actionHint" style="color: var(--muted); font-size: var(--text-sm);">sketch → hyle → live URL</span>
                 </div>
                 <div class="status" id="status"></div>
+                <div id="progress" style="display:none; margin-top: var(--sp-2);">
+                    <div style="display:flex; gap: var(--sp-2); align-items:center; flex-wrap:wrap;">
+                        <span class="progress-step" data-step="submit">submitting</span>
+                        <span style="color:var(--muted);">→</span>
+                        <span class="progress-step" data-step="build">building</span>
+                        <span style="color:var(--muted);">→</span>
+                        <span class="progress-step" data-step="deploy">deploying</span>
+                        <span style="color:var(--muted);">→</span>
+                        <span class="progress-step" data-step="live">live</span>
+                    </div>
+                </div>
             </form>
         </section>
 
@@ -507,11 +518,17 @@
     </div>
 
     <script>
-    document.getElementById('sketchForm').addEventListener('submit', (e) => {
+    // Configuration - orchestrator endpoint
+    const HYLE_API = 'https://hyle.hyperstitious.org/api/sketch';
+
+    document.getElementById('sketchForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const sketch = document.getElementById('sketchInput').value.trim();
         const status = document.getElementById('status');
+        const progress = document.getElementById('progress');
+        const submitBtn = document.getElementById('submitBtn');
+        const hint = document.getElementById('actionHint');
 
         if (sketch.length < 20) {
             status.textContent = 'Please describe your project in more detail.';
@@ -519,20 +536,110 @@
             return;
         }
 
-        const lines = sketch.split('\n');
-        let title = lines[0].slice(0, 80);
-        if (title.length < 3) title = 'New project';
+        // Show progress UI
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Building...';
+        hint.style.display = 'none';
+        progress.style.display = 'block';
+        status.className = 'status';
 
-        const issueUrl = `https://github.com/uprootiny/hyle/issues/new?` +
-            `title=${encodeURIComponent('[sketch] ' + title)}&` +
-            `body=${encodeURIComponent(sketch)}&` +
-            `labels=sketch`;
+        setStep('submit');
 
-        status.innerHTML = `<a href="${issueUrl}" target="_blank">Click to submit on GitHub →</a>`;
-        status.className = 'status visible success';
+        try {
+            // POST sketch directly to orchestrator
+            const res = await fetch(HYLE_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sketch })
+            });
 
-        setTimeout(() => window.open(issueUrl, '_blank'), 300);
+            if (!res.ok) {
+                const err = await res.text();
+                throw new Error(err || `HTTP ${res.status}`);
+            }
+
+            setStep('build');
+
+            const data = await res.json();
+
+            if (data.status === 'queued' && data.poll_url) {
+                // Poll for completion
+                await pollForCompletion(data.poll_url);
+            } else if (data.url) {
+                // Immediate result
+                setStep('live');
+                showResult(data.url);
+            } else {
+                throw new Error('Unexpected response');
+            }
+
+        } catch (err) {
+            status.textContent = `Error: ${err.message}`;
+            status.className = 'status visible error';
+            resetForm();
+        }
     });
+
+    async function pollForCompletion(pollUrl, maxAttempts = 60) {
+        for (let i = 0; i < maxAttempts; i++) {
+            await sleep(2000);
+            try {
+                const res = await fetch(pollUrl);
+                const data = await res.json();
+
+                if (data.status === 'building') {
+                    setStep('build');
+                } else if (data.status === 'deploying') {
+                    setStep('deploy');
+                } else if (data.status === 'live' && data.url) {
+                    setStep('live');
+                    showResult(data.url);
+                    return;
+                } else if (data.status === 'failed') {
+                    throw new Error(data.error || 'Build failed');
+                }
+            } catch (err) {
+                if (i === maxAttempts - 1) throw err;
+            }
+        }
+        throw new Error('Timeout waiting for build');
+    }
+
+    function setStep(step) {
+        document.querySelectorAll('.progress-step').forEach(el => {
+            el.style.color = el.dataset.step === step ? 'var(--accent)' : 'var(--muted)';
+            el.style.fontWeight = el.dataset.step === step ? '600' : '400';
+        });
+    }
+
+    function showResult(url) {
+        const status = document.getElementById('status');
+        status.innerHTML = `<a href="${url}" target="_blank" class="live-url"><span class="live-indicator"></span>${url}</a>`;
+        status.className = 'status visible success';
+        resetForm();
+    }
+
+    function resetForm() {
+        const submitBtn = document.getElementById('submitBtn');
+        const hint = document.getElementById('actionHint');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Build';
+        hint.style.display = '';
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // Check for sketch in URL hash (remix links)
+    function loadSketchFromHash() {
+        const hash = window.location.hash;
+        if (hash.startsWith('#sketch=')) {
+            const sketch = decodeURIComponent(hash.slice(8));
+            document.getElementById('sketchInput').value = sketch;
+            document.getElementById('sketchInput').focus();
+        }
+    }
+    loadSketchFromHash();
+    window.addEventListener('hashchange', loadSketchFromHash);
 
     // Drag and drop
     const input = document.getElementById('sketchInput');
