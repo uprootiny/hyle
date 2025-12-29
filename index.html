@@ -519,7 +519,8 @@
 
     <script>
     // Configuration - orchestrator endpoint
-    const HYLE_API = 'https://hyle.hyperstitious.org/api/sketch';
+    const HYLE_BASE = 'https://hyle.hyperstitious.org';
+    const HYLE_API = HYLE_BASE + '/api/sketch';
 
     document.getElementById('sketchForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -563,8 +564,8 @@
             const data = await res.json();
 
             if (data.status === 'queued' && data.poll_url) {
-                // Poll for completion
-                await pollForCompletion(data.poll_url);
+                // Poll for completion - use full URL since poll_url is relative
+                await pollForCompletion(HYLE_BASE + data.poll_url);
             } else if (data.url) {
                 // Immediate result
                 setStep('live');
