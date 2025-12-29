@@ -1,5 +1,39 @@
 # hyle Development Journal
 
+## 2025-12-30: Internet Artpiece Philosophy
+
+### Insight
+Hyle creates "internet artpieces" — not static webpages. The user's description:
+> "something people can open up in their browser and interact with, something responsive, smooth, dynamic"
+
+### Changes
+Updated the system prompt in `src/api/main.rs` to reframe what hyle produces:
+
+```
+You are creating an INTERNET ARTPIECE — a self-contained, interactive browser experience.
+
+This is NOT a static webpage. This is something people open in their browser and INTERACT with.
+Think: generative art, data visualizations, audio toys, interactive fiction, creative tools.
+
+Requirements:
+- Single index.html file (all CSS/JS inline)
+- Responsive: works on any screen size
+- Smooth: 60fps animations, no jank
+- Dynamic: responds to user input
+- Self-contained: no external dependencies
+- Delightful: surprising, playful, aesthetically considered
+
+Make it something people want to share. Make it memorable.
+```
+
+Also added a new gallery example: datacenter infrastructure visualization with dymaxion projection.
+
+### Git Commits
+- `2d99bba`: prompt: reframe hyle as internet artpiece generator
+- `5382123`: gallery: add datacenter infrastructure visualization example
+
+---
+
 ## 2025-12-29 (Part 3): Frontend Progress Visualization
 
 ### Problem
