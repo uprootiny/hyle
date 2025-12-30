@@ -4,556 +4,481 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>hyle - Rust-native code assistant</title>
-    <meta name="description" content="Autonomous code assistant that turns sketches into working projects. TUI-based, runs locally, deploys anywhere.">
-    <meta name="theme-color" content="#0a0a0b">
+    <meta name="description" content="Autonomous code assistant. See it work.">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
     <style>
-:root {
-    --bg: #0a0a0b;
-    --surface: #111114;
-    --surface-2: #18181c;
-    --border: #2a2a32;
-    --text: #e8e8ec;
-    --text-dim: #888890;
-    --text-muted: #555560;
-    --accent: #6b9fff;
-    --accent-dim: rgba(107, 159, 255, 0.15);
-    --green: #4ade80;
-    --mono: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
-}
-
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
+html, body { height: 100%; }
 body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    min-height: 100vh;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #0a0a0b;
+    color: #e8e8ec;
 }
 
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-.container {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 1.5rem;
-}
-
-/* Hero */
 .hero {
-    padding: 4rem 0 3rem;
-    text-align: center;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
 }
 
-.hero h1 {
-    font-size: clamp(3rem, 10vw, 5rem);
+/* Live demo as hero background */
+.hero-demo {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+.hero-demo iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* Overlay content */
+.hero-content {
+    position: relative;
+    z-index: 10;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    pointer-events: none;
+}
+
+.hero-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.brand {
+    pointer-events: auto;
+}
+
+.brand h1 {
+    font-size: 2.5rem;
     font-weight: 200;
     letter-spacing: -0.03em;
-    margin-bottom: 0.5rem;
-    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.8);
 }
 
-.hero .tagline {
-    font-size: 1.25rem;
-    color: var(--text-dim);
-    max-width: 500px;
-    margin: 0 auto 2rem;
+.brand p {
+    color: #888;
+    font-size: 0.9rem;
+    text-shadow: 0 1px 10px rgba(0,0,0,0.8);
 }
 
-.hero-actions {
+.nav {
     display: flex;
     gap: 1rem;
-    justify-content: center;
-    flex-wrap: wrap;
+    pointer-events: auto;
 }
 
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    border-radius: 6px;
-    font-size: 1rem;
-    font-weight: 500;
+.nav a {
+    color: #888;
+    text-decoration: none;
+    font-size: 0.85rem;
+    padding: 0.5rem 1rem;
+    background: rgba(0,0,0,0.6);
+    border-radius: 4px;
+    backdrop-filter: blur(10px);
     transition: all 0.15s;
 }
+.nav a:hover { color: #fff; background: rgba(107,159,255,0.3); }
 
-.btn-primary {
-    background: var(--accent);
-    color: var(--bg);
-}
-.btn-primary:hover {
-    background: #8bb3ff;
-    text-decoration: none;
-}
-
-.btn-secondary {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-}
-.btn-secondary:hover {
-    border-color: var(--accent);
-    text-decoration: none;
+.hero-bottom {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
 }
 
-/* Install snippet */
-.install-snippet {
-    margin: 2rem auto;
-    max-width: 500px;
-    background: var(--surface);
-    border: 1px solid var(--border);
+.demo-label {
+    pointer-events: auto;
+    background: rgba(0,0,0,0.7);
+    padding: 1rem 1.5rem;
     border-radius: 8px;
-    padding: 1rem 1.25rem;
-    font-family: var(--mono);
-    font-size: 0.9rem;
+    backdrop-filter: blur(10px);
+    max-width: 400px;
+}
+
+.demo-label h2 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.demo-label p {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 0.5rem;
+}
+
+.demo-label code {
+    display: block;
+    font-family: 'SF Mono', monospace;
+    font-size: 0.7rem;
+    color: #6b9fff;
+    background: rgba(107,159,255,0.1);
+    padding: 0.5rem;
+    border-radius: 4px;
+    white-space: pre-wrap;
+}
+
+.demo-nav {
+    display: flex;
+    gap: 0.5rem;
+    pointer-events: auto;
+}
+
+.demo-btn {
+    width: 40px;
+    height: 40px;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid #333;
+    border-radius: 50%;
+    color: #888;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.15s;
+    backdrop-filter: blur(10px);
+}
+.demo-btn:hover { background: rgba(107,159,255,0.3); color: #fff; border-color: #6b9fff; }
+
+.demo-dots {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0 1rem;
+}
+
+.demo-dot {
+    width: 8px;
+    height: 8px;
+    background: #333;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.demo-dot:hover { background: #666; }
+.demo-dot.active { background: #6b9fff; width: 24px; border-radius: 4px; }
+
+/* Scroll indicator */
+.scroll-hint {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #444;
+    font-size: 0.75rem;
+    text-align: center;
+    pointer-events: none;
+    animation: bounce 2s infinite;
+}
+@keyframes bounce {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-10px); }
+}
+
+/* Below fold - more demos */
+.demos-section {
+    padding: 4rem 2rem;
+    background: #0a0a0b;
+}
+
+.demos-section h2 {
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: 300;
+    margin-bottom: 2rem;
+    color: #888;
+}
+
+.demo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.demo-frame {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.demo-frame-header {
+    padding: 0.75rem 1rem;
+    background: #0a0a0b;
+    border-bottom: 1px solid #222;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.install-snippet code {
-    color: var(--green);
+.demo-frame-title {
+    font-size: 0.85rem;
+    font-weight: 500;
 }
 
-.install-snippet button {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 0.25rem;
-    font-size: 1rem;
-}
-.install-snippet button:hover { color: var(--accent); }
-
-/* Live Demos Section */
-.demos {
-    padding: 3rem 0;
-}
-
-.section-header {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.section-header h2 {
-    font-size: 1.5rem;
-    font-weight: 400;
-    margin-bottom: 0.5rem;
-}
-
-.section-header p {
-    color: var(--text-dim);
-}
-
-.demo-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.25rem;
-}
-
-.demo-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+.demo-frame-links {
     display: flex;
-    flex-direction: column;
+    gap: 0.75rem;
+    font-size: 0.75rem;
 }
 
-.demo-card:hover {
-    transform: translateY(-4px);
-    border-color: var(--accent);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+.demo-frame-links a {
+    color: #6b9fff;
     text-decoration: none;
 }
+.demo-frame-links a:hover { text-decoration: underline; }
 
-.demo-preview {
-    aspect-ratio: 16/10;
-    background: var(--surface-2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3rem;
-    position: relative;
-    overflow: hidden;
-}
-
-.demo-preview::after {
-    content: 'Click to launch';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 0.5rem;
-    background: linear-gradient(transparent, rgba(0,0,0,0.8));
-    font-size: 0.75rem;
-    color: var(--text-dim);
-    text-align: center;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.demo-card:hover .demo-preview::after {
-    opacity: 1;
-}
-
-.demo-content {
-    padding: 1rem 1.25rem;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.demo-tags {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.tag {
-    font-size: 0.65rem;
-    padding: 0.15rem 0.4rem;
-    background: var(--bg);
-    border-radius: 3px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-.tag.webgl { color: var(--accent); }
-.tag.data { color: #b56bff; }
-.tag.audio { color: #ff9f6b; }
-.tag.tool { color: var(--green); }
-
-.demo-title {
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: var(--text);
-    margin-bottom: 0.25rem;
-}
-
-.demo-desc {
-    font-size: 0.85rem;
-    color: var(--text-dim);
-    flex: 1;
-}
-
-.demo-prompt {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    line-height: 1.4;
-}
-
-.demo-prompt::before {
-    content: 'prompt: ';
-    color: var(--accent);
-}
-
-/* Features */
-.features {
-    padding: 3rem 0;
-    border-top: 1px solid var(--border);
-}
-
-.feature-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2rem;
-}
-
-.feature {
-    text-align: center;
-    padding: 1.5rem;
-}
-
-.feature-icon {
-    font-size: 2rem;
-    margin-bottom: 1rem;
-    opacity: 0.8;
-}
-
-.feature h3 {
-    font-size: 1rem;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
-}
-
-.feature p {
-    font-size: 0.9rem;
-    color: var(--text-dim);
-}
-
-/* TUI Preview */
-.tui-section {
-    padding: 3rem 0;
-    border-top: 1px solid var(--border);
-}
-
-.tui-preview {
+.demo-frame iframe {
+    width: 100%;
+    height: 350px;
+    border: none;
     background: #000;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-    max-width: 800px;
-    margin: 0 auto;
 }
 
-.tui-titlebar {
-    background: var(--surface);
-    padding: 0.5rem 1rem;
-    display: flex;
+.demo-frame-prompt {
+    padding: 0.75rem 1rem;
+    background: #0a0a0b;
+    border-top: 1px solid #222;
+    font-family: 'SF Mono', monospace;
+    font-size: 0.7rem;
+    color: #666;
+}
+.demo-frame-prompt::before {
+    content: 'prompt: ';
+    color: #6b9fff;
+}
+
+/* Install section */
+.install-section {
+    padding: 4rem 2rem;
+    text-align: center;
+    border-top: 1px solid #1a1a1a;
+}
+
+.install-section h2 {
+    font-size: 1.25rem;
+    font-weight: 300;
+    margin-bottom: 1.5rem;
+    color: #888;
+}
+
+.install-box {
+    display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    border-bottom: 1px solid var(--border);
+    gap: 1rem;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    font-family: 'SF Mono', monospace;
 }
 
-.tui-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-}
-.tui-dot.red { background: #ff5f57; }
-.tui-dot.yellow { background: #febc2e; }
-.tui-dot.green { background: #28c840; }
-
-.tui-title {
-    flex: 1;
-    text-align: center;
-    font-size: 0.8rem;
-    color: var(--text-muted);
+.install-box code {
+    color: #4ade80;
+    font-size: 1rem;
 }
 
-.tui-content {
-    padding: 1rem;
-    font-family: var(--mono);
-    font-size: 0.8rem;
-    line-height: 1.5;
-    min-height: 300px;
+.install-box button {
+    background: #222;
+    border: 1px solid #333;
+    color: #888;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
 }
+.install-box button:hover { background: #333; color: #fff; }
 
-.tui-line { margin: 0.25rem 0; }
-.tui-prompt { color: var(--green); }
-.tui-cmd { color: var(--text); }
-.tui-output { color: var(--text-dim); }
-.tui-accent { color: var(--accent); }
-.tui-success { color: var(--green); }
-.tui-dim { color: var(--text-muted); }
+.github-link {
+    display: inline-block;
+    margin-top: 1.5rem;
+    padding: 0.75rem 2rem;
+    background: #6b9fff;
+    color: #000;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+}
+.github-link:hover { background: #8bb3ff; }
 
-/* Footer */
 footer {
-    padding: 3rem 0;
-    border-top: 1px solid var(--border);
+    padding: 2rem;
     text-align: center;
-    color: var(--text-muted);
-    font-size: 0.9rem;
+    color: #444;
+    font-size: 0.8rem;
+    border-top: 1px solid #1a1a1a;
 }
+footer a { color: #666; }
 
-.footer-links {
-    display: flex;
-    gap: 2rem;
-    justify-content: center;
-    margin-bottom: 1rem;
-}
-
-/* Responsive */
-@media (max-width: 640px) {
-    .hero { padding: 2rem 0; }
+@media (max-width: 800px) {
     .demo-grid { grid-template-columns: 1fr; }
-    .feature-grid { grid-template-columns: 1fr; }
-    .footer-links { flex-direction: column; gap: 0.5rem; }
+    .hero-bottom { flex-direction: column; gap: 1rem; align-items: flex-start; }
+    .demo-label { max-width: 100%; }
 }
     </style>
 </head>
 <body>
-    <div class="container">
-        <section class="hero">
-            <h1>hyle</h1>
-            <p class="tagline">Rust-native code assistant. Describe what you want, get working code.</p>
-            <div class="hero-actions">
-                <a href="https://github.com/uprootiny/hyle" class="btn btn-primary">
-                    View on GitHub
-                </a>
-                <a href="/projects/vitrine/" class="btn btn-secondary">
-                    Browse Demos
-                </a>
-            </div>
-            <div class="install-snippet">
-                <code>cargo install hyle</code>
-                <button onclick="navigator.clipboard.writeText('cargo install hyle')" title="Copy">
-                    <span id="copyIcon">&#128203;</span>
-                </button>
-            </div>
-        </section>
 
-        <section class="demos">
-            <div class="section-header">
-                <h2>Live Demos</h2>
-                <p>Each built from a single prompt. Click to try.</p>
-            </div>
-            <div class="demo-grid">
-                <a href="/projects/datacenters/" class="demo-card">
-                    <div class="demo-preview">&#127760;</div>
-                    <div class="demo-content">
-                        <div class="demo-tags">
-                            <span class="tag webgl">WebGL</span>
-                            <span class="tag data">Data</span>
-                        </div>
-                        <div class="demo-title">Datacenters Globe</div>
-                        <div class="demo-desc">Interactive visualization of global cloud infrastructure with environmental impact metrics.</div>
-                        <div class="demo-prompt">dymaxion globe with datacenter locations, water usage, fire risk overlay, live token counter</div>
-                    </div>
-                </a>
-
-                <a href="/projects/seismic/" class="demo-card">
-                    <div class="demo-preview">&#128200;</div>
-                    <div class="demo-content">
-                        <div class="demo-tags">
-                            <span class="tag data">Data</span>
-                            <span class="tag audio">Audio</span>
-                        </div>
-                        <div class="demo-title">Seismic Activity</div>
-                        <div class="demo-desc">Real-time earthquake visualization with sonification from USGS data feed.</div>
-                        <div class="demo-prompt">real-time seismic sonification, fetch USGS feed, magnitude to pitch, depth to reverb, mercator rings</div>
-                    </div>
-                </a>
-
-                <a href="/projects/labyrinth/" class="demo-card">
-                    <div class="demo-preview">&#128269;</div>
-                    <div class="demo-content">
-                        <div class="demo-tags">
-                            <span class="tag">Generative</span>
-                        </div>
-                        <div class="demo-title">Labyrinth</div>
-                        <div class="demo-desc">Procedural text crawler with Borges-inspired Markov generation and URL state.</div>
-                        <div class="demo-prompt">procedural labyrinth crawler, ASCII map, rooms from markov chains on borges, state in URL hash</div>
-                    </div>
-                </a>
-
-                <a href="/projects/dodeca/" class="demo-card">
-                    <div class="demo-preview">&#9651;</div>
-                    <div class="demo-content">
-                        <div class="demo-tags">
-                            <span class="tag webgl">WebGL</span>
-                        </div>
-                        <div class="demo-title">Dodeca</div>
-                        <div class="demo-desc">Spiky dodecahedron with noise-perturbed surface and rotoscoped rendering.</div>
-                        <div class="demo-prompt">spiky dodecahedron with perturbed surface using landscape algos, rotoscoped over starry void</div>
-                    </div>
-                </a>
-
-                <a href="/projects/jsonl/" class="demo-card">
-                    <div class="demo-preview">&#128196;</div>
-                    <div class="demo-content">
-                        <div class="demo-tags">
-                            <span class="tag tool">Tool</span>
-                        </div>
-                        <div class="demo-title">JSONL Viewer</div>
-                        <div class="demo-desc">Stream-friendly JSON Lines viewer with syntax highlighting, queries, and export.</div>
-                        <div class="demo-prompt">JSONL viewer, paste or drag file, scrollable table, jq-style queries, export filtered</div>
-                    </div>
-                </a>
-
-                <a href="/projects/vitrine/" class="demo-card">
-                    <div class="demo-preview">&#127912;</div>
-                    <div class="demo-content">
-                        <div class="demo-tags">
-                            <span class="tag">Gallery</span>
-                        </div>
-                        <div class="demo-title">Vitrine</div>
-                        <div class="demo-desc">Curated showcase of all artpieces including external projects.</div>
-                        <div class="demo-prompt">showcase gallery page</div>
-                    </div>
-                </a>
-            </div>
-        </section>
-
-        <section class="features">
-            <div class="feature-grid">
-                <div class="feature">
-                    <div class="feature-icon">&#9889;</div>
-                    <h3>Fast & Local</h3>
-                    <p>Rust-native TUI. Runs on your machine. No cloud dependencies for the core loop.</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128736;</div>
-                    <h3>Model Agnostic</h3>
-                    <p>Works with OpenRouter, Anthropic, OpenAI. Automatic fallback on rate limits.</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128202;</div>
-                    <h3>Observable</h3>
-                    <p>Real-time telemetry, token tracking, system pressure detection, auto-throttle.</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128230;</div>
-                    <h3>Self-Deploying</h3>
-                    <p>Generates static HTML/JS. Deploy to GitHub Pages, Vercel, or any static host.</p>
-                </div>
-            </div>
-        </section>
-
-        <section class="tui-section">
-            <div class="section-header">
-                <h2>Terminal Interface</h2>
-                <p>Full TUI with multiple views, keyboard shortcuts, and session management.</p>
-            </div>
-            <div class="tui-preview">
-                <div class="tui-titlebar">
-                    <span class="tui-dot red"></span>
-                    <span class="tui-dot yellow"></span>
-                    <span class="tui-dot green"></span>
-                    <span class="tui-title">hyle</span>
-                </div>
-                <div class="tui-content">
-                    <div class="tui-line"><span class="tui-accent">hyle</span> <span class="tui-dim">v0.1.0</span></div>
-                    <div class="tui-line"><span class="tui-dim">model:</span> <span class="tui-output">anthropic/claude-sonnet</span></div>
-                    <div class="tui-line"><span class="tui-dim">───────────────────────────────────────────────</span></div>
-                    <div class="tui-line">&nbsp;</div>
-                    <div class="tui-line"><span class="tui-prompt">&gt;</span> <span class="tui-cmd">build a real-time earthquake visualizer with sonification</span></div>
-                    <div class="tui-line">&nbsp;</div>
-                    <div class="tui-line"><span class="tui-accent">thinking...</span></div>
-                    <div class="tui-line"><span class="tui-output">I'll create a seismic visualization that:</span></div>
-                    <div class="tui-line"><span class="tui-output">1. Fetches USGS earthquake feed (GeoJSON)</span></div>
-                    <div class="tui-line"><span class="tui-output">2. Maps earthquakes to Mercator projection</span></div>
-                    <div class="tui-line"><span class="tui-output">3. Sonifies magnitude → pitch, depth → reverb</span></div>
-                    <div class="tui-line">&nbsp;</div>
-                    <div class="tui-line"><span class="tui-success">&#10003;</span> <span class="tui-output">Created projects/seismic/index.html (256 lines)</span></div>
-                    <div class="tui-line"><span class="tui-success">&#10003;</span> <span class="tui-output">Deployed to hyle.lol/projects/seismic/</span></div>
-                    <div class="tui-line">&nbsp;</div>
-                    <div class="tui-line"><span class="tui-dim">───────────────────────────────────────────────</span></div>
-                    <div class="tui-line"><span class="tui-dim">CPU ▁▁▂▃▂▁▁  tokens: 1,247  elapsed: 8.3s</span></div>
-                </div>
-            </div>
-        </section>
-
-        <footer>
-            <div class="footer-links">
-                <a href="https://github.com/uprootiny/hyle">GitHub</a>
-                <a href="https://github.com/uprootiny/hyle/issues">Issues</a>
-                <a href="/projects/">All Projects</a>
-                <a href="https://hyperstitious.org">hyperstitious.org</a>
-            </div>
-            <p>Built with hyle</p>
-        </footer>
+<section class="hero">
+    <div class="hero-demo" id="heroDemo">
+        <iframe src="/projects/datacenters/" id="heroIframe"></iframe>
     </div>
 
-    <script>
-    // Copy button feedback
-    document.querySelector('.install-snippet button').addEventListener('click', function() {
-        const icon = document.getElementById('copyIcon');
-        icon.textContent = '✓';
-        setTimeout(() => { icon.textContent = '📋'; }, 1500);
+    <div class="hero-content">
+        <div class="hero-top">
+            <div class="brand">
+                <h1>hyle</h1>
+                <p>describe → build → deploy</p>
+            </div>
+            <nav class="nav">
+                <a href="https://github.com/uprootiny/hyle">source</a>
+                <a href="/projects/">all demos</a>
+            </nav>
+        </div>
+
+        <div class="hero-bottom">
+            <div class="demo-label" id="demoLabel">
+                <h2>Datacenters Globe</h2>
+                <p>Interactive cloud infrastructure visualization</p>
+                <code>dymaxion globe with datacenter locations, water usage, fire risk overlay</code>
+            </div>
+
+            <div class="demo-nav">
+                <button class="demo-btn" onclick="prevDemo()">←</button>
+                <div class="demo-dots" id="demoDots"></div>
+                <button class="demo-btn" onclick="nextDemo()">→</button>
+            </div>
+        </div>
+
+        <div class="scroll-hint">↓ more demos below</div>
+    </div>
+</section>
+
+<section class="demos-section">
+    <h2>All running live. Click to interact.</h2>
+
+    <div class="demo-grid">
+        <div class="demo-frame">
+            <div class="demo-frame-header">
+                <span class="demo-frame-title">Seismic Activity</span>
+                <div class="demo-frame-links">
+                    <a href="/projects/seismic/" target="_blank">fullscreen</a>
+                    <a href="https://github.com/uprootiny/hyle/blob/master/projects/seismic/index.html" target="_blank">source</a>
+                </div>
+            </div>
+            <iframe src="/projects/seismic/"></iframe>
+            <div class="demo-frame-prompt">real-time seismic sonification, fetch USGS feed, magnitude to pitch, mercator</div>
+        </div>
+
+        <div class="demo-frame">
+            <div class="demo-frame-header">
+                <span class="demo-frame-title">Labyrinth</span>
+                <div class="demo-frame-links">
+                    <a href="/projects/labyrinth/" target="_blank">fullscreen</a>
+                    <a href="https://github.com/uprootiny/hyle/blob/master/projects/labyrinth/index.html" target="_blank">source</a>
+                </div>
+            </div>
+            <iframe src="/projects/labyrinth/"></iframe>
+            <div class="demo-frame-prompt">procedural labyrinth crawler, ASCII map, markov chains on borges, URL state</div>
+        </div>
+
+        <div class="demo-frame">
+            <div class="demo-frame-header">
+                <span class="demo-frame-title">Dodeca</span>
+                <div class="demo-frame-links">
+                    <a href="/projects/dodeca/" target="_blank">fullscreen</a>
+                    <a href="https://github.com/uprootiny/hyle/blob/master/projects/dodeca/index.html" target="_blank">source</a>
+                </div>
+            </div>
+            <iframe src="/projects/dodeca/"></iframe>
+            <div class="demo-frame-prompt">spiky dodecahedron, noise-perturbed surface, rotoscoped over starry void</div>
+        </div>
+
+        <div class="demo-frame">
+            <div class="demo-frame-header">
+                <span class="demo-frame-title">JSONL Viewer</span>
+                <div class="demo-frame-links">
+                    <a href="/projects/jsonl/" target="_blank">fullscreen</a>
+                    <a href="https://github.com/uprootiny/hyle/blob/master/projects/jsonl/index.html" target="_blank">source</a>
+                </div>
+            </div>
+            <iframe src="/projects/jsonl/"></iframe>
+            <div class="demo-frame-prompt">JSONL viewer, drag file, jq-style queries, syntax highlighting, export</div>
+        </div>
+    </div>
+</section>
+
+<section class="install-section">
+    <h2>Run it yourself</h2>
+    <div class="install-box">
+        <code>cargo install hyle</code>
+        <button onclick="navigator.clipboard.writeText('cargo install hyle')">copy</button>
+    </div>
+    <br><br>
+    <a href="https://github.com/uprootiny/hyle" class="github-link">View on GitHub</a>
+</section>
+
+<footer>
+    <a href="https://hyperstitious.org">hyperstitious.org</a>
+</footer>
+
+<script>
+const demos = [
+    { src: '/projects/datacenters/', title: 'Datacenters Globe', desc: 'Interactive cloud infrastructure visualization', prompt: 'dymaxion globe with datacenter locations, water usage, fire risk overlay' },
+    { src: '/projects/seismic/', title: 'Seismic Activity', desc: 'Real-time earthquake visualization with sonification', prompt: 'real-time seismic sonification, fetch USGS feed, magnitude to pitch' },
+    { src: '/projects/dodeca/', title: 'Dodeca', desc: 'WebGL polyhedron with noise displacement', prompt: 'spiky dodecahedron, noise-perturbed surface, rotoscoped rendering' },
+    { src: '/projects/labyrinth/', title: 'Labyrinth', desc: 'Procedural text crawler', prompt: 'procedural labyrinth, ASCII map, markov chains on borges' },
+    { src: '/projects/jsonl/', title: 'JSONL Viewer', desc: 'Stream-friendly JSON Lines tool', prompt: 'JSONL viewer, drag file, jq-style queries, export' }
+];
+
+let currentDemo = 0;
+const heroIframe = document.getElementById('heroIframe');
+const demoLabel = document.getElementById('demoLabel');
+const demoDots = document.getElementById('demoDots');
+
+// Create dots
+demos.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'demo-dot' + (i === 0 ? ' active' : '');
+    dot.onclick = () => showDemo(i);
+    demoDots.appendChild(dot);
+});
+
+function showDemo(idx) {
+    currentDemo = idx;
+    const demo = demos[idx];
+    heroIframe.src = demo.src;
+    demoLabel.innerHTML = `
+        <h2>${demo.title}</h2>
+        <p>${demo.desc}</p>
+        <code>${demo.prompt}</code>
+    `;
+    document.querySelectorAll('.demo-dot').forEach((d, i) => {
+        d.classList.toggle('active', i === idx);
     });
-    </script>
+}
+
+function nextDemo() {
+    showDemo((currentDemo + 1) % demos.length);
+}
+
+function prevDemo() {
+    showDemo((currentDemo - 1 + demos.length) % demos.length);
+}
+
+// Auto-rotate hero demo
+setInterval(nextDemo, 12000);
+</script>
+
 </body>
 </html>
