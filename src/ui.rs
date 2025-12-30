@@ -275,6 +275,8 @@ enum TuiMsg {
     AgentToolDone { name: String, success: bool, output: String },
     AgentIterationDone { iteration: usize, tools: usize },
     AgentComplete { iterations: usize, success: bool },
+    /// Tool execution completed (non-blocking path)
+    ToolsComplete { feedback: String },
 }
 
 /// Main TUI state
@@ -1291,33 +1293,31 @@ async fn run_tui_loop(
                             state.log(format!("Session save error: {}", e));
                         }
 
-                        // Process tool calls in the response
+                        // Check for tool calls - spawn execution in background to avoid blocking
                         let response_copy = state.current_response.clone();
-                        if let Some(tool_feedback) = state.process_tool_calls(&response_copy) {
-                            // Show tool execution results
-                            state.output.push(String::new());
-                            state.output.push("─── Tool Results ───".to_string());
-                            for line in tool_feedback.lines().take(20) {
-                                state.output.push(format!("  {}", line));
-                            }
+                        let calls = parse_tool_calls(&response_copy);
+                        if !calls.is_empty() {
+                            state.executing_tools = true;
+                            state.output.push(format!("[Executing {} tool(s)...]", calls.len()));
                             state.mark_dirty();
 
-                            // AGENTIC LOOP: Continue if we have tool results and haven't hit max iterations
-                            if state.loop_iteration < state.max_iterations {
-                                state.loop_iteration += 1;
-                                state.log(format!("Agentic loop iteration {}/{}", state.loop_iteration, state.max_iterations));
+                            // Spawn tool execution in blocking thread pool
+                            let tx = tx.clone();
+                            tokio::task::spawn_blocking(move || {
+                                // Create temporary executor and tracker for this batch
+                                let mut executor = ToolExecutor::new();
+                                let mut tracker = ToolCallTracker::new();
 
-                                // Send continuation message
-                                let tx = tx.clone();
-                                let tool_results = tool_feedback.clone();
-                                let iteration = state.loop_iteration;
-                                tokio::spawn(async move {
-                                    let _ = tx.send(TuiMsg::ContinueLoop {
-                                        results: tool_results,
-                                        iteration,
-                                    }).await;
+                                let results = execute_tool_calls(&calls, &mut executor, &mut tracker);
+                                let indices: Vec<usize> = results.iter().map(|(idx, _)| *idx).collect();
+                                let feedback = format_tool_results(&tracker, &indices);
+
+                                // Send results back to main loop
+                                let rt = tokio::runtime::Handle::current();
+                                rt.block_on(async {
+                                    let _ = tx.send(TuiMsg::ToolsComplete { feedback }).await;
                                 });
-                            }
+                            });
                         } else {
                             // No tool calls - reset loop counter
                             state.loop_iteration = 0;
@@ -1393,6 +1393,37 @@ async fn run_tui_loop(
                     let status = if success { "completed" } else { "stopped" };
                     state.output.push(format!("[Agent {} after {} iterations]", status, iterations));
                     state.mark_dirty();
+                }
+                TuiMsg::ToolsComplete { feedback } => {
+                    // Tools finished executing in background
+                    state.executing_tools = false;
+
+                    // Show tool execution results
+                    state.output.push(String::new());
+                    state.output.push("─── Tool Results ───".to_string());
+                    for line in feedback.lines().take(20) {
+                        state.output.push(format!("  {}", line));
+                    }
+                    state.mark_dirty();
+
+                    // AGENTIC LOOP: Continue if we have tool results and haven't hit max iterations
+                    if state.loop_iteration < state.max_iterations {
+                        state.loop_iteration += 1;
+                        state.log(format!("Agentic loop iteration {}/{}", state.loop_iteration, state.max_iterations));
+
+                        // Send continuation message
+                        let tx = tx.clone();
+                        let tool_results = feedback.clone();
+                        let iteration = state.loop_iteration;
+                        tokio::spawn(async move {
+                            let _ = tx.send(TuiMsg::ContinueLoop {
+                                results: tool_results,
+                                iteration,
+                            }).await;
+                        });
+                    } else {
+                        state.loop_iteration = 0;
+                    }
                 }
                 TuiMsg::ContinueLoop { results, iteration } => {
                     // AGENTIC LOOP: Continue with tool results
