@@ -3,374 +3,1062 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>jsonl - viewer and query tool</title>
-    <meta name="hyle-sketch" content="JSONL viewer and query tool. paste or drag file. scrollable table. jq-style queries. export filtered results. client-side only">
+    <title>JSONL Viewer - hyle.lol</title>
+    <meta name="description" content="Stream-friendly JSON Lines viewer with syntax highlighting, queries, and export">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #0a0a0a;
-            color: #e8e8e8;
-            font-family: system-ui;
-            font-size: 14px;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        header {
-            padding: 1rem;
-            border-bottom: 1px solid #222;
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        h1 { font-size: 1rem; font-weight: 400; color: #666; }
-        h1 a { color: #6b9fff; text-decoration: none; }
-        #drop-zone {
-            flex: 1;
-            min-width: 200px;
-            padding: 0.75rem 1rem;
-            background: #111;
-            border: 2px dashed #333;
-            border-radius: 4px;
-            text-align: center;
-            color: #666;
-            cursor: pointer;
-        }
-        #drop-zone.dragover { border-color: #6b9fff; background: rgba(107,159,255,0.05); }
-        #drop-zone input { display: none; }
-        #query-box {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-        }
-        #query {
-            background: #111;
-            border: 1px solid #333;
-            color: #e8e8e8;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            font-family: 'SF Mono', monospace;
-            font-size: 13px;
-            width: 300px;
-        }
-        #query:focus { outline: none; border-color: #6b9fff; }
-        button {
-            background: #1a1a1a;
-            color: #e8e8e8;
-            border: 1px solid #333;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover { border-color: #6b9fff; }
-        #stats { color: #666; font-size: 12px; }
-        main {
-            flex: 1;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-        #table-header {
-            display: flex;
-            background: #111;
-            border-bottom: 1px solid #333;
-            font-weight: 600;
-            font-size: 12px;
-            color: #888;
-            position: sticky;
-            top: 0;
-        }
-        #table-body {
-            flex: 1;
-            overflow-y: auto;
-        }
-        .row {
-            display: flex;
-            border-bottom: 1px solid #1a1a1a;
-        }
-        .row:hover { background: #111; }
-        .row.highlight { background: rgba(107,159,255,0.1); }
-        .cell {
-            padding: 0.5rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            border-right: 1px solid #1a1a1a;
-            font-family: 'SF Mono', monospace;
-            font-size: 12px;
-        }
-        .cell:last-child { border-right: none; }
-        .line-num {
-            width: 60px;
-            min-width: 60px;
-            color: #444;
-            text-align: right;
-        }
-        .header-cell {
-            padding: 0.75rem 0.5rem;
-            cursor: pointer;
-            user-select: none;
-        }
-        .header-cell:hover { color: #e8e8e8; }
-        #empty {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #444;
-        }
-        .hidden { display: none !important; }
+:root {
+    --bg: #0a0a0b;
+    --surface: #111114;
+    --surface-2: #18181c;
+    --surface-3: #202026;
+    --border: #2a2a32;
+    --border-dim: #1e1e24;
+    --text: #e8e8ec;
+    --text-dim: #888890;
+    --text-muted: #555560;
+    --accent: #6b9fff;
+    --accent-dim: rgba(107, 159, 255, 0.15);
+    --green: #4ade80;
+    --yellow: #fbbf24;
+    --orange: #fb923c;
+    --red: #f87171;
+    --purple: #a78bfa;
+    --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    z-index: 100;
+}
+
+.logo {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.logo a { color: var(--accent); text-decoration: none; }
+.logo a:hover { text-decoration: underline; }
+
+/* Drop zone */
+.drop-zone {
+    flex: 1;
+    min-width: 180px;
+    max-width: 400px;
+    padding: 0.5rem 1rem;
+    background: var(--bg);
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    text-align: center;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 0.85rem;
+}
+.drop-zone:hover { border-color: var(--text-dim); }
+.drop-zone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+}
+.drop-zone.has-file {
+    border-style: solid;
+    border-color: var(--border);
+    color: var(--text-dim);
+}
+.drop-zone input { display: none; }
+
+/* Query box */
+.query-box {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.query-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    width: 280px;
+    transition: border-color 0.15s;
+}
+.query-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.query-input::placeholder { color: var(--text-muted); }
+
+.btn {
+    background: var(--surface-2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.btn:hover {
+    border-color: var(--accent);
+    color: var(--text);
+}
+.btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+}
+.btn-primary:hover {
+    background: #8bb3ff;
+    border-color: #8bb3ff;
+}
+
+.stats {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* Main content */
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Table container */
+.table-container {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+}
+
+/* Table */
+.table {
+    display: table;
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+}
+
+/* Header row */
+.table-head {
+    display: table-header-group;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--surface);
+}
+
+.header-row {
+    display: table-row;
+}
+
+.header-cell {
+    display: table-cell;
+    padding: 0.6rem 0.75rem;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 2px solid var(--border);
+    border-right: 1px solid var(--border-dim);
+    background: var(--surface);
+    white-space: nowrap;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+}
+.header-cell:hover { color: var(--text); }
+.header-cell:last-child { border-right: none; }
+
+.header-cell.sortable::after {
+    content: '↕';
+    margin-left: 0.5rem;
+    opacity: 0.3;
+}
+.header-cell.sort-asc::after {
+    content: '↑';
+    opacity: 1;
+    color: var(--accent);
+}
+.header-cell.sort-desc::after {
+    content: '↓';
+    opacity: 1;
+    color: var(--accent);
+}
+
+.col-num {
+    min-width: 50px;
+    width: 50px;
+    text-align: right;
+    color: var(--text-muted);
+}
+
+/* Resize handle */
+.resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    background: transparent;
+}
+.resize-handle:hover,
+.resize-handle.dragging {
+    background: var(--accent);
+}
+
+/* Body */
+.table-body {
+    display: table-row-group;
+}
+
+.data-row {
+    display: table-row;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.data-row:hover { background: var(--surface); }
+.data-row.selected { background: var(--accent-dim); }
+.data-row.expanded { background: var(--surface-2); }
+
+.data-cell {
+    display: table-cell;
+    padding: 0.4rem 0.75rem;
+    font-family: var(--mono);
+    font-size: 12px;
+    border-bottom: 1px solid var(--border-dim);
+    border-right: 1px solid var(--border-dim);
+    vertical-align: top;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.data-cell:last-child { border-right: none; }
+
+/* Syntax highlighting */
+.v-null { color: var(--text-muted); font-style: italic; }
+.v-bool { color: var(--orange); }
+.v-num { color: var(--yellow); }
+.v-str { color: var(--green); }
+.v-obj { color: var(--purple); }
+.v-arr { color: var(--accent); }
+
+/* Expanded row */
+.expand-row {
+    display: table-row;
+}
+.expand-cell {
+    display: table-cell;
+    padding: 1rem;
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--border);
+}
+.expand-content {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow: auto;
+}
+
+/* Empty state */
+.empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.3;
+}
+.empty-title {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-dim);
+}
+.empty-desc {
+    max-width: 400px;
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+}
+.empty-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Error toast */
+.toast {
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.85rem;
+    z-index: 1000;
+    transition: transform 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.toast.visible { transform: translateX(-50%) translateY(0); }
+.toast.error { border-color: var(--red); color: var(--red); }
+.toast.success { border-color: var(--green); color: var(--green); }
+
+/* Help panel */
+.help-panel {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    font-size: 0.8rem;
+    max-width: 320px;
+    z-index: 50;
+    display: none;
+}
+.help-panel.visible { display: block; }
+.help-panel h3 {
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-dim);
+}
+.help-panel code {
+    background: var(--bg);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+}
+.help-section {
+    margin-bottom: 0.75rem;
+}
+.help-section:last-child { margin-bottom: 0; }
+.help-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.2rem 0;
+    color: var(--text-muted);
+}
+.help-row code { color: var(--accent); }
+
+/* Footer */
+footer {
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+footer a { color: var(--text-dim); text-decoration: none; }
+footer a:hover { color: var(--accent); }
+.footer-keys {
+    display: flex;
+    gap: 1rem;
+}
+.footer-keys kbd {
+    background: var(--bg);
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    border: 1px solid var(--border);
+}
+
+/* Loading */
+.loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 10, 11, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    header {
+        padding: 0.5rem;
+        gap: 0.5rem;
+    }
+    .logo { display: none; }
+    .drop-zone { min-width: 100%; order: -1; }
+    .query-box { width: 100%; }
+    .query-input { flex: 1; width: auto; }
+    .stats { width: 100%; text-align: center; }
+    footer { flex-direction: column; gap: 0.5rem; }
+}
     </style>
 </head>
 <body>
     <header>
-        <h1><a href="https://uprootiny.github.io/hyle/">hyle</a> / jsonl · <a href="https://uprootiny.github.io/hyle/#sketch=JSONL%20viewer%20and%20query%20tool.%20paste%20or%20drag%20file.%20scrollable%20table.%20jq-style%20queries.%20export%20filtered%20results.%20client-side%20only" style="font-size:12px;color:#6b9fff;text-decoration:none;">remix →</a></h1>
-        <div id="drop-zone">
-            <input type="file" id="file-input" accept=".jsonl,.json,.ndjson">
-            drop jsonl file or click to browse
+        <div class="logo"><a href="/">hyle</a> / jsonl</div>
+        <div class="drop-zone" id="dropZone">
+            <input type="file" id="fileInput" accept=".jsonl,.json,.ndjson,.txt">
+            Drop .jsonl file or click to browse
         </div>
-        <div id="query-box">
-            <input type="text" id="query" placeholder=".path.to.field or .[] | select(.x > 0)">
-            <button onclick="applyQuery()">query</button>
-            <button onclick="clearQuery()">clear</button>
-            <button onclick="exportData()">export</button>
+        <div class="query-box">
+            <input type="text" class="query-input" id="queryInput"
+                   placeholder=".field == &quot;value&quot; or text search...">
+            <button class="btn btn-primary" onclick="applyQuery()">Filter</button>
+            <button class="btn" onclick="clearQuery()">Clear</button>
+            <button class="btn" onclick="exportData()">Export</button>
         </div>
-        <div id="stats"></div>
+        <div class="stats" id="stats"></div>
     </header>
+
     <main>
-        <div id="table-header"></div>
-        <div id="table-body"></div>
-        <div id="empty">paste or drop a .jsonl file</div>
+        <div class="table-container" id="tableContainer">
+            <div class="table" id="table">
+                <div class="table-head" id="tableHead"></div>
+                <div class="table-body" id="tableBody"></div>
+            </div>
+        </div>
+
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">{ }</div>
+            <div class="empty-title">JSONL Viewer</div>
+            <div class="empty-desc">
+                Drop a .jsonl file, paste JSON Lines, or try a sample dataset.
+                Each line should be a valid JSON object.
+            </div>
+            <div class="empty-actions">
+                <button class="btn btn-primary" onclick="loadSample()">Load Sample</button>
+                <button class="btn" onclick="document.getElementById('fileInput').click()">Browse</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+        </div>
     </main>
 
+    <footer>
+        <div class="footer-keys">
+            <span><kbd>↑↓</kbd> Navigate</span>
+            <span><kbd>Enter</kbd> Expand</span>
+            <span><kbd>Esc</kbd> Collapse</span>
+            <span><kbd>?</kbd> Help</span>
+        </div>
+        <div>
+            <a href="/">Back to hyle.lol</a>
+        </div>
+    </footer>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="help-panel" id="helpPanel">
+        <h3>Query Syntax</h3>
+        <div class="help-section">
+            <div class="help-row"><span>Field equals</span><code>.name == "foo"</code></div>
+            <div class="help-row"><span>Field contains</span><code>.name ~ "foo"</code></div>
+            <div class="help-row"><span>Comparison</span><code>.count > 10</code></div>
+            <div class="help-row"><span>Exists</span><code>.field?</code></div>
+            <div class="help-row"><span>Nested</span><code>.user.id == 1</code></div>
+            <div class="help-row"><span>Text search</span><code>any text</code></div>
+        </div>
+        <h3 style="margin-top: 1rem;">Keyboard</h3>
+        <div class="help-section">
+            <div class="help-row"><span>Navigate rows</span><code>↑ ↓</code></div>
+            <div class="help-row"><span>Expand row</span><code>Enter</code></div>
+            <div class="help-row"><span>Collapse</span><code>Esc</code></div>
+            <div class="help-row"><span>Focus query</span><code>/</code></div>
+        </div>
+    </div>
+
     <script>
-        let data = [];
-        let filtered = [];
-        let columns = [];
-        let columnWidths = {};
+// State
+let allData = [];
+let filteredData = [];
+let columns = [];
+let columnWidths = {};
+let selectedIdx = -1;
+let expandedIdx = -1;
+let sortCol = null;
+let sortDir = 'asc';
 
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        const tableHeader = document.getElementById('table-header');
-        const tableBody = document.getElementById('table-body');
-        const empty = document.getElementById('empty');
-        const stats = document.getElementById('stats');
-        const queryInput = document.getElementById('query');
+// DOM refs
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const tableContainer = document.getElementById('tableContainer');
+const tableHead = document.getElementById('tableHead');
+const tableBody = document.getElementById('tableBody');
+const emptyState = document.getElementById('emptyState');
+const loading = document.getElementById('loading');
+const stats = document.getElementById('stats');
+const queryInput = document.getElementById('queryInput');
+const toast = document.getElementById('toast');
+const helpPanel = document.getElementById('helpPanel');
 
-        // File handling
-        dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', (e) => {
+// File handling
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) loadFile(file);
+});
+fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+// Paste handling
+document.addEventListener('paste', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    const text = e.clipboardData.getData('text');
+    if (text && text.trim().startsWith('{')) {
+        parseJsonl(text, 'clipboard');
+    }
+});
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') {
+        if (e.key === 'Enter') applyQuery();
+        if (e.key === 'Escape') {
+            e.target.blur();
+            clearQuery();
+        }
+        return;
+    }
+
+    switch (e.key) {
+        case 'ArrowDown':
             e.preventDefault();
-            dropZone.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file) loadFile(file);
-        });
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files[0]) loadFile(e.target.files[0]);
-        });
-
-        // Paste handling
-        document.addEventListener('paste', (e) => {
-            const text = e.clipboardData.getData('text');
-            if (text) parseJsonl(text);
-        });
-
-        function loadFile(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => parseJsonl(e.target.result);
-            reader.readAsText(file);
-            dropZone.textContent = file.name;
-        }
-
-        function parseJsonl(text) {
-            const lines = text.trim().split('\n');
-            data = [];
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-                try {
-                    data.push(JSON.parse(line));
-                } catch (e) {
-                    console.warn(`Line ${i+1}: parse error`);
-                }
-            }
-
-            // Detect columns from first 100 rows
-            const allKeys = new Set();
-            for (let i = 0; i < Math.min(data.length, 100); i++) {
-                if (typeof data[i] === 'object' && data[i] !== null) {
-                    Object.keys(data[i]).forEach(k => allKeys.add(k));
-                }
-            }
-            columns = Array.from(allKeys);
-
-            // Calculate column widths
-            columnWidths = {};
-            columns.forEach(c => columnWidths[c] = Math.max(100, c.length * 10));
-
-            filtered = [...data];
-            render();
-            updateStats();
-        }
-
-        function render() {
-            if (data.length === 0) {
-                empty.classList.remove('hidden');
-                tableHeader.innerHTML = '';
-                tableBody.innerHTML = '';
-                return;
-            }
-            empty.classList.add('hidden');
-
-            // Render header
-            let headerHtml = `<div class="cell line-num header-cell">#</div>`;
-            for (const col of columns) {
-                headerHtml += `<div class="cell header-cell" style="width:${columnWidths[col]}px" title="${col}">${col}</div>`;
-            }
-            tableHeader.innerHTML = headerHtml;
-
-            // Render body (virtual scroll simplified - just render visible)
-            const maxRows = 1000; // Limit for performance
-            const toRender = filtered.slice(0, maxRows);
-
-            let bodyHtml = '';
-            for (let i = 0; i < toRender.length; i++) {
-                const row = toRender[i];
-                const lineNum = data.indexOf(row) + 1;
-                bodyHtml += `<div class="row" data-idx="${i}">`;
-                bodyHtml += `<div class="cell line-num">${lineNum}</div>`;
-                for (const col of columns) {
-                    const val = row && row[col] !== undefined ? JSON.stringify(row[col]) : '';
-                    const display = val.length > 100 ? val.slice(0, 100) + '...' : val;
-                    bodyHtml += `<div class="cell" style="width:${columnWidths[col]}px" title="${escapeHtml(val)}">${escapeHtml(display)}</div>`;
-                }
-                bodyHtml += '</div>';
-            }
-            tableBody.innerHTML = bodyHtml;
-
-            if (filtered.length > maxRows) {
-                stats.textContent += ` (showing ${maxRows} of ${filtered.length})`;
-            }
-        }
-
-        function escapeHtml(str) {
-            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        }
-
-        function updateStats() {
-            stats.textContent = `${filtered.length} rows, ${columns.length} columns`;
-        }
-
-        // Simple jq-like query engine
-        function applyQuery() {
-            const q = queryInput.value.trim();
-            if (!q) {
-                filtered = [...data];
+            selectRow(Math.min(selectedIdx + 1, filteredData.length - 1));
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            selectRow(Math.max(selectedIdx - 1, 0));
+            break;
+        case 'Enter':
+            if (selectedIdx >= 0) toggleExpand(selectedIdx);
+            break;
+        case 'Escape':
+            if (expandedIdx >= 0) {
+                collapseRow();
             } else {
-                filtered = data.filter(row => matchesQuery(row, q));
+                selectRow(-1);
             }
-            render();
-            updateStats();
-        }
+            break;
+        case '/':
+            e.preventDefault();
+            queryInput.focus();
+            break;
+        case '?':
+            helpPanel.classList.toggle('visible');
+            break;
+    }
+});
 
-        function matchesQuery(obj, query) {
-            // Simple path query: .foo.bar
-            if (query.startsWith('.') && !query.includes('|')) {
-                const val = getPath(obj, query);
-                return val !== undefined && val !== null;
+function loadFile(file) {
+    showLoading(true);
+    dropZone.textContent = file.name;
+    dropZone.classList.add('has-file');
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        parseJsonl(e.target.result, file.name);
+        showLoading(false);
+    };
+    reader.onerror = () => {
+        showToast('Failed to read file', 'error');
+        showLoading(false);
+    };
+    reader.readAsText(file);
+}
+
+function parseJsonl(text, source = 'input') {
+    const lines = text.trim().split('\n');
+    const parsed = [];
+    const errors = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        try {
+            parsed.push(JSON.parse(line));
+        } catch (e) {
+            errors.push(i + 1);
+        }
+    }
+
+    if (parsed.length === 0) {
+        showToast('No valid JSON lines found', 'error');
+        return;
+    }
+
+    if (errors.length > 0 && errors.length <= 5) {
+        showToast(`Skipped ${errors.length} invalid lines: ${errors.join(', ')}`, 'error');
+    } else if (errors.length > 5) {
+        showToast(`Skipped ${errors.length} invalid lines`, 'error');
+    }
+
+    allData = parsed;
+    detectColumns();
+    filteredData = [...allData];
+    sortCol = null;
+    sortDir = 'asc';
+    selectedIdx = -1;
+    expandedIdx = -1;
+
+    render();
+    updateStats();
+    showToast(`Loaded ${parsed.length} rows from ${source}`, 'success');
+}
+
+function detectColumns() {
+    const keyFreq = {};
+    const keyOrder = [];
+    const sampleSize = Math.min(allData.length, 200);
+
+    for (let i = 0; i < sampleSize; i++) {
+        const obj = allData[i];
+        if (typeof obj !== 'object' || obj === null) continue;
+
+        for (const key of Object.keys(obj)) {
+            if (!keyFreq[key]) {
+                keyFreq[key] = 0;
+                keyOrder.push(key);
             }
+            keyFreq[key]++;
+        }
+    }
 
-            // Select query: .[] | select(.x > 0)
-            const selectMatch = query.match(/\.\[\]\s*\|\s*select\((.+)\)/);
-            if (selectMatch) {
-                return evalSelect(obj, selectMatch[1]);
+    // Sort by frequency, then by first appearance
+    columns = keyOrder.sort((a, b) => {
+        const freqDiff = keyFreq[b] - keyFreq[a];
+        if (freqDiff !== 0) return freqDiff;
+        return keyOrder.indexOf(a) - keyOrder.indexOf(b);
+    });
+
+    // Auto-size columns based on content
+    columnWidths = {};
+    for (const col of columns) {
+        let maxLen = col.length;
+        for (let i = 0; i < Math.min(sampleSize, 50); i++) {
+            const val = allData[i]?.[col];
+            if (val !== undefined) {
+                const str = formatValue(val, true);
+                maxLen = Math.max(maxLen, Math.min(str.length, 40));
             }
-
-            // Contains query: .field contains "text"
-            const containsMatch = query.match(/\.(\w+)\s+contains\s+"([^"]+)"/);
-            if (containsMatch) {
-                const val = obj[containsMatch[1]];
-                return val && String(val).includes(containsMatch[2]);
-            }
-
-            // Default: check if any field contains query text
-            return JSON.stringify(obj).toLowerCase().includes(query.toLowerCase());
         }
+        columnWidths[col] = Math.max(80, Math.min(maxLen * 8 + 24, 300));
+    }
+}
 
-        function getPath(obj, path) {
-            const parts = path.replace(/^\./,'').split('.').filter(p => p);
-            let val = obj;
-            for (const p of parts) {
-                if (val && typeof val === 'object') {
-                    // Handle array index
-                    const arrMatch = p.match(/^(\w+)\[(\d+)\]$/);
-                    if (arrMatch) {
-                        val = val[arrMatch[1]];
-                        if (Array.isArray(val)) val = val[parseInt(arrMatch[2])];
-                    } else {
-                        val = val[p];
-                    }
-                } else {
-                    return undefined;
-                }
-            }
-            return val;
+function render() {
+    if (allData.length === 0) {
+        emptyState.style.display = 'flex';
+        tableHead.innerHTML = '';
+        tableBody.innerHTML = '';
+        return;
+    }
+    emptyState.style.display = 'none';
+
+    renderHeader();
+    renderBody();
+}
+
+function renderHeader() {
+    let html = '<div class="header-row">';
+    html += '<div class="header-cell col-num">#</div>';
+
+    for (const col of columns) {
+        const sortClass = sortCol === col
+            ? (sortDir === 'asc' ? 'sort-asc' : 'sort-desc')
+            : 'sortable';
+        html += `<div class="header-cell ${sortClass}"
+                     style="width: ${columnWidths[col]}px"
+                     onclick="sortBy('${col}')"
+                     title="${col}">
+                    ${escapeHtml(col)}
+                    <div class="resize-handle" onmousedown="startResize(event, '${col}')"></div>
+                 </div>`;
+    }
+    html += '</div>';
+    tableHead.innerHTML = html;
+}
+
+function renderBody() {
+    const maxRows = 2000;
+    const toRender = filteredData.slice(0, maxRows);
+
+    let html = '';
+    for (let i = 0; i < toRender.length; i++) {
+        const row = toRender[i];
+        const lineNum = allData.indexOf(row) + 1;
+        const isSelected = i === selectedIdx;
+        const isExpanded = i === expandedIdx;
+
+        html += `<div class="data-row ${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}"
+                     data-idx="${i}"
+                     onclick="selectRow(${i})"
+                     ondblclick="toggleExpand(${i})">`;
+        html += `<div class="data-cell col-num">${lineNum}</div>`;
+
+        for (const col of columns) {
+            const val = row?.[col];
+            const formatted = formatValue(val);
+            const raw = val !== undefined ? JSON.stringify(val) : '';
+            html += `<div class="data-cell"
+                         style="width: ${columnWidths[col]}px"
+                         title="${escapeHtml(raw)}">${formatted}</div>`;
         }
+        html += '</div>';
 
-        function evalSelect(obj, condition) {
-            // Simple comparison: .x > 0, .name == "foo"
-            const compMatch = condition.match(/\.(\w+)\s*(==|!=|>|<|>=|<=)\s*(.+)/);
-            if (compMatch) {
-                const [_, field, op, rawVal] = compMatch;
-                const fieldVal = obj[field];
-                let cmpVal = rawVal.trim();
-
-                // Parse comparison value
-                if (cmpVal.startsWith('"') && cmpVal.endsWith('"')) {
-                    cmpVal = cmpVal.slice(1, -1);
-                } else if (!isNaN(cmpVal)) {
-                    cmpVal = parseFloat(cmpVal);
-                }
-
-                switch (op) {
-                    case '==': return fieldVal == cmpVal;
-                    case '!=': return fieldVal != cmpVal;
-                    case '>': return fieldVal > cmpVal;
-                    case '<': return fieldVal < cmpVal;
-                    case '>=': return fieldVal >= cmpVal;
-                    case '<=': return fieldVal <= cmpVal;
-                }
-            }
-            return true;
+        if (isExpanded) {
+            html += `<div class="expand-row">
+                        <td class="expand-cell" colspan="${columns.length + 1}">
+                            <div class="expand-content">${syntaxHighlight(JSON.stringify(row, null, 2))}</div>
+                        </td>
+                     </div>`;
         }
+    }
+    tableBody.innerHTML = html;
 
-        function clearQuery() {
-            queryInput.value = '';
-            filtered = [...data];
-            render();
-            updateStats();
+    // Scroll selected into view
+    if (selectedIdx >= 0) {
+        const row = tableBody.children[selectedIdx * (expandedIdx >= 0 && expandedIdx < selectedIdx ? 2 : 1)];
+        if (row) row.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function formatValue(val, plain = false) {
+    if (val === undefined) return plain ? '' : '<span class="v-null">—</span>';
+    if (val === null) return plain ? 'null' : '<span class="v-null">null</span>';
+    if (typeof val === 'boolean') return plain ? String(val) : `<span class="v-bool">${val}</span>`;
+    if (typeof val === 'number') return plain ? String(val) : `<span class="v-num">${val}</span>`;
+    if (typeof val === 'string') {
+        const escaped = escapeHtml(val);
+        const truncated = escaped.length > 80 ? escaped.slice(0, 80) + '…' : escaped;
+        return plain ? val : `<span class="v-str">"${truncated}"</span>`;
+    }
+    if (Array.isArray(val)) {
+        return plain ? `[${val.length}]` : `<span class="v-arr">[${val.length} items]</span>`;
+    }
+    if (typeof val === 'object') {
+        const keys = Object.keys(val).length;
+        return plain ? `{${keys}}` : `<span class="v-obj">{${keys} keys}</span>`;
+    }
+    return plain ? String(val) : escapeHtml(String(val));
+}
+
+function syntaxHighlight(json) {
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+        let cls = 'v-num';
+        if (/^"/.test(match)) {
+            cls = /:$/.test(match) ? 'v-str' : 'v-str';
+        } else if (/true|false/.test(match)) {
+            cls = 'v-bool';
+        } else if (/null/.test(match)) {
+            cls = 'v-null';
         }
+        return `<span class="${cls}">${match}</span>`;
+    });
+}
 
-        function exportData() {
-            if (filtered.length === 0) return;
-            const jsonl = filtered.map(r => JSON.stringify(r)).join('\n');
-            const blob = new Blob([jsonl], { type: 'application/jsonl' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'filtered.jsonl';
-            a.click();
-            URL.revokeObjectURL(url);
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function selectRow(idx) {
+    selectedIdx = idx;
+    renderBody();
+}
+
+function toggleExpand(idx) {
+    if (expandedIdx === idx) {
+        collapseRow();
+    } else {
+        expandedIdx = idx;
+        selectedIdx = idx;
+        renderBody();
+    }
+}
+
+function collapseRow() {
+    expandedIdx = -1;
+    renderBody();
+}
+
+// Sorting
+function sortBy(col) {
+    if (sortCol === col) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortCol = col;
+        sortDir = 'asc';
+    }
+
+    filteredData.sort((a, b) => {
+        let va = a?.[col];
+        let vb = b?.[col];
+
+        // Handle undefined/null
+        if (va === undefined || va === null) return sortDir === 'asc' ? 1 : -1;
+        if (vb === undefined || vb === null) return sortDir === 'asc' ? -1 : 1;
+
+        // Compare
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    selectedIdx = -1;
+    expandedIdx = -1;
+    render();
+}
+
+// Column resizing
+let resizeCol = null;
+let resizeStartX = 0;
+let resizeStartWidth = 0;
+
+function startResize(e, col) {
+    e.stopPropagation();
+    resizeCol = col;
+    resizeStartX = e.clientX;
+    resizeStartWidth = columnWidths[col];
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+    e.target.classList.add('dragging');
+}
+
+function doResize(e) {
+    if (!resizeCol) return;
+    const diff = e.clientX - resizeStartX;
+    columnWidths[resizeCol] = Math.max(60, resizeStartWidth + diff);
+    render();
+}
+
+function stopResize() {
+    if (resizeCol) {
+        document.querySelectorAll('.resize-handle').forEach(h => h.classList.remove('dragging'));
+    }
+    resizeCol = null;
+    document.removeEventListener('mousemove', doResize);
+    document.removeEventListener('mouseup', stopResize);
+}
+
+// Query engine
+function applyQuery() {
+    const q = queryInput.value.trim();
+    if (!q) {
+        filteredData = [...allData];
+    } else {
+        filteredData = allData.filter(row => matchesQuery(row, q));
+    }
+    selectedIdx = -1;
+    expandedIdx = -1;
+    render();
+    updateStats();
+}
+
+function matchesQuery(obj, query) {
+    // Field existence: .field?
+    const existsMatch = query.match(/^\.([a-zA-Z_][\w.]*)\?$/);
+    if (existsMatch) {
+        return getPath(obj, existsMatch[1]) !== undefined;
+    }
+
+    // Field comparison: .field == "value" or .field > 10
+    const compMatch = query.match(/^\.([a-zA-Z_][\w.]*)\s*(==|!=|>=|<=|>|<|~)\s*(.+)$/);
+    if (compMatch) {
+        const [_, path, op, rawVal] = compMatch;
+        const fieldVal = getPath(obj, path);
+        let cmpVal = rawVal.trim();
+
+        // Parse value
+        if (cmpVal === 'null') cmpVal = null;
+        else if (cmpVal === 'true') cmpVal = true;
+        else if (cmpVal === 'false') cmpVal = false;
+        else if (cmpVal.startsWith('"') && cmpVal.endsWith('"')) cmpVal = cmpVal.slice(1, -1);
+        else if (!isNaN(cmpVal)) cmpVal = parseFloat(cmpVal);
+
+        switch (op) {
+            case '==': return fieldVal == cmpVal;
+            case '!=': return fieldVal != cmpVal;
+            case '>': return fieldVal > cmpVal;
+            case '<': return fieldVal < cmpVal;
+            case '>=': return fieldVal >= cmpVal;
+            case '<=': return fieldVal <= cmpVal;
+            case '~': return String(fieldVal).toLowerCase().includes(String(cmpVal).toLowerCase());
         }
+    }
 
-        // Keyboard shortcut
-        queryInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') applyQuery();
-            if (e.key === 'Escape') clearQuery();
-        });
+    // Simple path check: .field.nested
+    if (query.startsWith('.') && !query.includes(' ')) {
+        return getPath(obj, query.slice(1)) !== undefined;
+    }
+
+    // Text search in any field
+    const searchLower = query.toLowerCase();
+    return JSON.stringify(obj).toLowerCase().includes(searchLower);
+}
+
+function getPath(obj, path) {
+    const parts = path.split('.');
+    let val = obj;
+    for (const p of parts) {
+        if (val == null || typeof val !== 'object') return undefined;
+        // Handle array index: field[0]
+        const arrMatch = p.match(/^(\w+)\[(\d+)\]$/);
+        if (arrMatch) {
+            val = val[arrMatch[1]];
+            if (Array.isArray(val)) val = val[parseInt(arrMatch[2])];
+            else return undefined;
+        } else {
+            val = val[p];
+        }
+    }
+    return val;
+}
+
+function clearQuery() {
+    queryInput.value = '';
+    filteredData = [...allData];
+    selectedIdx = -1;
+    expandedIdx = -1;
+    render();
+    updateStats();
+}
+
+function exportData() {
+    if (filteredData.length === 0) {
+        showToast('No data to export', 'error');
+        return;
+    }
+    const jsonl = filteredData.map(r => JSON.stringify(r)).join('\n');
+    const blob = new Blob([jsonl], { type: 'application/x-ndjson' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `export-${filteredData.length}-rows.jsonl`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${filteredData.length} rows`, 'success');
+}
+
+function updateStats() {
+    const showing = Math.min(filteredData.length, 2000);
+    const total = allData.length;
+    const filtered = filteredData.length;
+
+    if (filtered === total) {
+        stats.textContent = `${total.toLocaleString()} rows · ${columns.length} columns`;
+    } else {
+        stats.textContent = `${filtered.toLocaleString()} of ${total.toLocaleString()} rows · ${columns.length} columns`;
+    }
+
+    if (showing < filtered) {
+        stats.textContent += ` (showing ${showing.toLocaleString()})`;
+    }
+}
+
+function showLoading(show) {
+    loading.style.display = show ? 'flex' : 'none';
+}
+
+function showToast(msg, type = 'info') {
+    toast.textContent = msg;
+    toast.className = `toast ${type} visible`;
+    setTimeout(() => toast.classList.remove('visible'), 3000);
+}
+
+// Sample data
+function loadSample() {
+    const sample = [
+        {"id": 1, "name": "Alice Chen", "email": "alice@example.com", "role": "admin", "active": true, "logins": 142, "meta": {"created": "2024-01-15", "tier": "pro"}},
+        {"id": 2, "name": "Bob Smith", "email": "bob@example.com", "role": "user", "active": true, "logins": 89, "meta": {"created": "2024-02-20", "tier": "free"}},
+        {"id": 3, "name": "Carol Davis", "email": "carol@example.com", "role": "user", "active": false, "logins": 23, "meta": {"created": "2024-03-10", "tier": "free"}},
+        {"id": 4, "name": "Dan Wilson", "email": "dan@example.com", "role": "moderator", "active": true, "logins": 567, "meta": {"created": "2023-11-05", "tier": "pro"}},
+        {"id": 5, "name": "Eve Johnson", "email": "eve@example.com", "role": "user", "active": true, "logins": 34, "meta": {"created": "2024-04-01", "tier": "enterprise"}},
+        {"id": 6, "name": "Frank Brown", "email": "frank@example.com", "role": "user", "active": true, "logins": 201, "meta": {"created": "2024-01-28", "tier": "pro"}},
+        {"id": 7, "name": "Grace Lee", "email": "grace@example.com", "role": "admin", "active": true, "logins": 892, "meta": {"created": "2023-08-12", "tier": "enterprise"}},
+        {"id": 8, "name": "Henry Miller", "email": "henry@example.com", "role": "user", "active": false, "logins": 5, "meta": {"created": "2024-05-15", "tier": "free"}},
+        {"id": 9, "name": "Ivy Taylor", "email": "ivy@example.com", "role": "moderator", "active": true, "logins": 156, "meta": {"created": "2024-02-14", "tier": "pro"}},
+        {"id": 10, "name": "Jack Anderson", "email": "jack@example.com", "role": "user", "active": true, "logins": 78, "meta": {"created": "2024-03-22", "tier": "free"}}
+    ];
+    parseJsonl(sample.map(r => JSON.stringify(r)).join('\n'), 'sample');
+}
     </script>
 </body>
 </html>
