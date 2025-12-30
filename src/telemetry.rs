@@ -2,10 +2,15 @@
 //!
 //! Samples CPU/memory/network at configurable rate.
 //! Detects pressure spikes and triggers auto-throttle.
+//!
+//! The `TelemetrySampler` runs in a background thread to avoid
+//! blocking the main event loop during sysinfo calls.
 
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use sysinfo::{System, Networks};
+use tokio::sync::mpsc;
 
 /// Telemetry sample
 #[derive(Debug, Clone)]
@@ -188,6 +193,117 @@ impl Telemetry {
     /// Time since last sample
     pub fn since_last_sample(&self) -> Duration {
         self.last_sample.elapsed()
+    }
+
+    /// Ingest a pre-computed sample from background thread
+    pub fn ingest(&mut self, sample: Sample) {
+        // Check for pressure spike
+        if self.detect_spike(&sample) && self.spike_snapshot.is_none() {
+            self.spike_snapshot = Some(self.samples.iter().cloned().collect());
+        }
+
+        // Add to ring buffer
+        if self.samples.len() >= self.max_samples {
+            self.samples.pop_front();
+        }
+        self.samples.push_back(sample);
+        self.last_sample = Instant::now();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BACKGROUND TELEMETRY SAMPLER
+// ═══════════════════════════════════════════════════════════════
+
+/// Message from background sampler to main loop
+#[derive(Debug, Clone)]
+pub enum TelemetryMsg {
+    Sample(Sample),
+}
+
+/// Handle to control background telemetry sampler
+pub struct TelemetrySampler {
+    tx: mpsc::Sender<()>,
+}
+
+impl TelemetrySampler {
+    /// Spawn background telemetry sampler at ~4Hz
+    ///
+    /// Returns (sampler handle, sample receiver)
+    pub fn spawn(sample_rate_hz: u32) -> (Self, mpsc::Receiver<TelemetryMsg>) {
+        let (control_tx, mut control_rx) = mpsc::channel::<()>(1);
+        let (sample_tx, sample_rx) = mpsc::channel::<TelemetryMsg>(16);
+
+        let interval_ms = 1000 / sample_rate_hz.max(1);
+
+        // Spawn blocking task for sysinfo operations
+        std::thread::spawn(move || {
+            let mut system = System::new_all();
+            let mut networks = Networks::new_with_refreshed_list();
+            let mut last_net_rx: u64 = 0;
+            let mut last_net_tx: u64 = 0;
+
+            loop {
+                // Check for shutdown signal (non-blocking)
+                if control_rx.try_recv().is_ok() {
+                    break;
+                }
+
+                // Sample system stats (this is the blocking part)
+                system.refresh_all();
+                networks.refresh();
+
+                // Calculate CPU average
+                let cpus = system.cpus();
+                let cpu_percent = if cpus.is_empty() {
+                    0.0
+                } else {
+                    cpus.iter().map(|c| c.cpu_usage()).sum::<f32>() / cpus.len() as f32
+                };
+
+                // Memory
+                let total_mem = system.total_memory() as f32;
+                let used_mem = system.used_memory() as f32;
+                let mem_percent = if total_mem > 0.0 {
+                    (used_mem / total_mem) * 100.0
+                } else {
+                    0.0
+                };
+
+                // Network delta
+                let mut net_rx: u64 = 0;
+                let mut net_tx: u64 = 0;
+                for (_, data) in networks.iter() {
+                    net_rx += data.total_received();
+                    net_tx += data.total_transmitted();
+                }
+                let rx_delta = net_rx.saturating_sub(last_net_rx);
+                let tx_delta = net_tx.saturating_sub(last_net_tx);
+                last_net_rx = net_rx;
+                last_net_tx = net_tx;
+
+                let sample = Sample {
+                    timestamp: Instant::now(),
+                    cpu_percent,
+                    mem_percent,
+                    net_rx_bytes: rx_delta,
+                    net_tx_bytes: tx_delta,
+                };
+
+                // Send sample (non-blocking, drop if channel full)
+                let _ = sample_tx.try_send(TelemetryMsg::Sample(sample));
+
+                // Sleep until next sample
+                std::thread::sleep(Duration::from_millis(interval_ms as u64));
+            }
+        });
+
+        (Self { tx: control_tx }, sample_rx)
+    }
+
+    /// Signal sampler to stop
+    pub fn stop(&self) {
+        let _ = self.tx.try_send(());
     }
 }
 

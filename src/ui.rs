@@ -31,7 +31,7 @@ use crate::models::Model;
 use crate::project::{Project, ProjectType};
 use crate::session::Session;
 use crate::skills::{is_slash_command, execute_slash_command_with_context, SlashContext};
-use crate::telemetry::{Telemetry, ThrottleMode, PressureLevel};
+use crate::telemetry::{Telemetry, TelemetryMsg, TelemetrySampler, ThrottleMode, PressureLevel};
 use crate::traces::Traces;
 use crate::tools::{ToolCallTracker, ToolExecutor, ToolCallDisplay};
 use crate::agent::{parse_tool_calls, execute_tool_calls, format_tool_results};
@@ -1163,22 +1163,25 @@ async fn run_tui_loop(
 
     let (tx, mut rx) = mpsc::channel::<TuiMsg>(256);
 
-    // Telemetry sampling interval
-    let mut last_telemetry = std::time::Instant::now();
+    // Spawn background telemetry sampler (non-blocking sysinfo)
+    let (_telemetry_handle, mut telemetry_rx) = TelemetrySampler::spawn(4);
 
     loop {
         state.tick += 1;
 
-        // Sample telemetry at ~4Hz
-        if last_telemetry.elapsed() >= Duration::from_millis(250) {
-            state.telemetry.sample();
-            state.traces.memory.sample();
-            last_telemetry = std::time::Instant::now();
+        // Receive telemetry samples from background thread (non-blocking)
+        while let Ok(msg) = telemetry_rx.try_recv() {
+            match msg {
+                TelemetryMsg::Sample(sample) => {
+                    state.telemetry.ingest(sample);
+                    state.traces.memory.sample(); // This is cheap, keep inline
 
-            // Auto-throttle on high pressure
-            if state.telemetry.pressure() == PressureLevel::Critical && state.throttle == ThrottleMode::Normal {
-                state.throttle = ThrottleMode::Throttled;
-                state.log("Auto-throttled due to high CPU pressure");
+                    // Auto-throttle on high pressure
+                    if state.telemetry.pressure() == PressureLevel::Critical && state.throttle == ThrottleMode::Normal {
+                        state.throttle = ThrottleMode::Throttled;
+                        state.log("Auto-throttled due to high CPU pressure");
+                    }
+                }
             }
         }
 
