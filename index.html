@@ -3,1102 +3,556 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>hyle — paste a sketch, get a project</title>
-    <meta name="description" content="Autonomous code assistant. Paste a sketch, get working code deployed to a subdomain.">
-    <meta name="theme-color" content="#111">
+    <title>hyle - Rust-native code assistant</title>
+    <meta name="description" content="Autonomous code assistant that turns sketches into working projects. TUI-based, runs locally, deploys anywhere.">
+    <meta name="theme-color" content="#0a0a0b">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
     <style>
-        :root {
-            --bg: #0a0a0a;
-            --fg: #e8e8e8;
-            --muted: #666;
-            --accent: #6b9fff;
-            --accent-dim: #3d5a99;
-            --border: #222;
-            --code-bg: #141414;
-            --success: #4a9;
-            --sp-1: 0.5rem;
-            --sp-2: 1rem;
-            --sp-3: 1.5rem;
-            --sp-4: 2rem;
-            --sp-6: 3rem;
-            --text-sm: 0.875rem;
-            --text-base: 1rem;
-            --text-lg: 1.25rem;
-            --text-xl: 2rem;
-        }
-
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-            font-size: var(--text-base);
-            line-height: 1.6;
-            color: var(--fg);
-            background: var(--bg);
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: var(--sp-4);
-        }
-
-        header {
-            text-align: center;
-            padding: var(--sp-6) 0;
-        }
-
-        h1 {
-            font-size: var(--text-xl);
-            font-weight: 300;
-            letter-spacing: -0.02em;
-            margin-bottom: var(--sp-1);
-        }
-
-        .tagline {
-            font-size: var(--text-lg);
-            color: var(--muted);
-        }
-
-        /* WORKFLOW EXAMPLES */
-        .workflows {
-            display: flex;
-            flex-direction: column;
-            gap: var(--sp-6);
-            margin: var(--sp-6) 0;
-        }
-
-        .workflow {
-            background: var(--code-bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .workflow-header {
-            padding: var(--sp-2) var(--sp-3);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: var(--sp-2);
-        }
-
-        .workflow-title {
-            font-size: var(--text-sm);
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .workflow-link {
-            margin-left: auto;
-            font-size: var(--text-sm);
-            color: var(--accent);
-            text-decoration: none;
-        }
-
-        .workflow-link:hover {
-            text-decoration: underline;
-        }
-
-        .flow-steps {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .flow-step {
-            padding: var(--sp-3);
-            border-bottom: 1px solid var(--border);
-            display: grid;
-            grid-template-columns: 100px 1fr;
-            gap: var(--sp-3);
-            align-items: start;
-        }
-
-        .flow-step:last-child {
-            border-bottom: none;
-        }
-
-        .step-label {
-            font-size: var(--text-sm);
-            color: var(--muted);
-            font-weight: 500;
-            padding-top: 2px;
-        }
-
-        .step-content {
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            font-size: var(--text-sm);
-            line-height: 1.5;
-        }
-
-        .prompt-text {
-            color: var(--fg);
-            white-space: pre-wrap;
-        }
-
-        .response-text {
-            color: var(--accent);
-        }
-
-        .hyle-steps {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .hyle-step {
-            display: flex;
-            align-items: center;
-            gap: var(--sp-1);
-            color: var(--muted);
-            font-size: var(--text-sm);
-        }
-
-        .hyle-step::before {
-            content: '→';
-            color: var(--accent-dim);
-        }
-
-        .hyle-step.done {
-            color: var(--success);
-        }
-
-        .hyle-step.done::before {
-            content: '✓';
-            color: var(--success);
-        }
-
-        .live-url {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--sp-1);
-            padding: 6px 12px;
-            background: rgba(107, 159, 255, 0.1);
-            border: 1px solid var(--accent-dim);
-            border-radius: 4px;
-            color: var(--accent);
-            text-decoration: none;
-            font-size: var(--text-sm);
-        }
-
-        .live-url:hover {
-            background: rgba(107, 159, 255, 0.2);
-        }
-
-        .live-indicator {
-            width: 8px;
-            height: 8px;
-            background: var(--success);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* INPUT SECTION */
-        .input-section {
-            margin: var(--sp-6) 0;
-            padding: var(--sp-4);
-            background: var(--code-bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-        }
-
-        .input-section h2 {
-            font-size: var(--text-base);
-            font-weight: 500;
-            margin-bottom: var(--sp-3);
-        }
-
-        .sketch-input {
-            width: 100%;
-            min-height: 200px;
-            padding: var(--sp-2);
-            background: var(--bg);
-            border: 2px dashed var(--border);
-            border-radius: 4px;
-            color: var(--fg);
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            font-size: var(--text-sm);
-            line-height: 1.5;
-            resize: vertical;
-        }
-
-        .sketch-input:focus {
-            outline: none;
-            border-color: var(--accent);
-            border-style: solid;
-        }
-
-        .sketch-input::placeholder {
-            color: var(--muted);
-        }
-
-        .input-actions {
-            display: flex;
-            gap: var(--sp-2);
-            margin-top: var(--sp-2);
-            align-items: center;
-        }
-
-        .submit-btn {
-            padding: 10px 24px;
-            background: var(--accent);
-            color: var(--bg);
-            border: none;
-            border-radius: 4px;
-            font-size: var(--text-base);
-            font-weight: 500;
-            cursor: pointer;
-        }
-
-        .submit-btn:hover { background: #8bb4ff; }
-
-        .status {
-            padding: var(--sp-2);
-            border-radius: 4px;
-            font-size: var(--text-sm);
-            display: none;
-            margin-top: var(--sp-2);
-        }
-
-        .status.visible { display: block; }
-        .status.success { background: rgba(68, 170, 153, 0.15); border: 1px solid var(--success); }
-        .status.error { background: rgba(255, 100, 100, 0.1); border: 1px solid #c66; }
-
-        /* FOOTER */
-        footer {
-            text-align: center;
-            padding: var(--sp-6) 0;
-            color: var(--muted);
-            font-size: var(--text-sm);
-        }
-
-        footer a { color: var(--accent); text-decoration: none; }
-        footer a:hover { text-decoration: underline; }
-
-        /* RESPONSIVE */
-        @media (max-width: 600px) {
-            .flow-step {
-                grid-template-columns: 1fr;
-                gap: var(--sp-1);
-            }
-            .step-label {
-                font-size: 0.75rem;
-            }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            .live-indicator { animation: none; }
-        }
-
-        /* PROGRESS VISUALIZATION */
-        .progress-viz {
-            margin-top: var(--sp-3);
-            padding: var(--sp-3);
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            display: none;
-        }
-
-        .progress-viz.active { display: block; }
-
-        .process-graph {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: var(--sp-3);
-            position: relative;
-        }
-
-        .process-graph::before {
-            content: '';
-            position: absolute;
-            left: 20px;
-            right: 20px;
-            height: 2px;
-            background: var(--border);
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 0;
-        }
-
-        .graph-node {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--code-bg);
-            border: 2px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            z-index: 1;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-
-        .graph-node.active {
-            border-color: var(--accent);
-            box-shadow: 0 0 20px rgba(107, 159, 255, 0.4);
-            animation: node-pulse 1.5s infinite;
-        }
-
-        .graph-node.done {
-            background: var(--success);
-            border-color: var(--success);
-            color: var(--bg);
-        }
-
-        .graph-node .node-label {
-            position: absolute;
-            bottom: -20px;
-            font-size: 10px;
-            color: var(--muted);
-            white-space: nowrap;
-        }
-
-        .graph-node.active .node-label,
-        .graph-node.done .node-label {
-            color: var(--fg);
-        }
-
-        @keyframes node-pulse {
-            0%, 100% { box-shadow: 0 0 10px rgba(107, 159, 255, 0.4); }
-            50% { box-shadow: 0 0 25px rgba(107, 159, 255, 0.7); }
-        }
-
-        .graph-edge {
-            flex: 1;
-            height: 2px;
-            background: var(--border);
-            margin: 0 -5px;
-            z-index: 0;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .graph-edge.active::after {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            height: 100%;
-            width: 30%;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            animation: edge-flow 1s infinite linear;
-        }
-
-        .graph-edge.done {
-            background: var(--success);
-        }
-
-        @keyframes edge-flow {
-            0% { left: -30%; }
-            100% { left: 100%; }
-        }
-
-        .model-tracker {
-            margin-top: var(--sp-2);
-            padding: var(--sp-2);
-            background: var(--code-bg);
-            border-radius: 4px;
-            font-family: 'SF Mono', monospace;
-            font-size: 11px;
-            max-height: 150px;
-            overflow-y: auto;
-        }
-
-        .model-log {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .model-entry {
-            display: flex;
-            align-items: center;
-            gap: var(--sp-1);
-            padding: 4px 8px;
-            border-radius: 3px;
-            animation: entry-appear 0.3s ease;
-        }
-
-        @keyframes entry-appear {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        .model-entry.trying {
-            background: rgba(107, 159, 255, 0.1);
-            color: var(--accent);
-        }
-
-        .model-entry.success {
-            background: rgba(68, 170, 153, 0.1);
-            color: var(--success);
-        }
-
-        .model-entry.failed {
-            background: rgba(255, 100, 100, 0.05);
-            color: #966;
-        }
-
-        .model-entry .icon {
-            font-size: 12px;
-        }
-
-        .model-entry .model-name {
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .model-entry .tokens {
-            color: var(--muted);
-        }
-
-        .stats-bar {
-            display: flex;
-            gap: var(--sp-3);
-            margin-top: var(--sp-2);
-            padding-top: var(--sp-2);
-            border-top: 1px solid var(--border);
-            font-size: 11px;
-            color: var(--muted);
-        }
-
-        .stat {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .stat-value {
-            color: var(--fg);
-            font-family: 'SF Mono', monospace;
-        }
-
-        .token-counter {
-            animation: counter-tick 0.1s ease;
-        }
-
-        @keyframes counter-tick {
-            0% { transform: scale(1.1); color: var(--accent); }
-            100% { transform: scale(1); }
-        }
-
-        .shimmer {
-            background: linear-gradient(
-                90deg,
-                var(--code-bg) 0%,
-                rgba(107, 159, 255, 0.1) 50%,
-                var(--code-bg) 100%
-            );
-            background-size: 200% 100%;
-            animation: shimmer 2s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
-        .collapse-toggle {
-            background: none;
-            border: none;
-            color: var(--muted);
-            font-size: 11px;
-            cursor: pointer;
-            padding: 4px;
-        }
-
-        .collapse-toggle:hover {
-            color: var(--fg);
-        }
+:root {
+    --bg: #0a0a0b;
+    --surface: #111114;
+    --surface-2: #18181c;
+    --border: #2a2a32;
+    --text: #e8e8ec;
+    --text-dim: #888890;
+    --text-muted: #555560;
+    --accent: #6b9fff;
+    --accent-dim: rgba(107, 159, 255, 0.15);
+    --green: #4ade80;
+    --mono: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+}
+
+/* Hero */
+.hero {
+    padding: 4rem 0 3rem;
+    text-align: center;
+}
+
+.hero h1 {
+    font-size: clamp(3rem, 10vw, 5rem);
+    font-weight: 200;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.hero .tagline {
+    font-size: 1.25rem;
+    color: var(--text-dim);
+    max-width: 500px;
+    margin: 0 auto 2rem;
+}
+
+.hero-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.15s;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+}
+.btn-primary:hover {
+    background: #8bb3ff;
+    text-decoration: none;
+}
+
+.btn-secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+.btn-secondary:hover {
+    border-color: var(--accent);
+    text-decoration: none;
+}
+
+/* Install snippet */
+.install-snippet {
+    margin: 2rem auto;
+    max-width: 500px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.install-snippet code {
+    color: var(--green);
+}
+
+.install-snippet button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+    font-size: 1rem;
+}
+.install-snippet button:hover { color: var(--accent); }
+
+/* Live Demos Section */
+.demos {
+    padding: 3rem 0;
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.section-header h2 {
+    font-size: 1.5rem;
+    font-weight: 400;
+    margin-bottom: 0.5rem;
+}
+
+.section-header p {
+    color: var(--text-dim);
+}
+
+.demo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.25rem;
+}
+
+.demo-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+
+.demo-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    text-decoration: none;
+}
+
+.demo-preview {
+    aspect-ratio: 16/10;
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.demo-preview::after {
+    content: 'Click to launch';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0.5rem;
+    background: linear-gradient(transparent, rgba(0,0,0,0.8));
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.demo-card:hover .demo-preview::after {
+    opacity: 1;
+}
+
+.demo-content {
+    padding: 1rem 1.25rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.demo-tags {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.tag {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+    background: var(--bg);
+    border-radius: 3px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.tag.webgl { color: var(--accent); }
+.tag.data { color: #b56bff; }
+.tag.audio { color: #ff9f6b; }
+.tag.tool { color: var(--green); }
+
+.demo-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 0.25rem;
+}
+
+.demo-desc {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    flex: 1;
+}
+
+.demo-prompt {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.demo-prompt::before {
+    content: 'prompt: ';
+    color: var(--accent);
+}
+
+/* Features */
+.features {
+    padding: 3rem 0;
+    border-top: 1px solid var(--border);
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+}
+
+.feature {
+    text-align: center;
+    padding: 1.5rem;
+}
+
+.feature-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    opacity: 0.8;
+}
+
+.feature h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.feature p {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+}
+
+/* TUI Preview */
+.tui-section {
+    padding: 3rem 0;
+    border-top: 1px solid var(--border);
+}
+
+.tui-preview {
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.tui-titlebar {
+    background: var(--surface);
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.tui-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+.tui-dot.red { background: #ff5f57; }
+.tui-dot.yellow { background: #febc2e; }
+.tui-dot.green { background: #28c840; }
+
+.tui-title {
+    flex: 1;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.tui-content {
+    padding: 1rem;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    min-height: 300px;
+}
+
+.tui-line { margin: 0.25rem 0; }
+.tui-prompt { color: var(--green); }
+.tui-cmd { color: var(--text); }
+.tui-output { color: var(--text-dim); }
+.tui-accent { color: var(--accent); }
+.tui-success { color: var(--green); }
+.tui-dim { color: var(--text-muted); }
+
+/* Footer */
+footer {
+    padding: 3rem 0;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.footer-links {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .hero { padding: 2rem 0; }
+    .demo-grid { grid-template-columns: 1fr; }
+    .feature-grid { grid-template-columns: 1fr; }
+    .footer-links { flex-direction: column; gap: 0.5rem; }
+}
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
+        <section class="hero">
             <h1>hyle</h1>
-            <p class="tagline">paste a sketch, get a live project</p>
-        </header>
-
-        <!-- WORKFLOW EXAMPLES -->
-        <section class="workflows">
-
-            <!-- Example 1: Generative Art -->
-            <article class="workflow">
-                <div class="workflow-header">
-                    <span class="workflow-title">Generative Art</span>
-                    <a href="https://uprootiny.github.io/hyle/projects/dodeca/" class="workflow-link">view live →</a>
-                </div>
-                <div class="flow-steps">
-                    <div class="flow-step">
-                        <span class="step-label">prompt</span>
-                        <div class="step-content">
-                            <span class="prompt-text">spiky dodecahedron with perturbed surface using landscape generation algos. layered rotoscoped rendering floating over starry void</span>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">response</span>
-                        <div class="step-content">
-                            <span class="response-text">WebGL sketch. Simplex noise displacement on subdivided icosahedron. Edge detection shader for rotoscope effect.</span>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">hyle</span>
-                        <div class="step-content">
-                            <div class="hyle-steps">
-                                <span class="hyle-step done">implement geometry with noise displacement</span>
-                                <span class="hyle-step done">add rotation and lighting</span>
-                                <span class="hyle-step done">deploy static HTML</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">live</span>
-                        <div class="step-content">
-                            <a href="https://uprootiny.github.io/hyle/projects/dodeca/" class="live-url">
-                                <span class="live-indicator"></span>
-                                dodeca
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </article>
-
-            <!-- Example 2: Data Sonification -->
-            <article class="workflow">
-                <div class="workflow-header">
-                    <span class="workflow-title">Data Sonification</span>
-                    <a href="https://uprootiny.github.io/hyle/projects/seismic/" class="workflow-link">view live →</a>
-                </div>
-                <div class="flow-steps">
-                    <div class="flow-step">
-                        <span class="step-label">prompt</span>
-                        <div class="step-content">
-                            <span class="prompt-text">real-time seismic data sonification. fetch USGS earthquake feed, map magnitude to pitch, depth to reverb, location to stereo pan. visualize as expanding rings on mercator</span>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">response</span>
-                        <div class="step-content">
-                            <span class="response-text">Web Audio API for synthesis. Fetch USGS GeoJSON every 30s. Canvas 2D for map. Magnitude → frequency, depth → duration.</span>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">hyle</span>
-                        <div class="step-content">
-                            <div class="hyle-steps">
-                                <span class="hyle-step done">implement USGS feed fetcher</span>
-                                <span class="hyle-step done">build Web Audio synthesizer</span>
-                                <span class="hyle-step done">render mercator map with rings</span>
-                                <span class="hyle-step done">deploy</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">live</span>
-                        <div class="step-content">
-                            <a href="https://uprootiny.github.io/hyle/projects/seismic/" class="live-url">
-                                <span class="live-indicator"></span>
-                                seismic
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </article>
-
-            <!-- Example 3: Interactive Fiction -->
-            <article class="workflow">
-                <div class="workflow-header">
-                    <span class="workflow-title">Interactive Fiction</span>
-                    <a href="https://uprootiny.github.io/hyle/projects/labyrinth/" class="workflow-link">view live →</a>
-                </div>
-                <div class="flow-steps">
-                    <div class="flow-step">
-                        <span class="step-label">prompt</span>
-                        <div class="step-content">
-                            <span class="prompt-text">procedural labyrinth crawler. text-based with ASCII map. rooms from markov chains on borges. inventory. time moves when you move. state in URL hash</span>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">response</span>
-                        <div class="step-content">
-                            <span class="response-text">Vanilla JS. Markov chain from Borges corpus. Recursive backtracking maze. State serialized to base64 URL hash.</span>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">hyle</span>
-                        <div class="step-content">
-                            <div class="hyle-steps">
-                                <span class="hyle-step done">implement markov text generator</span>
-                                <span class="hyle-step done">build maze algorithm</span>
-                                <span class="hyle-step done">add URL hash persistence</span>
-                                <span class="hyle-step done">deploy</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">live</span>
-                        <div class="step-content">
-                            <a href="https://uprootiny.github.io/hyle/projects/labyrinth/" class="live-url">
-                                <span class="live-indicator"></span>
-                                labyrinth
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </article>
-
-            <!-- Example 4: Developer Tool -->
-            <article class="workflow">
-                <div class="workflow-header">
-                    <span class="workflow-title">Developer Tool</span>
-                    <a href="https://uprootiny.github.io/hyle/projects/jsonl/" class="workflow-link">view live →</a>
-                </div>
-                <div class="flow-steps">
-                    <div class="flow-step">
-                        <span class="step-label">prompt</span>
-                        <div class="step-content">
-                            <span class="prompt-text">JSONL viewer and query tool. paste or drag file. scrollable table. jq-style queries. export filtered results. client-side only</span>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">response</span>
-                        <div class="step-content">
-                            <span class="response-text">Vanilla JS. Parse JSONL line by line. Subset of jq syntax (.foo.bar, select). CSS grid table. Blob export.</span>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">hyle</span>
-                        <div class="step-content">
-                            <div class="hyle-steps">
-                                <span class="hyle-step done">implement JSONL parser</span>
-                                <span class="hyle-step done">build query engine</span>
-                                <span class="hyle-step done">add drag-drop and export</span>
-                                <span class="hyle-step done">deploy</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">live</span>
-                        <div class="step-content">
-                            <a href="https://uprootiny.github.io/hyle/projects/jsonl/" class="live-url">
-                                <span class="live-indicator"></span>
-                                jsonl
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </article>
-
-            <!-- Example 5: Data Visualization -->
-            <article class="workflow">
-                <div class="workflow-header">
-                    <span class="workflow-title">Critical Infrastructure</span>
-                    <a href="https://uprootiny.github.io/hyle/projects/datacenters/" class="workflow-link">view live →</a>
-                </div>
-                <div class="flow-steps">
-                    <div class="flow-step">
-                        <span class="step-label">prompt</span>
-                        <div class="step-content">
-                            <span class="prompt-text">dymaxion projection globe with datacenter locations. show water usage, electricity draw, grid load. forest fire risk overlay. live token counter showing inference cost. click datacenters to see environmental impact radius</span>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">response</span>
-                        <div class="step-content">
-                            <span class="response-text">Canvas 2D dymaxion projection. Hardcoded datacenter coords (AWS, GCP, Azure regions). Simulated real-time metrics. Radial impact visualization on click.</span>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">hyle</span>
-                        <div class="step-content">
-                            <div class="hyle-steps">
-                                <span class="hyle-step done">implement dymaxion map projection</span>
-                                <span class="hyle-step done">add datacenter markers with metadata</span>
-                                <span class="hyle-step done">create impact radius visualization</span>
-                                <span class="hyle-step done">add live token counter overlay</span>
-                                <span class="hyle-step done">deploy</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flow-step">
-                        <span class="step-label">live</span>
-                        <div class="step-content">
-                            <a href="https://uprootiny.github.io/hyle/projects/datacenters/" class="live-url">
-                                <span class="live-indicator"></span>
-                                datacenters
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </article>
-
+            <p class="tagline">Rust-native code assistant. Describe what you want, get working code.</p>
+            <div class="hero-actions">
+                <a href="https://github.com/uprootiny/hyle" class="btn btn-primary">
+                    View on GitHub
+                </a>
+                <a href="/projects/vitrine/" class="btn btn-secondary">
+                    Browse Demos
+                </a>
+            </div>
+            <div class="install-snippet">
+                <code>cargo install hyle</code>
+                <button onclick="navigator.clipboard.writeText('cargo install hyle')" title="Copy">
+                    <span id="copyIcon">&#128203;</span>
+                </button>
+            </div>
         </section>
 
-        <!-- INPUT SECTION -->
-        <section class="input-section">
-            <h2>Your turn</h2>
-            <form id="sketchForm">
-                <textarea
-                    class="sketch-input"
-                    id="sketchInput"
-                    placeholder="describe what you want to build..."
-                    required
-                ></textarea>
-                <div class="input-actions">
-                    <button type="submit" class="submit-btn" id="submitBtn">Build</button>
-                    <span id="actionHint" style="color: var(--muted); font-size: var(--text-sm);">sketch → hyle → live URL</span>
+        <section class="demos">
+            <div class="section-header">
+                <h2>Live Demos</h2>
+                <p>Each built from a single prompt. Click to try.</p>
+            </div>
+            <div class="demo-grid">
+                <a href="/projects/datacenters/" class="demo-card">
+                    <div class="demo-preview">&#127760;</div>
+                    <div class="demo-content">
+                        <div class="demo-tags">
+                            <span class="tag webgl">WebGL</span>
+                            <span class="tag data">Data</span>
+                        </div>
+                        <div class="demo-title">Datacenters Globe</div>
+                        <div class="demo-desc">Interactive visualization of global cloud infrastructure with environmental impact metrics.</div>
+                        <div class="demo-prompt">dymaxion globe with datacenter locations, water usage, fire risk overlay, live token counter</div>
+                    </div>
+                </a>
+
+                <a href="/projects/seismic/" class="demo-card">
+                    <div class="demo-preview">&#128200;</div>
+                    <div class="demo-content">
+                        <div class="demo-tags">
+                            <span class="tag data">Data</span>
+                            <span class="tag audio">Audio</span>
+                        </div>
+                        <div class="demo-title">Seismic Activity</div>
+                        <div class="demo-desc">Real-time earthquake visualization with sonification from USGS data feed.</div>
+                        <div class="demo-prompt">real-time seismic sonification, fetch USGS feed, magnitude to pitch, depth to reverb, mercator rings</div>
+                    </div>
+                </a>
+
+                <a href="/projects/labyrinth/" class="demo-card">
+                    <div class="demo-preview">&#128269;</div>
+                    <div class="demo-content">
+                        <div class="demo-tags">
+                            <span class="tag">Generative</span>
+                        </div>
+                        <div class="demo-title">Labyrinth</div>
+                        <div class="demo-desc">Procedural text crawler with Borges-inspired Markov generation and URL state.</div>
+                        <div class="demo-prompt">procedural labyrinth crawler, ASCII map, rooms from markov chains on borges, state in URL hash</div>
+                    </div>
+                </a>
+
+                <a href="/projects/dodeca/" class="demo-card">
+                    <div class="demo-preview">&#9651;</div>
+                    <div class="demo-content">
+                        <div class="demo-tags">
+                            <span class="tag webgl">WebGL</span>
+                        </div>
+                        <div class="demo-title">Dodeca</div>
+                        <div class="demo-desc">Spiky dodecahedron with noise-perturbed surface and rotoscoped rendering.</div>
+                        <div class="demo-prompt">spiky dodecahedron with perturbed surface using landscape algos, rotoscoped over starry void</div>
+                    </div>
+                </a>
+
+                <a href="/projects/jsonl/" class="demo-card">
+                    <div class="demo-preview">&#128196;</div>
+                    <div class="demo-content">
+                        <div class="demo-tags">
+                            <span class="tag tool">Tool</span>
+                        </div>
+                        <div class="demo-title">JSONL Viewer</div>
+                        <div class="demo-desc">Stream-friendly JSON Lines viewer with syntax highlighting, queries, and export.</div>
+                        <div class="demo-prompt">JSONL viewer, paste or drag file, scrollable table, jq-style queries, export filtered</div>
+                    </div>
+                </a>
+
+                <a href="/projects/vitrine/" class="demo-card">
+                    <div class="demo-preview">&#127912;</div>
+                    <div class="demo-content">
+                        <div class="demo-tags">
+                            <span class="tag">Gallery</span>
+                        </div>
+                        <div class="demo-title">Vitrine</div>
+                        <div class="demo-desc">Curated showcase of all artpieces including external projects.</div>
+                        <div class="demo-prompt">showcase gallery page</div>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="feature-grid">
+                <div class="feature">
+                    <div class="feature-icon">&#9889;</div>
+                    <h3>Fast & Local</h3>
+                    <p>Rust-native TUI. Runs on your machine. No cloud dependencies for the core loop.</p>
                 </div>
-                <div class="status" id="status"></div>
-                <div class="progress-viz" id="progressViz">
-                    <div class="process-graph">
-                        <div class="graph-node" data-node="submit">
-                            <span>↑</span>
-                            <span class="node-label">submit</span>
-                        </div>
-                        <div class="graph-edge" data-edge="submit-queue"></div>
-                        <div class="graph-node" data-node="queue">
-                            <span>◎</span>
-                            <span class="node-label">queue</span>
-                        </div>
-                        <div class="graph-edge" data-edge="queue-build"></div>
-                        <div class="graph-node" data-node="build">
-                            <span>⚙</span>
-                            <span class="node-label">build</span>
-                        </div>
-                        <div class="graph-edge" data-edge="build-deploy"></div>
-                        <div class="graph-node" data-node="deploy">
-                            <span>▸</span>
-                            <span class="node-label">deploy</span>
-                        </div>
-                        <div class="graph-edge" data-edge="deploy-live"></div>
-                        <div class="graph-node" data-node="live">
-                            <span>✓</span>
-                            <span class="node-label">live</span>
-                        </div>
-                    </div>
-                    <div class="model-tracker" id="modelTracker">
-                        <div class="model-log" id="modelLog"></div>
-                    </div>
-                    <div class="stats-bar">
-                        <div class="stat">
-                            <span>elapsed:</span>
-                            <span class="stat-value" id="statElapsed">0s</span>
-                        </div>
-                        <div class="stat">
-                            <span>models tried:</span>
-                            <span class="stat-value" id="statModels">0</span>
-                        </div>
-                        <div class="stat">
-                            <span>polls:</span>
-                            <span class="stat-value" id="statPolls">0</span>
-                        </div>
-                    </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128736;</div>
+                    <h3>Model Agnostic</h3>
+                    <p>Works with OpenRouter, Anthropic, OpenAI. Automatic fallback on rate limits.</p>
                 </div>
-            </form>
+                <div class="feature">
+                    <div class="feature-icon">&#128202;</div>
+                    <h3>Observable</h3>
+                    <p>Real-time telemetry, token tracking, system pressure detection, auto-throttle.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128230;</div>
+                    <h3>Self-Deploying</h3>
+                    <p>Generates static HTML/JS. Deploy to GitHub Pages, Vercel, or any static host.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="tui-section">
+            <div class="section-header">
+                <h2>Terminal Interface</h2>
+                <p>Full TUI with multiple views, keyboard shortcuts, and session management.</p>
+            </div>
+            <div class="tui-preview">
+                <div class="tui-titlebar">
+                    <span class="tui-dot red"></span>
+                    <span class="tui-dot yellow"></span>
+                    <span class="tui-dot green"></span>
+                    <span class="tui-title">hyle</span>
+                </div>
+                <div class="tui-content">
+                    <div class="tui-line"><span class="tui-accent">hyle</span> <span class="tui-dim">v0.1.0</span></div>
+                    <div class="tui-line"><span class="tui-dim">model:</span> <span class="tui-output">anthropic/claude-sonnet</span></div>
+                    <div class="tui-line"><span class="tui-dim">───────────────────────────────────────────────</span></div>
+                    <div class="tui-line">&nbsp;</div>
+                    <div class="tui-line"><span class="tui-prompt">&gt;</span> <span class="tui-cmd">build a real-time earthquake visualizer with sonification</span></div>
+                    <div class="tui-line">&nbsp;</div>
+                    <div class="tui-line"><span class="tui-accent">thinking...</span></div>
+                    <div class="tui-line"><span class="tui-output">I'll create a seismic visualization that:</span></div>
+                    <div class="tui-line"><span class="tui-output">1. Fetches USGS earthquake feed (GeoJSON)</span></div>
+                    <div class="tui-line"><span class="tui-output">2. Maps earthquakes to Mercator projection</span></div>
+                    <div class="tui-line"><span class="tui-output">3. Sonifies magnitude → pitch, depth → reverb</span></div>
+                    <div class="tui-line">&nbsp;</div>
+                    <div class="tui-line"><span class="tui-success">&#10003;</span> <span class="tui-output">Created projects/seismic/index.html (256 lines)</span></div>
+                    <div class="tui-line"><span class="tui-success">&#10003;</span> <span class="tui-output">Deployed to hyle.lol/projects/seismic/</span></div>
+                    <div class="tui-line">&nbsp;</div>
+                    <div class="tui-line"><span class="tui-dim">───────────────────────────────────────────────</span></div>
+                    <div class="tui-line"><span class="tui-dim">CPU ▁▁▂▃▂▁▁  tokens: 1,247  elapsed: 8.3s</span></div>
+                </div>
+            </div>
         </section>
 
         <footer>
-            <p>
-                <a href="https://github.com/uprootiny/hyle">source</a> ·
-                <a href="https://github.com/uprootiny/hyle/issues">projects</a> ·
+            <div class="footer-links">
+                <a href="https://github.com/uprootiny/hyle">GitHub</a>
+                <a href="https://github.com/uprootiny/hyle/issues">Issues</a>
+                <a href="/projects/">All Projects</a>
                 <a href="https://hyperstitious.org">hyperstitious.org</a>
-            </p>
+            </div>
+            <p>Built with hyle</p>
         </footer>
     </div>
 
     <script>
-    // Configuration - orchestrator endpoint
-    const HYLE_BASE = 'https://hyle.hyperstitious.org';
-    const HYLE_API = HYLE_BASE + '/api/sketch';
-
-    // Progress state
-    let buildState = {
-        startTime: 0,
-        pollCount: 0,
-        modelsSeen: new Set(),
-        currentModel: null,
-        elapsedTimer: null
-    };
-
-    document.getElementById('sketchForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const sketch = document.getElementById('sketchInput').value.trim();
-        const status = document.getElementById('status');
-        const progressViz = document.getElementById('progressViz');
-        const submitBtn = document.getElementById('submitBtn');
-        const hint = document.getElementById('actionHint');
-
-        if (sketch.length < 20) {
-            status.textContent = 'Please describe your project in more detail.';
-            status.className = 'status visible error';
-            return;
-        }
-
-        // Reset and show progress UI
-        resetProgressState();
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Building...';
-        hint.style.display = 'none';
-        progressViz.classList.add('active');
-        status.className = 'status';
-
-        setGraphNode('submit', 'active');
-        addModelEntry('system', 'Submitting sketch...', 'trying');
-
-        try {
-            // POST sketch directly to orchestrator
-            const res = await fetch(HYLE_API, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sketch })
-            });
-
-            if (!res.ok) {
-                const err = await res.text();
-                throw new Error(err || `HTTP ${res.status}`);
-            }
-
-            setGraphNode('submit', 'done');
-            setGraphEdge('submit-queue', 'done');
-            setGraphNode('queue', 'active');
-            updateModelEntry('system', 'Queued', 'success');
-
-            const data = await res.json();
-
-            if (data.status === 'queued' && data.poll_url) {
-                addModelEntry('queue', `Job ID: ${data.job_id || 'unknown'}`, 'success');
-                // Poll for completion - use full URL since poll_url is relative
-                await pollForCompletion(HYLE_BASE + data.poll_url);
-            } else if (data.url) {
-                // Immediate result
-                completeGraph();
-                showResult(data.url);
-            } else {
-                throw new Error('Unexpected response');
-            }
-
-        } catch (err) {
-            addModelEntry('error', err.message, 'failed');
-            status.textContent = `Error: ${err.message}`;
-            status.className = 'status visible error';
-            resetForm();
-        }
-    });
-
-    async function pollForCompletion(pollUrl, maxAttempts = 120) {
-        setGraphNode('queue', 'done');
-        setGraphEdge('queue-build', 'active');
-        setGraphNode('build', 'active');
-
-        for (let i = 0; i < maxAttempts; i++) {
-            await sleep(1500);
-            buildState.pollCount++;
-            document.getElementById('statPolls').textContent = buildState.pollCount;
-
-            try {
-                const res = await fetch(pollUrl);
-                const data = await res.json();
-
-                // Update models tried
-                if (data.models_tried && Array.isArray(data.models_tried)) {
-                    updateModelsTried(data.models_tried);
-                }
-
-                if (data.status === 'queued') {
-                    setGraphNode('queue', 'active');
-                    setGraphNode('build', '');
-                    setGraphEdge('queue-build', '');
-                } else if (data.status === 'building') {
-                    setGraphNode('queue', 'done');
-                    setGraphEdge('queue-build', 'done');
-                    setGraphNode('build', 'active');
-                    setGraphEdge('build-deploy', 'active');
-                } else if (data.status === 'deploying') {
-                    setGraphNode('build', 'done');
-                    setGraphEdge('build-deploy', 'done');
-                    setGraphNode('deploy', 'active');
-                    setGraphEdge('deploy-live', 'active');
-                    addModelEntry('deploy', 'Writing files...', 'trying');
-                } else if (data.status === 'live' && data.url) {
-                    completeGraph();
-                    addModelEntry('live', data.url, 'success');
-                    showResult(data.url);
-                    return;
-                } else if (data.status === 'failed') {
-                    addModelEntry('error', data.error || 'Build failed', 'failed');
-                    throw new Error(data.error || 'Build failed');
-                }
-            } catch (err) {
-                if (err.message.includes('Build failed') || i === maxAttempts - 1) throw err;
-            }
-        }
-        throw new Error('Timeout waiting for build');
-    }
-
-    function updateModelsTried(models) {
-        const statModels = document.getElementById('statModels');
-
-        models.forEach((model, idx) => {
-            if (!buildState.modelsSeen.has(model)) {
-                buildState.modelsSeen.add(model);
-
-                // Mark previous model as failed (rate limited)
-                if (buildState.currentModel) {
-                    updateModelEntry(buildState.currentModel, buildState.currentModel + ' (429)', 'failed');
-                }
-
-                // Add new model entry
-                const shortName = model.split('/').pop().replace(':free', '');
-                addModelEntry(model, shortName, 'trying');
-                buildState.currentModel = model;
-
-                statModels.textContent = buildState.modelsSeen.size;
-                statModels.classList.remove('token-counter');
-                void statModels.offsetWidth; // Trigger reflow
-                statModels.classList.add('token-counter');
-            }
-        });
-
-        // If we have models and still building, mark current as active
-        if (models.length > 0 && buildState.currentModel) {
-            const currentShort = buildState.currentModel.split('/').pop().replace(':free', '');
-            updateModelEntry(buildState.currentModel, currentShort + ' ⚙', 'trying');
-        }
-    }
-
-    function addModelEntry(id, text, status) {
-        const log = document.getElementById('modelLog');
-        const icons = { trying: '◎', success: '✓', failed: '✗' };
-
-        const entry = document.createElement('div');
-        entry.className = `model-entry ${status}`;
-        entry.id = `model-${id}`;
-        entry.innerHTML = `
-            <span class="icon">${icons[status]}</span>
-            <span class="model-name">${text}</span>
-        `;
-        log.appendChild(entry);
-        log.scrollTop = log.scrollHeight;
-    }
-
-    function updateModelEntry(id, text, status) {
-        const entry = document.getElementById(`model-${id}`);
-        const icons = { trying: '◎', success: '✓', failed: '✗' };
-        if (entry) {
-            entry.className = `model-entry ${status}`;
-            entry.querySelector('.icon').textContent = icons[status];
-            entry.querySelector('.model-name').textContent = text;
-        }
-    }
-
-    function setGraphNode(node, state) {
-        const el = document.querySelector(`[data-node="${node}"]`);
-        if (el) {
-            el.classList.remove('active', 'done');
-            if (state) el.classList.add(state);
-        }
-    }
-
-    function setGraphEdge(edge, state) {
-        const el = document.querySelector(`[data-edge="${edge}"]`);
-        if (el) {
-            el.classList.remove('active', 'done');
-            if (state) el.classList.add(state);
-        }
-    }
-
-    function completeGraph() {
-        ['submit', 'queue', 'build', 'deploy', 'live'].forEach(n => setGraphNode(n, 'done'));
-        ['submit-queue', 'queue-build', 'build-deploy', 'deploy-live'].forEach(e => setGraphEdge(e, 'done'));
-        if (buildState.currentModel) {
-            const shortName = buildState.currentModel.split('/').pop().replace(':free', '');
-            updateModelEntry(buildState.currentModel, shortName + ' ✓', 'success');
-        }
-    }
-
-    function resetProgressState() {
-        buildState = {
-            startTime: Date.now(),
-            pollCount: 0,
-            modelsSeen: new Set(),
-            currentModel: null,
-            elapsedTimer: setInterval(updateElapsed, 1000)
-        };
-        document.getElementById('modelLog').innerHTML = '';
-        document.getElementById('statElapsed').textContent = '0s';
-        document.getElementById('statModels').textContent = '0';
-        document.getElementById('statPolls').textContent = '0';
-        // Reset graph
-        document.querySelectorAll('.graph-node').forEach(n => n.classList.remove('active', 'done'));
-        document.querySelectorAll('.graph-edge').forEach(e => e.classList.remove('active', 'done'));
-    }
-
-    function updateElapsed() {
-        const elapsed = Math.floor((Date.now() - buildState.startTime) / 1000);
-        const mins = Math.floor(elapsed / 60);
-        const secs = elapsed % 60;
-        document.getElementById('statElapsed').textContent = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-    }
-
-    function showResult(url) {
-        clearInterval(buildState.elapsedTimer);
-        const status = document.getElementById('status');
-        status.innerHTML = `<a href="${url}" target="_blank" class="live-url"><span class="live-indicator"></span>${url}</a>`;
-        status.className = 'status visible success';
-        resetForm();
-    }
-
-    function resetForm() {
-        clearInterval(buildState.elapsedTimer);
-        const submitBtn = document.getElementById('submitBtn');
-        const hint = document.getElementById('actionHint');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Build';
-        hint.style.display = '';
-    }
-
-    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-    // Check for sketch in URL hash (remix links)
-    function loadSketchFromHash() {
-        const hash = window.location.hash;
-        if (hash.startsWith('#sketch=')) {
-            const sketch = decodeURIComponent(hash.slice(8));
-            document.getElementById('sketchInput').value = sketch;
-            document.getElementById('sketchInput').focus();
-        }
-    }
-    loadSketchFromHash();
-    window.addEventListener('hashchange', loadSketchFromHash);
-
-    // Drag and drop
-    const input = document.getElementById('sketchInput');
-    input.addEventListener('dragover', (e) => { e.preventDefault(); input.style.borderColor = 'var(--accent)'; });
-    input.addEventListener('dragleave', () => { input.style.borderColor = ''; });
-    input.addEventListener('drop', (e) => {
-        e.preventDefault();
-        input.style.borderColor = '';
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (ev) => { input.value = ev.target.result; };
-            reader.readAsText(file);
-        }
+    // Copy button feedback
+    document.querySelector('.install-snippet button').addEventListener('click', function() {
+        const icon = document.getElementById('copyIcon');
+        icon.textContent = '✓';
+        setTimeout(() => { icon.textContent = '📋'; }, 1500);
     });
     </script>
 </body>
