@@ -432,18 +432,31 @@ const FREE_MODEL_FALLBACKS: &[&str] = &[
 
 impl TuiState {
     fn new(context_window: u32, project: Option<Project>, model: &str, api_key: &str) -> Self {
-        let welcome = if let Some(ref p) = project {
-            format!("hyle: {} ({} files, {} lines). Ctrl-C×2 quit, Esc zoom-out.",
-                p.name, p.files.len(), p.total_lines())
+        // Build welcome message with helpful tips
+        let model_short = model.split('/').last().unwrap_or(model);
+        let mut welcome_lines = Vec::new();
+
+        if let Some(ref p) = project {
+            welcome_lines.push(format!("hyle: {} ({} files, {} lines)",
+                p.name, p.files.len(), p.total_lines()));
         } else {
-            "Welcome to hyle. Press Ctrl-C twice to quit, Esc to zoom out.".into()
-        };
+            welcome_lines.push("hyle - Rust-native code assistant".into());
+        }
+
+        welcome_lines.push(format!("Model: {}  Context: {}k tokens", model_short, context_window / 1000));
+        welcome_lines.push(String::new());
+        welcome_lines.push("Quick tips:".into());
+        welcome_lines.push("  /help     - show available commands".into());
+        welcome_lines.push("  /clear    - start fresh conversation".into());
+        welcome_lines.push("  Tab       - switch views (Chat/Telemetry/Log/Sessions)".into());
+        welcome_lines.push("  Ctrl-C ×2 - quit (session auto-saved)".into());
+        welcome_lines.push(String::new());
 
         Self {
             tab: Tab::Chat,
             input: String::new(),
             cursor_pos: 0,
-            output: vec![welcome],
+            output: welcome_lines,
             log: Vec::new(),
             telemetry: Telemetry::new(60, 4), // 60 second window, 4Hz
             traces: Traces::new(context_window),
@@ -526,6 +539,52 @@ impl TuiState {
         }
 
         None // All models exhausted
+    }
+
+    /// Format an error message to be more user-friendly
+    fn format_error_for_user(error: &str) -> String {
+        let lower = error.to_lowercase();
+
+        // Network errors
+        if lower.contains("connection") || lower.contains("network") || lower.contains("dns") {
+            return "Network error - check your internet connection".into();
+        }
+        if lower.contains("timeout") {
+            return "Request timed out - the API may be slow, try again".into();
+        }
+
+        // Auth errors
+        if lower.contains("401") || lower.contains("unauthorized") || lower.contains("invalid api key") {
+            return "Invalid API key - check OPENROUTER_API_KEY".into();
+        }
+        if lower.contains("403") || lower.contains("forbidden") {
+            return "Access denied - your API key may lack permissions".into();
+        }
+
+        // Server errors
+        if lower.contains("500") || lower.contains("internal server") {
+            return "API server error - try again in a moment".into();
+        }
+        if lower.contains("502") || lower.contains("503") || lower.contains("bad gateway") {
+            return "API temporarily unavailable - try again shortly".into();
+        }
+
+        // Context length
+        if lower.contains("context") && lower.contains("length") {
+            return "Message too long - try a shorter prompt or /clear".into();
+        }
+
+        // Content filter
+        if lower.contains("content") && (lower.contains("filter") || lower.contains("policy")) {
+            return "Content filtered by API - rephrase your request".into();
+        }
+
+        // Truncate very long errors
+        if error.len() > 100 {
+            format!("{}...", &error[..100])
+        } else {
+            error.to_string()
+        }
     }
 
     /// Check if error is a rate limit and handle it
@@ -1360,9 +1419,10 @@ async fn run_tui_loop(
                             state.log("All models rate limited. Press ESC to pick a model.");
                         }
                     } else {
-                        state.output.push(format!("\n[Error: {}]", e));
+                        let friendly = TuiState::format_error_for_user(&e);
+                        state.output.push(format!("\n[Error: {}]", friendly));
                         state.mark_dirty();
-                        state.log(format!("Error: {}", e));
+                        state.log(format!("Error: {}", friendly));
                     }
                 }
                 // Agent mode events
@@ -2035,7 +2095,7 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
             "Waiting for first token...".into()
         }
     } else {
-        "Input (Enter to send, Ctrl-A/E/K/U readline)".into()
+        "Input (↑↓ history, Enter send)".into()
     };
     let input = Paragraph::new(state.input.as_str())
         .style(input_style)
@@ -2053,13 +2113,15 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
     let pressure = state.telemetry.pressure();
     let sparkline = state.telemetry.cpu_sparkline(16);
 
-    // Build contextual help based on current view
+    // Build contextual help based on current view and state
     let help = if state.in_overlay() {
         "Esc:back ↑↓:select Enter:use"
     } else if exit_warning {
-        "Ctrl-C:QUIT NOW"
+        "Ctrl-C again to QUIT"
+    } else if state.is_generating {
+        "k:stop ^C:quit Tab:views"
     } else {
-        "^C:quit ^P:prompts ^G:git Tab:tabs"
+        "^C:quit ^P:prompts ^G:git ^A:artifacts Tab:views t/f/n:throttle"
     };
 
     // Cost indicator (only for paid models)
@@ -2071,9 +2133,19 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
         String::new()
     };
 
+    // Build generation status with model name
+    let gen_status = if state.is_generating {
+        let model_short = state.current_model.split('/').last().unwrap_or(&state.current_model);
+        let model_short = if model_short.len() > 20 { &model_short[..20] } else { model_short };
+        let elapsed = state.request_start.elapsed().as_secs();
+        format!("{} {}..{}s", spinner_char(state.tick), model_short, elapsed)
+    } else {
+        " ".to_string()
+    };
+
     let status = format!(
         " {} | {} {} | {}{} | {}",
-        if state.is_generating { spinner_char(state.tick) } else { ' ' },
+        gen_status,
         sparkline,
         pressure.symbol(),
         state.throttle.name(),
