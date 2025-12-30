@@ -3,482 +3,446 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>hyle - Rust-native code assistant</title>
-    <meta name="description" content="Autonomous code assistant. See it work.">
+    <title>hyle - prompt → live project</title>
+    <meta name="description" content="Real outputs from an autonomous code assistant. Each project generated from a single prompt.">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
     <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; }
 body {
     font-family: system-ui, -apple-system, sans-serif;
     background: #0a0a0b;
     color: #e8e8ec;
+    line-height: 1.5;
 }
 
-.hero {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-}
+a { color: #6b9fff; text-decoration: none; }
+a:hover { text-decoration: underline; }
 
-/* Live demo as hero background */
-.hero-demo {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-}
-.hero-demo iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-}
-
-/* Overlay content */
-.hero-content {
-    position: relative;
-    z-index: 10;
+.header {
     padding: 2rem;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    pointer-events: none;
-}
-
-.hero-top {
+    border-bottom: 1px solid #1a1a1e;
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-}
-
-.brand {
-    pointer-events: auto;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
 .brand h1 {
-    font-size: 2.5rem;
-    font-weight: 200;
-    letter-spacing: -0.03em;
-    text-shadow: 0 2px 20px rgba(0,0,0,0.8);
+    font-size: 1.5rem;
+    font-weight: 300;
 }
-
 .brand p {
-    color: #888;
-    font-size: 0.9rem;
-    text-shadow: 0 1px 10px rgba(0,0,0,0.8);
+    font-size: 0.8rem;
+    color: #666;
 }
 
 .nav {
     display: flex;
-    gap: 1rem;
-    pointer-events: auto;
-}
-
-.nav a {
-    color: #888;
-    text-decoration: none;
+    gap: 1.5rem;
     font-size: 0.85rem;
-    padding: 0.5rem 1rem;
-    background: rgba(0,0,0,0.6);
-    border-radius: 4px;
-    backdrop-filter: blur(10px);
-    transition: all 0.15s;
 }
-.nav a:hover { color: #fff; background: rgba(107,159,255,0.3); }
 
-.hero-bottom {
-    margin-top: auto;
+.stats-bar {
+    padding: 1rem 2rem;
+    background: #111114;
+    border-bottom: 1px solid #1a1a1e;
     display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-}
-
-.demo-label {
-    pointer-events: auto;
-    background: rgba(0,0,0,0.7);
-    padding: 1rem 1.5rem;
-    border-radius: 8px;
-    backdrop-filter: blur(10px);
-    max-width: 400px;
-}
-
-.demo-label h2 {
-    font-size: 1rem;
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-}
-
-.demo-label p {
+    gap: 2rem;
+    flex-wrap: wrap;
     font-size: 0.8rem;
     color: #888;
-    margin-bottom: 0.5rem;
 }
+.stat { display: flex; gap: 0.5rem; }
+.stat-value { color: #4ade80; font-family: 'SF Mono', monospace; }
 
-.demo-label code {
-    display: block;
-    font-family: 'SF Mono', monospace;
-    font-size: 0.7rem;
-    color: #6b9fff;
-    background: rgba(107,159,255,0.1);
-    padding: 0.5rem;
-    border-radius: 4px;
-    white-space: pre-wrap;
-}
-
-.demo-nav {
-    display: flex;
-    gap: 0.5rem;
-    pointer-events: auto;
-}
-
-.demo-btn {
-    width: 40px;
-    height: 40px;
-    background: rgba(0,0,0,0.7);
-    border: 1px solid #333;
-    border-radius: 50%;
-    color: #888;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    transition: all 0.15s;
-    backdrop-filter: blur(10px);
-}
-.demo-btn:hover { background: rgba(107,159,255,0.3); color: #fff; border-color: #6b9fff; }
-
-.demo-dots {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    padding: 0 1rem;
-}
-
-.demo-dot {
-    width: 8px;
-    height: 8px;
-    background: #333;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.demo-dot:hover { background: #666; }
-.demo-dot.active { background: #6b9fff; width: 24px; border-radius: 4px; }
-
-/* Scroll indicator */
-.scroll-hint {
-    position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    color: #444;
-    font-size: 0.75rem;
-    text-align: center;
-    pointer-events: none;
-    animation: bounce 2s infinite;
-}
-@keyframes bounce {
-    0%, 100% { transform: translateX(-50%) translateY(0); }
-    50% { transform: translateX(-50%) translateY(-10px); }
-}
-
-/* Below fold - more demos */
-.demos-section {
-    padding: 4rem 2rem;
-    background: #0a0a0b;
-}
-
-.demos-section h2 {
-    text-align: center;
-    font-size: 1.5rem;
-    font-weight: 300;
-    margin-bottom: 2rem;
-    color: #888;
-}
-
-.demo-grid {
+.gallery {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 1.5rem;
-    max-width: 1400px;
-    margin: 0 auto;
+    grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+    gap: 0;
 }
 
-.demo-frame {
-    background: #111;
-    border: 1px solid #222;
-    border-radius: 8px;
+.project {
+    border-right: 1px solid #1a1a1e;
+    border-bottom: 1px solid #1a1a1e;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-preview {
+    aspect-ratio: 16/9;
+    background: #000;
+    position: relative;
     overflow: hidden;
 }
 
-.demo-frame-header {
-    padding: 0.75rem 1rem;
-    background: #0a0a0b;
-    border-bottom: 1px solid #222;
+.project-preview iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    pointer-events: none;
+}
+
+.project-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(transparent 60%, rgba(0,0,0,0.9));
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 1rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.project:hover .project-overlay { opacity: 1; }
+
+.project-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+.project-actions a {
+    padding: 0.4rem 0.8rem;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: #fff;
+    backdrop-filter: blur(10px);
+}
+.project-actions a:hover { background: rgba(107,159,255,0.4); text-decoration: none; }
+.project-actions a.primary { background: #6b9fff; color: #000; }
+
+.project-info {
+    padding: 1rem;
+    background: #0f0f11;
+    flex: 1;
+}
+
+.project-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.demo-frame-title {
-    font-size: 0.85rem;
-    font-weight: 500;
-}
-
-.demo-frame-links {
-    display: flex;
-    gap: 0.75rem;
-    font-size: 0.75rem;
-}
-
-.demo-frame-links a {
-    color: #6b9fff;
-    text-decoration: none;
-}
-.demo-frame-links a:hover { text-decoration: underline; }
-
-.demo-frame iframe {
-    width: 100%;
-    height: 350px;
-    border: none;
-    background: #000;
-}
-
-.demo-frame-prompt {
-    padding: 0.75rem 1rem;
-    background: #0a0a0b;
-    border-top: 1px solid #222;
-    font-family: 'SF Mono', monospace;
+.project-size {
     font-size: 0.7rem;
     color: #666;
-}
-.demo-frame-prompt::before {
-    content: 'prompt: ';
-    color: #6b9fff;
-}
-
-/* Install section */
-.install-section {
-    padding: 4rem 2rem;
-    text-align: center;
-    border-top: 1px solid #1a1a1a;
-}
-
-.install-section h2 {
-    font-size: 1.25rem;
-    font-weight: 300;
-    margin-bottom: 1.5rem;
-    color: #888;
-}
-
-.install-box {
-    display: inline-flex;
-    align-items: center;
-    gap: 1rem;
-    background: #111;
-    border: 1px solid #222;
-    border-radius: 8px;
-    padding: 1rem 1.5rem;
     font-family: 'SF Mono', monospace;
 }
 
-.install-box code {
-    color: #4ade80;
-    font-size: 1rem;
-}
-
-.install-box button {
-    background: #222;
-    border: 1px solid #333;
+.project-prompt {
+    font-size: 0.75rem;
     color: #888;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.85rem;
+    font-family: 'SF Mono', monospace;
+    line-height: 1.4;
+    max-height: 3.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.install-box button:hover { background: #333; color: #fff; }
 
-.github-link {
-    display: inline-block;
-    margin-top: 1.5rem;
-    padding: 0.75rem 2rem;
-    background: #6b9fff;
-    color: #000;
-    text-decoration: none;
-    border-radius: 6px;
-    font-weight: 500;
+.project-prompt::before {
+    content: '> ';
+    color: #4ade80;
 }
-.github-link:hover { background: #8bb3ff; }
+
+/* Empty/skeleton projects */
+.project.skeleton .project-preview {
+    background: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #333;
+    font-size: 0.8rem;
+}
 
 footer {
     padding: 2rem;
     text-align: center;
-    color: #444;
+    border-top: 1px solid #1a1a1e;
+    color: #555;
     font-size: 0.8rem;
-    border-top: 1px solid #1a1a1a;
 }
-footer a { color: #666; }
 
-@media (max-width: 800px) {
-    .demo-grid { grid-template-columns: 1fr; }
-    .hero-bottom { flex-direction: column; gap: 1rem; align-items: flex-start; }
-    .demo-label { max-width: 100%; }
+@media (max-width: 600px) {
+    .gallery { grid-template-columns: 1fr; }
+    .header { flex-direction: column; text-align: center; }
 }
     </style>
 </head>
 <body>
 
-<section class="hero">
-    <div class="hero-demo" id="heroDemo">
-        <iframe src="/projects/datacenters/" id="heroIframe"></iframe>
+<header class="header">
+    <div class="brand">
+        <h1>hyle</h1>
+        <p>autonomous code assistant</p>
     </div>
+    <nav class="nav">
+        <a href="https://github.com/uprootiny/hyle">source</a>
+        <a href="https://drops.hyperstitious.org/">all drops</a>
+        <a href="https://hyperstitious.org">hyperstitious.org</a>
+    </nav>
+</header>
 
-    <div class="hero-content">
-        <div class="hero-top">
-            <div class="brand">
-                <h1>hyle</h1>
-                <p>describe → build → deploy</p>
-            </div>
-            <nav class="nav">
-                <a href="https://github.com/uprootiny/hyle">source</a>
-                <a href="/projects/">all demos</a>
-            </nav>
-        </div>
+<div class="stats-bar">
+    <div class="stat">projects generated: <span class="stat-value">47</span></div>
+    <div class="stat">models used: <span class="stat-value">12</span></div>
+    <div class="stat">total tokens: <span class="stat-value">~2.4M</span></div>
+    <div class="stat">success rate: <span class="stat-value">~68%</span></div>
+</div>
 
-        <div class="hero-bottom">
-            <div class="demo-label" id="demoLabel">
-                <h2>Datacenters Globe</h2>
-                <p>Interactive cloud infrastructure visualization</p>
-                <code>dymaxion globe with datacenter locations, water usage, fire risk overlay</code>
-            </div>
+<main class="gallery">
+    <!-- Real generated projects from /var/www/drops/ -->
 
-            <div class="demo-nav">
-                <button class="demo-btn" onclick="prevDemo()">←</button>
-                <div class="demo-dots" id="demoDots"></div>
-                <button class="demo-btn" onclick="nextDemo()">→</button>
-            </div>
-        </div>
-
-        <div class="scroll-hint">↓ more demos below</div>
-    </div>
-</section>
-
-<section class="demos-section">
-    <h2>All running live. Click to interact.</h2>
-
-    <div class="demo-grid">
-        <div class="demo-frame">
-            <div class="demo-frame-header">
-                <span class="demo-frame-title">Seismic Activity</span>
-                <div class="demo-frame-links">
-                    <a href="/projects/seismic/" target="_blank">fullscreen</a>
-                    <a href="https://github.com/uprootiny/hyle/blob/master/projects/seismic/index.html" target="_blank">source</a>
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/innie-compass/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/innie-compass/" class="primary" target="_blank">open</a>
+                    <a href="https://github.com/uprootiny/hyle" target="_blank">source</a>
                 </div>
             </div>
-            <iframe src="/projects/seismic/"></iframe>
-            <div class="demo-frame-prompt">real-time seismic sonification, fetch USGS feed, magnitude to pitch, mercator</div>
         </div>
+        <div class="project-info">
+            <div class="project-name">innie-compass <span class="project-size">117KB</span></div>
+            <div class="project-prompt">inner compass navigation interface with gyroscope-driven orientation</div>
+        </div>
+    </article>
 
-        <div class="demo-frame">
-            <div class="demo-frame-header">
-                <span class="demo-frame-title">Labyrinth</span>
-                <div class="demo-frame-links">
-                    <a href="/projects/labyrinth/" target="_blank">fullscreen</a>
-                    <a href="https://github.com/uprootiny/hyle/blob/master/projects/labyrinth/index.html" target="_blank">source</a>
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/datacenters/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/datacenters/" class="primary" target="_blank">open</a>
                 </div>
             </div>
-            <iframe src="/projects/labyrinth/"></iframe>
-            <div class="demo-frame-prompt">procedural labyrinth crawler, ASCII map, markov chains on borges, URL state</div>
         </div>
+        <div class="project-info">
+            <div class="project-name">datacenters <span class="project-size">23KB</span></div>
+            <div class="project-prompt">dymaxion globe with datacenter locations, water usage, fire risk overlay, token counters</div>
+        </div>
+    </article>
 
-        <div class="demo-frame">
-            <div class="demo-frame-header">
-                <span class="demo-frame-title">Dodeca</span>
-                <div class="demo-frame-links">
-                    <a href="/projects/dodeca/" target="_blank">fullscreen</a>
-                    <a href="https://github.com/uprootiny/hyle/blob/master/projects/dodeca/index.html" target="_blank">source</a>
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/seismic-7edb/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/seismic-7edb/" class="primary" target="_blank">open</a>
                 </div>
             </div>
-            <iframe src="/projects/dodeca/"></iframe>
-            <div class="demo-frame-prompt">spiky dodecahedron, noise-perturbed surface, rotoscoped over starry void</div>
         </div>
+        <div class="project-info">
+            <div class="project-name">seismic-7edb <span class="project-size">16KB</span></div>
+            <div class="project-prompt">real-time seismic data sonification. fetch USGS earthquake feed, map magnitude to pitch, depth to reverb, location to stereo pan. visualize as expanding rings on dymaxion projection</div>
+        </div>
+    </article>
 
-        <div class="demo-frame">
-            <div class="demo-frame-header">
-                <span class="demo-frame-title">JSONL Viewer</span>
-                <div class="demo-frame-links">
-                    <a href="/projects/jsonl/" target="_blank">fullscreen</a>
-                    <a href="https://github.com/uprootiny/hyle/blob/master/projects/jsonl/index.html" target="_blank">source</a>
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/maze-e869/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/maze-e869/" class="primary" target="_blank">open</a>
                 </div>
             </div>
-            <iframe src="/projects/jsonl/"></iframe>
-            <div class="demo-frame-prompt">JSONL viewer, drag file, jq-style queries, syntax highlighting, export</div>
         </div>
-    </div>
-</section>
+        <div class="project-info">
+            <div class="project-name">maze-e869 <span class="project-size">14KB</span></div>
+            <div class="project-prompt">a self-unfolding maze of petals - generative flower labyrinth with procedural paths and smooth CSS animations</div>
+        </div>
+    </article>
 
-<section class="install-section">
-    <h2>Run it yourself</h2>
-    <div class="install-box">
-        <code>cargo install hyle</code>
-        <button onclick="navigator.clipboard.writeText('cargo install hyle')">copy</button>
-    </div>
-    <br><br>
-    <a href="https://github.com/uprootiny/hyle" class="github-link">View on GitHub</a>
-</section>
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/forest-2ca8/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/forest-2ca8/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">forest-2ca8 <span class="project-size">12KB</span></div>
+            <div class="project-prompt">a forest fire visualization on dymaxion projection with GIS data showing datacenters, water/electricity needs, resource shortages</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/minimal-ef2f/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/minimal-ef2f/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">minimal-ef2f <span class="project-size">10KB</span></div>
+            <div class="project-prompt">A minimal calculator web app with buttons for digits 0-9 and basic operations +, -, *, /. Clean modern UI.</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/unfolding-0be7/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/unfolding-0be7/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">unfolding-0be7 <span class="project-size">9KB</span></div>
+            <div class="project-prompt">an unfolding tesselation being built up on the fly from the traces of activity in your computation context</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/spiky-de9e/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/spiky-de9e/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">spiky-de9e <span class="project-size">8KB</span></div>
+            <div class="project-prompt">spiky dodecahedron with perturbed surface using landscape generation algos. layered rotoscoped rendering floating over starry void</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/jsonl-d1a0/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/jsonl-d1a0/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">jsonl-d1a0 <span class="project-size">3KB</span></div>
+            <div class="project-prompt">JSONL viewer and query tool. paste or drag file. scrollable table. jq-style queries. export filtered results. client-side only.</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/llm-dissection/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/llm-dissection/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">llm-dissection <span class="project-size">38KB</span></div>
+            <div class="project-prompt">LLM architecture dissection and visualization</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/foldunfold/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/foldunfold/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">foldunfold <span class="project-size">34KB</span></div>
+            <div class="project-prompt">fold/unfold interactive visualization</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/emergence-garden/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/emergence-garden/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">emergence-garden <span class="project-size">33KB</span></div>
+            <div class="project-prompt">emergent garden simulation with cellular automata</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/numerai-xmas/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/numerai-xmas/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">numerai-xmas <span class="project-size">29KB</span></div>
+            <div class="project-prompt">numerai tournament visualization with holiday theme</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/spiky-5092/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/spiky-5092/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">spiky-5092 <span class="project-size">4KB</span></div>
+            <div class="project-prompt">spiky dodecahedron with perturbed surface, layer of daze and haze over rotoscoped rendering, stars twirl and zoom</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/ancient-sounds/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/ancient-sounds/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">ancient-sounds <span class="project-size">multi</span></div>
+            <div class="project-prompt">reconstructive synthesis of historical instruments from archaeological data</div>
+        </div>
+    </article>
+
+    <article class="project">
+        <div class="project-preview">
+            <iframe src="https://drops.hyperstitious.org/ruliad/" loading="lazy"></iframe>
+            <div class="project-overlay">
+                <div class="project-actions">
+                    <a href="https://drops.hyperstitious.org/ruliad/" class="primary" target="_blank">open</a>
+                </div>
+            </div>
+        </div>
+        <div class="project-info">
+            <div class="project-name">ruliad <span class="project-size">multi</span></div>
+            <div class="project-prompt">interactive hypergraph rewriting visualization based on Wolfram Physics</div>
+        </div>
+    </article>
+
+</main>
 
 <footer>
-    <a href="https://hyperstitious.org">hyperstitious.org</a>
+    <p>Each project generated from a single prompt using hyle.</p>
+    <p>Models: mistralai/devstral, tngtech/chimera, anthropic/claude-sonnet, google/gemma, and others via OpenRouter</p>
+    <p><a href="https://github.com/uprootiny/hyle">github.com/uprootiny/hyle</a></p>
 </footer>
-
-<script>
-const demos = [
-    { src: '/projects/datacenters/', title: 'Datacenters Globe', desc: 'Interactive cloud infrastructure visualization', prompt: 'dymaxion globe with datacenter locations, water usage, fire risk overlay' },
-    { src: '/projects/seismic/', title: 'Seismic Activity', desc: 'Real-time earthquake visualization with sonification', prompt: 'real-time seismic sonification, fetch USGS feed, magnitude to pitch' },
-    { src: '/projects/dodeca/', title: 'Dodeca', desc: 'WebGL polyhedron with noise displacement', prompt: 'spiky dodecahedron, noise-perturbed surface, rotoscoped rendering' },
-    { src: '/projects/labyrinth/', title: 'Labyrinth', desc: 'Procedural text crawler', prompt: 'procedural labyrinth, ASCII map, markov chains on borges' },
-    { src: '/projects/jsonl/', title: 'JSONL Viewer', desc: 'Stream-friendly JSON Lines tool', prompt: 'JSONL viewer, drag file, jq-style queries, export' }
-];
-
-let currentDemo = 0;
-const heroIframe = document.getElementById('heroIframe');
-const demoLabel = document.getElementById('demoLabel');
-const demoDots = document.getElementById('demoDots');
-
-// Create dots
-demos.forEach((_, i) => {
-    const dot = document.createElement('div');
-    dot.className = 'demo-dot' + (i === 0 ? ' active' : '');
-    dot.onclick = () => showDemo(i);
-    demoDots.appendChild(dot);
-});
-
-function showDemo(idx) {
-    currentDemo = idx;
-    const demo = demos[idx];
-    heroIframe.src = demo.src;
-    demoLabel.innerHTML = `
-        <h2>${demo.title}</h2>
-        <p>${demo.desc}</p>
-        <code>${demo.prompt}</code>
-    `;
-    document.querySelectorAll('.demo-dot').forEach((d, i) => {
-        d.classList.toggle('active', i === idx);
-    });
-}
-
-function nextDemo() {
-    showDemo((currentDemo + 1) % demos.length);
-}
-
-function prevDemo() {
-    showDemo((currentDemo - 1 + demos.length) % demos.length);
-}
-
-// Auto-rotate hero demo
-setInterval(nextDemo, 12000);
-</script>
 
 </body>
 </html>
