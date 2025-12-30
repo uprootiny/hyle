@@ -3,40 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>hyle projects</title>
+    <title>Projects - hyle.lol</title>
     <style>
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background: #111;
-            color: #e8e8e8;
-            padding: 2rem;
-            max-width: 65ch;
-            margin: 0 auto;
-            line-height: 1.6;
-        }
-        h1 { font-weight: 400; }
-        a { color: #6b9fff; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .empty {
-            color: #888;
-            padding: 2rem;
-            border: 1px dashed #333;
-            border-radius: 4px;
-            text-align: center;
-        }
+:root {
+    --bg: #0a0a0b;
+    --surface: #111114;
+    --border: #2a2a32;
+    --text: #e8e8ec;
+    --text-dim: #888890;
+    --text-muted: #555560;
+    --accent: #6b9fff;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+}
+
+h1 {
+    font-size: 2rem;
+    font-weight: 300;
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    color: var(--text-dim);
+    margin-bottom: 2.5rem;
+}
+
+.project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.project {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: border-color 0.15s, transform 0.15s;
+}
+
+.project:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+    text-decoration: none;
+}
+
+.project-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.project-name {
+    font-weight: 500;
+    color: var(--text);
+}
+
+.project-desc {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.project-tags {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tag {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    background: var(--bg);
+    border-radius: 4px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.tag.webgl { color: var(--accent); }
+.tag.data { color: #b56bff; }
+.tag.audio { color: #ff9f6b; }
+.tag.tool { color: #4ade80; }
+
+footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+@media (max-width: 640px) {
+    .project {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    footer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
     </style>
 </head>
 <body>
-    <h1>hyle projects</h1>
-    <p>Projects built from <a href="/">hyle.lol</a> sketches.</p>
+    <div class="container">
+        <h1>Projects</h1>
+        <p class="subtitle">Artpieces and tools built from <a href="/">hyle</a> sketches</p>
 
-    <div class="empty">
-        <p>No projects yet.</p>
-        <p><a href="/">Submit a sketch</a> to create one.</p>
+        <div class="project-list">
+            <a href="/projects/vitrine/" class="project">
+                <div class="project-info">
+                    <span class="project-name">Vitrine</span>
+                    <span class="project-desc">Curated showcase gallery of all artpieces</span>
+                </div>
+                <div class="project-tags">
+                    <span class="tag">gallery</span>
+                </div>
+            </a>
+
+            <a href="/projects/datacenters/" class="project">
+                <div class="project-info">
+                    <span class="project-name">Datacenters Globe</span>
+                    <span class="project-desc">Interactive visualization of global cloud infrastructure and environmental impact</span>
+                </div>
+                <div class="project-tags">
+                    <span class="tag webgl">WebGL</span>
+                    <span class="tag data">Data</span>
+                </div>
+            </a>
+
+            <a href="/projects/seismic/" class="project">
+                <div class="project-info">
+                    <span class="project-name">Seismic Activity</span>
+                    <span class="project-desc">Real-time earthquake visualization and sonification from USGS data</span>
+                </div>
+                <div class="project-tags">
+                    <span class="tag data">Data</span>
+                    <span class="tag audio">Audio</span>
+                </div>
+            </a>
+
+            <a href="/projects/labyrinth/" class="project">
+                <div class="project-info">
+                    <span class="project-name">Labyrinth</span>
+                    <span class="project-desc">Procedural text crawler with Borges-inspired Markov generation</span>
+                </div>
+                <div class="project-tags">
+                    <span class="tag">Generative</span>
+                </div>
+            </a>
+
+            <a href="/projects/dodeca/" class="project">
+                <div class="project-info">
+                    <span class="project-name">Dodeca</span>
+                    <span class="project-desc">Spiky dodecahedron with noise-perturbed surface and rotoscoped rendering</span>
+                </div>
+                <div class="project-tags">
+                    <span class="tag webgl">WebGL</span>
+                </div>
+            </a>
+
+            <a href="/projects/jsonl/" class="project">
+                <div class="project-info">
+                    <span class="project-name">JSONL Viewer</span>
+                    <span class="project-desc">Stream-friendly JSON Lines viewer with syntax highlighting and queries</span>
+                </div>
+                <div class="project-tags">
+                    <span class="tag tool">Tool</span>
+                </div>
+            </a>
+        </div>
+
+        <footer>
+            <span>Built with <a href="/">hyle</a></span>
+            <a href="/">Back to hyle.lol</a>
+        </footer>
     </div>
-
-    <p style="margin-top: 2rem; color: #888; font-size: 0.9rem;">
-        <a href="/">Back to hyle.lol</a>
-    </p>
 </body>
 </html>
