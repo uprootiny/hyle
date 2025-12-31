@@ -8,25 +8,35 @@
     <style>
 :root {
     --bg: #09090b;
-    --bg-card: #111113;
-    --border: #1a1a1e;
+    --bg-card: #0f0f11;
+    --bg-hover: #141418;
+    --border: #1c1c22;
+    --border-subtle: #18181c;
     --text: #e4e4e7;
     --text-dim: #71717a;
+    --text-muted: #52525b;
     --accent: #4ade80;
+    --accent-dim: rgba(74, 222, 128, 0.15);
     --blue: #60a5fa;
+    --blue-dim: rgba(96, 165, 250, 0.15);
     --purple: #a78bfa;
     --amber: #fbbf24;
     --red: #f87171;
+    --red-dim: rgba(248, 113, 113, 0.15);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+html { scroll-behavior: smooth; }
+
 body {
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background: var(--bg);
     color: var(--text);
-    line-height: 1.5;
+    line-height: 1.6;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .app {
@@ -60,28 +70,41 @@ header {
 }
 
 .brand .lambda {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
     color: var(--accent);
+    text-shadow: 0 0 20px var(--accent-dim);
+    transition: all 0.3s ease;
+}
+
+.brand:hover .lambda {
+    text-shadow: 0 0 30px rgba(74, 222, 128, 0.4);
+    transform: scale(1.05);
 }
 
 .brand h1 {
     font-size: 1.25rem;
-    font-weight: 400;
+    font-weight: 500;
+    letter-spacing: -0.02em;
 }
 
 nav {
     display: flex;
-    gap: 1.5rem;
+    gap: 1.25rem;
     font-size: 0.8rem;
 }
 
 nav a {
     color: var(--text-dim);
     text-decoration: none;
-    transition: color 0.15s;
+    padding: 0.35rem 0.6rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
 }
 
-nav a:hover { color: var(--text); }
+nav a:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+}
 
 /* Sketch Input */
 .sketch-form {
@@ -89,36 +112,46 @@ nav a:hover { color: var(--text); }
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 1.5rem;
+    transition: border-color 0.2s ease;
+}
+
+.sketch-form:focus-within {
+    border-color: var(--border);
+    box-shadow: 0 0 0 1px var(--accent-dim);
 }
 
 .sketch-form h2 {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 500;
     margin-bottom: 1rem;
     color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 .sketch-input {
     width: 100%;
-    min-height: 120px;
+    min-height: 130px;
     background: var(--bg);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
     padding: 1rem;
     color: var(--text);
-    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
     font-size: 0.85rem;
     resize: vertical;
-    transition: border-color 0.15s;
+    transition: all 0.2s ease;
 }
 
 .sketch-input:focus {
     outline: none;
     border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
 .sketch-input::placeholder {
-    color: #3f3f46;
+    color: var(--text-muted);
+    opacity: 0.6;
 }
 
 .form-actions {
@@ -138,23 +171,67 @@ nav a:hover { color: var(--text); }
     background: var(--accent);
     color: var(--bg);
     border: none;
-    padding: 0.6rem 1.25rem;
+    padding: 0.6rem 1.5rem;
     border-radius: 6px;
     font-size: 0.85rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.submit-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.4s ease;
 }
 
 .submit-btn:hover {
     background: #22c55e;
     transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--accent-dim);
+}
+
+.submit-btn:hover::before {
+    transform: translateX(100%);
+}
+
+.submit-btn:active {
+    transform: translateY(0);
 }
 
 .submit-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
     transform: none;
+    box-shadow: none;
+}
+
+.submit-btn.loading {
+    pointer-events: none;
+}
+
+.submit-btn.loading::after {
+    content: '';
+    width: 14px;
+    height: 14px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-left: 8px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.kbd-hint {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-left: 0.5rem;
 }
 
 /* Gallery */
@@ -163,37 +240,64 @@ nav a:hover { color: var(--text); }
 }
 
 .gallery h2 {
-    font-size: 0.8rem;
-    font-weight: 400;
+    font-size: 0.75rem;
+    font-weight: 500;
     color: var(--text-dim);
     margin-bottom: 1rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
 }
 
 .projects {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 1rem;
 }
 
 .project-card {
     background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
     overflow: hidden;
-    transition: border-color 0.15s, transform 0.15s;
+    transition: all 0.25s ease;
+    cursor: pointer;
 }
 
 .project-card:hover {
-    border-color: #27272a;
-    transform: translateY(-2px);
+    border-color: var(--border);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
 
 .project-thumb {
     aspect-ratio: 16/10;
     background: #000;
     overflow: hidden;
+    position: relative;
+}
+
+.project-thumb::after {
+    content: '↗';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--text);
+    opacity: 0;
+    transform: translate(4px, -4px);
+    transition: all 0.2s ease;
+}
+
+.project-card:hover .project-thumb::after {
+    opacity: 1;
+    transform: translate(0, 0);
 }
 
 .project-thumb iframe {
@@ -201,21 +305,24 @@ nav a:hover { color: var(--text); }
     height: 100%;
     border: none;
     pointer-events: none;
-    transform: scale(1.01);
+    transform: scale(1.02);
+    transition: transform 0.3s ease;
 }
 
 .project-card:hover .project-thumb iframe {
-    pointer-events: auto;
+    transform: scale(1.05);
 }
 
 .project-meta {
-    padding: 0.75rem;
+    padding: 0.85rem;
+    background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.1));
 }
 
 .project-name {
     font-size: 0.8rem;
-    font-weight: 500;
-    margin-bottom: 0.25rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    color: var(--text);
 }
 
 .project-desc {
@@ -225,6 +332,7 @@ nav a:hover { color: var(--text); }
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    line-height: 1.4;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -232,7 +340,7 @@ nav a:hover { color: var(--text); }
    ═══════════════════════════════════════════════════════════════ */
 
 .cascade-panel {
-    background: var(--bg-card);
+    background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg) 100%);
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -241,46 +349,68 @@ nav a:hover { color: var(--text); }
 
 .cascade-header {
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-subtle);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background: var(--bg-card);
 }
 
 .cascade-title {
     font-size: 0.85rem;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.6rem;
+    letter-spacing: -0.01em;
 }
 
 .cascade-status {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--text-dim);
-    transition: all 0.3s;
+    background: var(--text-muted);
+    transition: all 0.4s ease;
 }
 
-.cascade-status.idle { background: var(--text-dim); }
+.cascade-status.idle {
+    background: var(--text-muted);
+    animation: breathe 3s ease-in-out infinite;
+}
+
 .cascade-status.active {
     background: var(--blue);
-    box-shadow: 0 0 12px var(--blue);
-    animation: pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 16px var(--blue), 0 0 4px var(--blue);
+    animation: pulse 1.2s ease-in-out infinite;
 }
-.cascade-status.done { background: var(--accent); }
-.cascade-status.error { background: var(--red); }
+
+.cascade-status.done {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-dim);
+}
+
+.cascade-status.error {
+    background: var(--red);
+    box-shadow: 0 0 8px var(--red-dim);
+}
+
+@keyframes breathe {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.7; }
+}
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
 }
 
 .cascade-stats {
     font-size: 0.7rem;
     color: var(--text-dim);
-    font-family: monospace;
+    font-family: 'SF Mono', monospace;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg);
+    border-radius: 4px;
 }
 
 /* Progress bar */
@@ -308,57 +438,92 @@ nav a:hover { color: var(--text); }
 .cascade-stages {
     flex: 1;
     overflow-y: auto;
-    padding: 0.75rem;
+    padding: 1rem;
+    position: relative;
+}
+
+.cascade-stages::before {
+    content: '';
+    position: absolute;
+    left: 1.5rem;
+    top: 1rem;
+    bottom: 1rem;
+    width: 1px;
+    background: linear-gradient(to bottom, var(--border-subtle), transparent);
+    pointer-events: none;
 }
 
 .stage {
     display: flex;
     align-items: flex-start;
-    gap: 0.75rem;
-    padding: 0.6rem 0.5rem;
-    border-radius: 6px;
-    margin-bottom: 2px;
+    gap: 0.85rem;
+    padding: 0.75rem 0.5rem;
+    border-radius: 8px;
+    margin-bottom: 4px;
     background: transparent;
-    transition: background 0.15s;
+    transition: all 0.2s ease;
+    position: relative;
 }
 
-.stage:hover { background: rgba(255,255,255,0.02); }
+.stage:hover {
+    background: rgba(255,255,255,0.02);
+}
 
 .stage-icon {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+    background: var(--bg-card);
+    border-radius: 50%;
 }
 
-.stage-icon.pending { color: #3f3f46; }
+.stage-icon.pending {
+    color: var(--text-muted);
+}
+
 .stage-icon.running {
     color: var(--blue);
-    animation: spin 1s linear infinite;
+    animation: spin 0.8s linear infinite;
+    background: var(--blue-dim);
 }
-.stage-icon.done { color: var(--accent); }
-.stage-icon.error { color: var(--red); }
+
+.stage-icon.done {
+    color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.stage-icon.error {
+    color: var(--red);
+    background: var(--red-dim);
+}
 
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
 
-.stage-content { flex: 1; min-width: 0; }
+.stage-content {
+    flex: 1;
+    min-width: 0;
+}
 
 .stage-name {
     font-size: 0.8rem;
+    font-weight: 500;
     color: var(--text);
 }
 
 .stage-detail {
     font-size: 0.7rem;
     color: var(--text-dim);
-    margin-top: 2px;
-    font-family: monospace;
+    margin-top: 3px;
+    font-family: 'SF Mono', monospace;
 }
 
 .stage-detail .model { color: var(--purple); }
@@ -367,64 +532,153 @@ nav a:hover { color: var(--text); }
 
 .stage-time {
     font-size: 0.65rem;
-    color: #3f3f46;
+    color: var(--text-muted);
     min-width: 45px;
     text-align: right;
+    font-family: 'SF Mono', monospace;
 }
 
 /* Log stream */
 .cascade-log {
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--border-subtle);
     background: var(--bg);
-    max-height: 150px;
+    max-height: 160px;
     overflow-y: auto;
-    font-family: 'SF Mono', monospace;
+    font-family: 'SF Mono', 'JetBrains Mono', monospace;
     font-size: 0.65rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+.cascade-log::-webkit-scrollbar {
+    width: 4px;
+}
+
+.cascade-log::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
 }
 
 .log-entry {
-    padding: 0.3rem 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.02);
+    padding: 0.35rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.015);
     display: flex;
     gap: 0.75rem;
-    animation: fadeIn 0.2s ease-out;
+    animation: slideIn 0.25s ease-out;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; background: rgba(96, 165, 250, 0.1); }
-    to { opacity: 1; background: transparent; }
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-8px);
+        background: var(--blue-dim);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+        background: transparent;
+    }
 }
 
-.log-ts { color: #27272a; min-width: 60px; }
-.log-msg { color: var(--text-dim); }
-.log-msg.info { color: var(--text-dim); }
-.log-msg.model { color: var(--purple); }
-.log-msg.token { color: var(--accent); }
-.log-msg.check { color: #22c55e; }
-.log-msg.warn { color: var(--amber); }
-.log-msg.error { color: var(--red); }
+.log-ts {
+    color: var(--text-muted);
+    min-width: 60px;
+    opacity: 0.6;
+}
 
-/* Footer */
-.cascade-footer {
-    padding: 0.75rem 1rem;
-    border-top: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.7rem;
+.log-msg {
     color: var(--text-dim);
 }
 
+.log-msg.info { color: var(--text-dim); }
+.log-msg.model { color: var(--purple); }
+.log-msg.token { color: var(--accent); }
+.log-msg.check { color: var(--accent); font-weight: 500; }
+.log-msg.warn { color: var(--amber); }
+.log-msg.error { color: var(--red); font-weight: 500; }
+
+/* Footer */
+.cascade-footer {
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-family: 'SF Mono', monospace;
+    background: var(--bg-card);
+}
+
+.cascade-footer span {
+    padding: 0.2rem 0.4rem;
+    background: var(--bg);
+    border-radius: 3px;
+}
+
 /* Responsive */
-@media (max-width: 900px) {
+@media (max-width: 960px) {
     .app {
         grid-template-columns: 1fr;
         grid-template-rows: 1fr auto;
     }
+
+    .main {
+        padding: 1.5rem;
+    }
+
     .cascade-panel {
         border-left: none;
         border-top: 1px solid var(--border);
-        max-height: 40vh;
+        max-height: 45vh;
     }
+
+    nav {
+        gap: 0.5rem;
+    }
+
+    nav a {
+        padding: 0.25rem 0.4rem;
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .main {
+        padding: 1rem;
+        gap: 1.5rem;
+    }
+
+    header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .projects {
+        grid-template-columns: 1fr;
+    }
+
+    .cascade-stages::before {
+        left: 1.25rem;
+    }
+}
+
+/* Focus visible */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+button:focus-visible,
+textarea:focus-visible {
+    outline: none;
+}
+
+/* Selection */
+::selection {
+    background: var(--accent-dim);
+    color: var(--text);
 }
     </style>
 </head>
@@ -534,11 +788,33 @@ const modelName = $('modelName');
 let building = false;
 let startTime = 0;
 let pollInterval = null;
-let timerInterval = null;
+let rafId = null;
 
-// Update char count
+// Update char count with debounce
+let charDebounce = null;
 sketchInput.addEventListener('input', () => {
-    charCount.textContent = sketchInput.value.length;
+    clearTimeout(charDebounce);
+    charDebounce = setTimeout(() => {
+        charCount.textContent = sketchInput.value.length;
+    }, 16);
+});
+
+// Keyboard shortcut: Cmd/Ctrl+Enter to submit
+sketchInput.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        submitBtn.click();
+    }
+});
+
+// Project card click handlers
+document.querySelectorAll('.project-card').forEach(card => {
+    card.addEventListener('click', () => {
+        const iframe = card.querySelector('iframe');
+        if (iframe) {
+            window.open(iframe.src, '_blank');
+        }
+    });
 });
 
 // Submit handler
@@ -548,6 +824,7 @@ submitBtn.addEventListener('click', async () => {
 
     building = true;
     submitBtn.disabled = true;
+    submitBtn.classList.add('loading');
     startBuild(sketch);
 });
 
@@ -591,12 +868,15 @@ function setStage(name, status, detail = '', time = '') {
     if (time) timeEl.textContent = time;
 }
 
-function setProgress(pct) {
-    progressBar.style.width = `${pct}%`;
-}
-
 function setCascadeState(state) {
     cascadeStatus.className = `cascade-status ${state}`;
+}
+
+function updateTimer() {
+    if (!building) return;
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    elapsedTime.textContent = `${elapsed}s`;
+    rafId = requestAnimationFrame(updateTimer);
 }
 
 async function startBuild(sketch) {
@@ -609,11 +889,8 @@ async function startBuild(sketch) {
     modelName.textContent = '—';
     startTime = Date.now();
 
-    // Start timer
-    timerInterval = setInterval(() => {
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        elapsedTime.textContent = `${elapsed}s`;
-    }, 100);
+    // Start smooth timer
+    rafId = requestAnimationFrame(updateTimer);
 
     log('submitting sketch...', 'info');
     setStage('submit', 'running', 'sending to API');
@@ -723,13 +1000,32 @@ async function pollJob(jobId) {
 
 function endBuild() {
     clearInterval(pollInterval);
-    clearInterval(timerInterval);
+    cancelAnimationFrame(rafId);
     building = false;
     submitBtn.disabled = false;
+    submitBtn.classList.remove('loading');
+}
+
+// Smooth progress interpolation
+let currentProgress = 0;
+function setProgress(target) {
+    const animate = () => {
+        const diff = target - currentProgress;
+        if (Math.abs(diff) < 0.5) {
+            currentProgress = target;
+            progressBar.style.width = `${target}%`;
+            return;
+        }
+        currentProgress += diff * 0.15;
+        progressBar.style.width = `${currentProgress}%`;
+        requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
 }
 
 // Initial log
 log('cascade ready', 'info');
+setCascadeState('idle');
 </script>
 
 </body>
