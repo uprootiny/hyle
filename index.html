@@ -948,25 +948,64 @@ async function startBuild(sketch) {
     }
 }
 
+const POLL_TIMEOUT_MS = 120000; // 2 minutes max
+const POLL_INTERVAL_MS = 2000;
+
 async function pollJob(jobId) {
     let lastStatus = '';
     let modelsTried = 0;
+    let pollCount = 0;
+    let errorCount = 0;
+    const maxErrors = 5;
 
     pollInterval = setInterval(async () => {
+        pollCount++;
+        const elapsed = Date.now() - startTime;
+
+        // Timeout check
+        if (elapsed > POLL_TIMEOUT_MS) {
+            log('timeout: build took too long', 'error');
+            setStage('generate', 'error', 'timeout after 2 minutes');
+            setCascadeState('error');
+            cascadeStats.textContent = 'timeout';
+            endBuild();
+            return;
+        }
+
+        // Show progress heartbeat every 10s
+        if (pollCount % 5 === 0 && lastStatus === 'building') {
+            log(`still generating... (${Math.floor(elapsed/1000)}s)`, 'info');
+        }
+
         try {
             const res = await fetch(`${API}/api/jobs/${jobId}`);
-            if (!res.ok) throw new Error('Job not found');
-
             const data = await res.json();
 
+            // Handle not_found (job expired or never existed)
+            if (data.status === 'not_found') {
+                errorCount++;
+                if (errorCount >= maxErrors) {
+                    log('job lost: server may have restarted', 'error');
+                    setStage('generate', 'error', 'job not found');
+                    setCascadeState('error');
+                    cascadeStats.textContent = 'lost';
+                    endBuild();
+                }
+                return;
+            }
+
+            errorCount = 0; // Reset on successful response
+
             // Update models tried
-            if (data.models_tried.length > modelsTried) {
+            if (data.models_tried && data.models_tried.length > modelsTried) {
                 const newModels = data.models_tried.slice(modelsTried);
                 newModels.forEach(m => {
-                    log(`trying: ${m.split('/').pop().split(':')[0]}`, 'model');
+                    const name = m.split('/').pop().split(':')[0];
+                    log(`trying: ${name}`, 'model');
                 });
                 modelsTried = data.models_tried.length;
-                modelName.textContent = data.models_tried[data.models_tried.length - 1]?.split('/').pop().split(':')[0] || '—';
+                const currentModel = data.models_tried[data.models_tried.length - 1];
+                modelName.textContent = currentModel?.split('/').pop().split(':')[0] || '—';
             }
 
             // Update stages based on status
@@ -985,17 +1024,19 @@ async function pollJob(jobId) {
                         setStage('generate', 'running', `<span class="model">${modelName.textContent}</span>`);
                         setProgress(40);
                         cascadeStats.textContent = `${modelsTried} model(s)`;
+                        log('LLM generating...', 'info');
                         break;
 
                     case 'deploying':
-                        setStage('generate', 'done', `<span class="tokens">${modelsTried} attempts</span>`, '✓');
+                        setStage('generate', 'done', `<span class="tokens">${modelsTried} attempt(s)</span>`, '✓');
                         setStage('deploy', 'running', 'copying files');
                         setProgress(80);
-                        cascadeStats.textContent = 'deploying...';
+                        cascadeStats.textContent = 'deploying';
+                        log('deploying to server...', 'info');
                         break;
 
                     case 'live':
-                        setStage('deploy', 'done', `<span class="file">${data.url}</span>`, '✓');
+                        setStage('deploy', 'done', `<span class="file">${data.url || 'deployed'}</span>`, '✓');
                         setProgress(100);
                         setCascadeState('done');
                         cascadeStats.textContent = 'complete';
@@ -1007,19 +1048,28 @@ async function pollJob(jobId) {
                         break;
 
                     case 'failed':
-                        setStage('generate', 'error', data.error || 'unknown error');
+                        const errMsg = data.error || 'unknown error';
+                        setStage('generate', 'error', errMsg);
                         setCascadeState('error');
                         cascadeStats.textContent = 'failed';
-                        log(`failed: ${data.error}`, 'error');
+                        log(`failed: ${errMsg}`, 'error');
                         endBuild();
                         break;
                 }
             }
 
         } catch (err) {
-            log(`poll error: ${err.message}`, 'warn');
+            errorCount++;
+            log(`network error (${errorCount}/${maxErrors})`, 'warn');
+            if (errorCount >= maxErrors) {
+                log('too many errors, stopping', 'error');
+                setStage('generate', 'error', 'network failure');
+                setCascadeState('error');
+                cascadeStats.textContent = 'error';
+                endBuild();
+            }
         }
-    }, 2000);
+    }, POLL_INTERVAL_MS);
 }
 
 function endBuild() {
