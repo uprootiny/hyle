@@ -502,7 +502,6 @@ nav a:hover {
 
 .stage-icon.running {
     color: var(--blue);
-    animation: spin 0.8s linear infinite;
     background: var(--blue-dim);
 }
 
@@ -516,9 +515,36 @@ nav a:hover {
     background: var(--red-dim);
 }
 
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+/* Stage animations */
+.stage {
+    max-height: 80px;
+    opacity: 1;
+    transition: all 0.3s ease;
+}
+
+.stage.folded {
+    max-height: 0;
+    opacity: 0;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+}
+
+.stage.expanded {
+    animation: unfold 0.3s ease-out;
+}
+
+@keyframes unfold {
+    from {
+        max-height: 0;
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        max-height: 80px;
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .stage-content {
@@ -542,6 +568,20 @@ nav a:hover {
 .stage-detail .model { color: var(--purple); }
 .stage-detail .tokens { color: var(--accent); }
 .stage-detail .file { color: var(--amber); }
+
+.stage-detail a,
+.log-msg a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+.stage-detail a:hover,
+.log-msg a:hover {
+    text-decoration-style: solid;
+    opacity: 0.9;
+}
 
 .stage-time {
     font-size: 0.65rem;
@@ -852,14 +892,34 @@ submitBtn.addEventListener('click', async () => {
     startBuild(sketch);
 });
 
+// Braille spinners from cascade.rs
+const SPINNERS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+let spinnerIdx = 0;
+let spinnerInterval = null;
+
+// Log prefixes matching cascade.rs
+const LOG_PREFIX = {
+    info: '·',
+    model: '⚡',
+    token: '↳',
+    check: '✓',
+    warn: '⚠',
+    error: '✗'
+};
+
 function ts() {
     return new Date().toLocaleTimeString('en-US', { hour12: false });
 }
 
+function linkify(text) {
+    return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+}
+
 function log(msg, type = 'info') {
+    const prefix = LOG_PREFIX[type] || '·';
     const entry = document.createElement('div');
     entry.className = 'log-entry';
-    entry.innerHTML = `<span class="log-ts">${ts()}</span><span class="log-msg ${type}">${msg}</span>`;
+    entry.innerHTML = `<span class="log-ts">${ts()}</span><span class="log-msg ${type}">${prefix} ${linkify(msg)}</span>`;
     logStream.appendChild(entry);
     logStream.scrollTop = logStream.scrollHeight;
     while (logStream.children.length > 50) logStream.firstChild.remove();
@@ -867,9 +927,11 @@ function log(msg, type = 'info') {
 
 function setStage(name, status, detail = '', time = '') {
     let stage = stageList.querySelector(`[data-stage="${name}"]`);
-    if (!stage) {
+    const isNew = !stage;
+
+    if (isNew) {
         stage = document.createElement('div');
-        stage.className = 'stage';
+        stage.className = 'stage expanded';
         stage.dataset.stage = name;
         stage.innerHTML = `
             <span class="stage-icon pending">○</span>
@@ -887,8 +949,24 @@ function setStage(name, status, detail = '', time = '') {
     const timeEl = stage.querySelector('.stage-time');
 
     icon.className = `stage-icon ${status}`;
-    icon.textContent = status === 'running' ? '◌' : status === 'done' ? '✓' : status === 'error' ? '✗' : '○';
-    if (detail) detailEl.innerHTML = detail;
+
+    // Use braille spinner for running, static icons for others
+    if (status === 'running') {
+        // Start spinner if not already running
+        if (!spinnerInterval) {
+            spinnerInterval = setInterval(() => {
+                spinnerIdx = (spinnerIdx + 1) % SPINNERS.length;
+                document.querySelectorAll('.stage-icon.running').forEach(el => {
+                    el.textContent = SPINNERS[spinnerIdx];
+                });
+            }, 80);
+        }
+        icon.textContent = SPINNERS[spinnerIdx];
+    } else {
+        icon.textContent = status === 'done' ? '✓' : status === 'error' ? '✗' : '○';
+    }
+
+    if (detail) detailEl.innerHTML = linkify(detail);
     if (time) timeEl.textContent = time;
 }
 
@@ -1036,11 +1114,12 @@ async function pollJob(jobId) {
                         break;
 
                     case 'live':
-                        setStage('deploy', 'done', `<span class="file">${data.url || 'deployed'}</span>`, '✓');
+                        const url = data.url || 'deployed';
+                        setStage('deploy', 'done', `<span class="file"><a href="${url}" target="_blank">${url}</a></span>`, '✓');
                         setProgress(100);
                         setCascadeState('done');
                         cascadeStats.textContent = 'complete';
-                        log(`live: ${data.url}`, 'check');
+                        log(`live: ${url}`, 'check');
                         if (data.model_used) {
                             modelName.textContent = data.model_used.split('/').pop().split(':')[0];
                         }
@@ -1074,6 +1153,8 @@ async function pollJob(jobId) {
 
 function endBuild() {
     clearInterval(pollInterval);
+    clearInterval(spinnerInterval);
+    spinnerInterval = null;
     cancelAnimationFrame(rafId);
     building = false;
     submitBtn.disabled = false;
