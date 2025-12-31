@@ -154,6 +154,19 @@ nav a:hover {
     opacity: 0.6;
 }
 
+.sketch-input.shake {
+    animation: shake 0.4s ease;
+    border-color: var(--amber);
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+}
+
 .form-actions {
     display: flex;
     justify-content: space-between;
@@ -818,9 +831,20 @@ document.querySelectorAll('.project-card').forEach(card => {
 });
 
 // Submit handler
+const MIN_CHARS = 10;
+
 submitBtn.addEventListener('click', async () => {
     const sketch = sketchInput.value.trim();
-    if (sketch.length < 20 || building) return;
+
+    if (building) return;
+
+    if (sketch.length < MIN_CHARS) {
+        sketchInput.classList.add('shake');
+        log(`need at least ${MIN_CHARS} characters (have ${sketch.length})`, 'warn');
+        setTimeout(() => sketchInput.classList.remove('shake'), 500);
+        sketchInput.focus();
+        return;
+    }
 
     building = true;
     submitBtn.disabled = true;
