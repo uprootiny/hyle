@@ -1114,15 +1114,21 @@ async function pollJob(jobId) {
                         break;
 
                     case 'live':
-                        const url = data.url || 'deployed';
-                        setStage('deploy', 'done', `<span class="file"><a href="${url}" target="_blank">${url}</a></span>`, '✓');
+                        const liveUrl = data.url || 'deployed';
+                        setStage('deploy', 'done', `<span class="file"><a href="${liveUrl}" target="_blank">${liveUrl}</a></span>`, '✓');
                         setProgress(100);
                         setCascadeState('done');
                         cascadeStats.textContent = 'complete';
-                        log(`live: ${url}`, 'check');
+                        log(`live: ${liveUrl}`, 'check');
                         if (data.model_used) {
                             modelName.textContent = data.model_used.split('/').pop().split(':')[0];
                         }
+                        // Add to gallery
+                        addProjectToGallery({
+                            url: liveUrl,
+                            name: null, // Will extract from URL
+                            desc: sketchInput.value.trim().slice(0, 80) + (sketchInput.value.length > 80 ? '...' : '')
+                        });
                         endBuild();
                         break;
 
@@ -1178,9 +1184,77 @@ function setProgress(target) {
     requestAnimationFrame(animate);
 }
 
+// Gallery management
+const projectGrid = $('projectGrid');
+const STORAGE_KEY = 'hyle_recent_projects';
+
+function loadRecentProjects() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            const projects = JSON.parse(saved);
+            projects.forEach(p => addProjectToGallery(p, false));
+        }
+    } catch (e) {
+        console.warn('Failed to load projects:', e);
+    }
+}
+
+function saveRecentProjects() {
+    try {
+        const cards = projectGrid.querySelectorAll('.project-card.user-created');
+        const projects = Array.from(cards).map(card => ({
+            url: card.dataset.url,
+            name: card.querySelector('.project-name').textContent,
+            desc: card.querySelector('.project-desc').textContent
+        }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(projects.slice(0, 10)));
+    } catch (e) {
+        console.warn('Failed to save projects:', e);
+    }
+}
+
+function addProjectToGallery(project, save = true) {
+    const { url, name, desc } = project;
+    if (!url) return;
+
+    // Extract name from URL if not provided
+    const displayName = name || url.replace(/https?:\/\//, '').replace('.hyperstitious.org', '').replace(/\/$/, '');
+    const displayDesc = desc || 'Generated artpiece';
+
+    const card = document.createElement('article');
+    card.className = 'project-card user-created';
+    card.dataset.url = url;
+    card.innerHTML = `
+        <div class="project-thumb">
+            <iframe src="${url}" loading="lazy"></iframe>
+        </div>
+        <div class="project-meta">
+            <div class="project-name">${displayName}</div>
+            <div class="project-desc">${displayDesc}</div>
+        </div>
+    `;
+    card.addEventListener('click', () => window.open(url, '_blank'));
+
+    // Insert at the beginning
+    projectGrid.insertBefore(card, projectGrid.firstChild);
+
+    // Animate in
+    card.style.opacity = '0';
+    card.style.transform = 'scale(0.9)';
+    requestAnimationFrame(() => {
+        card.style.transition = 'all 0.3s ease';
+        card.style.opacity = '1';
+        card.style.transform = 'scale(1)';
+    });
+
+    if (save) saveRecentProjects();
+}
+
 // Initial log
 log('cascade ready', 'info');
 setCascadeState('idle');
+loadRecentProjects();
 </script>
 
 </body>
