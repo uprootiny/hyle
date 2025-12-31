@@ -1,5 +1,200 @@
 # hyle Development Journal
 
+## 2025-12-31: hyle.lol Reactive Cascade UI
+
+### Problem
+The hyle.lol landing page had several UX issues:
+- Submit button did nothing with short prompts (silent failure)
+- No feedback during long builds (some models take 2+ minutes)
+- Jobs could get "lost" with no indication
+- URLs weren't clickable
+- Completed projects didn't appear in gallery
+- Basic spinner instead of the fancy cascade visualization from CLI
+
+### Solution
+Complete overhaul of the frontend with reactive cascade display mirroring `src/cascade.rs`.
+
+#### Braille Spinners
+Replaced CSS rotation with the same braille animation from the CLI:
+```javascript
+const SPINNERS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+// Cycles at 80ms intervals for smooth animation
+```
+
+#### Log Prefixes
+Matching the Rust `LogLevel` enum:
+```javascript
+const LOG_PREFIX = {
+    info: '·',    // General info
+    model: '⚡',   // Model selection
+    token: '↳',   // Token activity
+    check: '✓',   // Success
+    warn: '⚠',    // Warning
+    error: '✗'    // Error
+};
+```
+
+#### Robust Polling
+```javascript
+const POLL_TIMEOUT_MS = 120000;  // 2 minute max
+const maxErrors = 5;             // Consecutive errors before abort
+
+// Heartbeat every 10s during generation
+if (pollCount % 5 === 0 && lastStatus === 'building') {
+    log(`still generating... (${elapsed}s)`, 'info');
+}
+
+// Handle job expiration
+if (data.status === 'not_found') {
+    errorCount++;
+    if (errorCount >= maxErrors) {
+        log('job lost: server may have restarted', 'error');
+        endBuild();
+    }
+}
+```
+
+#### Dynamic Gallery
+Completed projects now appear at the top of the gallery:
+```javascript
+function addProjectToGallery({ url, name, desc }) {
+    const card = document.createElement('article');
+    card.className = 'project-card user-created';
+    // ... create card HTML
+    projectGrid.insertBefore(card, projectGrid.firstChild);
+    // Animate in with scale effect
+    saveRecentProjects(); // Persist to localStorage
+}
+```
+
+#### Clickable URLs
+```javascript
+function linkify(text) {
+    return text.replace(
+        /(https?:\/\/[^\s]+)/g,
+        '<a href="$1" target="_blank">$1</a>'
+    );
+}
+```
+
+### Visual Polish
+- Refined color palette with `--accent-dim`, `--blue-dim` for glows
+- Stage unfold animation when new stages appear
+- Smooth progress bar interpolation using `requestAnimationFrame`
+- Shake animation on validation failure
+- Loading spinner on submit button
+- Breathing animation on idle status indicator
+
+### UX Improvements
+- Minimum 10 characters (down from 20) with clear feedback
+- Keyboard shortcut: `Cmd/Ctrl+Enter` to submit
+- Project cards clickable to open in new tab
+- localStorage persistence for recent projects (max 10)
+
+### Model Performance Observed
+From testing, model response times varied significantly:
+- `mistral-small-3.1-24b-instruct`: ~10s (fastest)
+- `deepseek-r1-0528`: ~60s
+- `gemma-3-27b-it`: ~156s (slowest)
+
+The 2-minute timeout accommodates slow models while preventing infinite hangs.
+
+### Git Commits
+- `24d6e27`: ui: reactive cascade status display on landing page
+- `866dff8`: ui: polish and tune reactive landing page
+- `b3d794e`: fix: add validation feedback when sketch too short
+- `18ad4be`: fix: improve cascade feedback and error handling
+- `1cc302f`: ui: braille spinners, clickable URLs, cascade polish
+- `a5bce60`: feat: dynamic gallery with completed projects
+
+---
+
+## 2025-12-31: LLM Failure Taxonomy and Tiered Recovery
+
+### Problem
+When dispatching tasks to LLMs in agentic loops, failures were handled ad-hoc:
+- Rate limits (429) just triggered immediate retry
+- No structured classification of error types
+- No exponential backoff
+- No circuit breaker pattern
+- Model fallback was primitive
+
+### Solution
+Created `src/failures.rs` with comprehensive failure taxonomy and recovery strategies.
+
+#### Failure Categories
+```
+Transient       → Network blip, 503, timeout     → Immediate retry (3x)
+RateLimit       → 429, quota exhausted           → Exponential backoff
+ModelSpecific   → Overload, unavailable          → Fallback to different model
+ContentRelated  → Context too long, policy       → Truncate/rephrase
+Fatal           → Auth failed, API key invalid   → Circuit break, abort
+```
+
+#### Recovery Strategy Tiers
+1. **Tier 1 (Transient)**: Immediate retry up to 3 times
+2. **Tier 2 (Rate Limit)**: Exponential backoff with jitter (1s→2s→4s→...→60s max)
+3. **Tier 3 (Model)**: Fallback to next model in rotation
+4. **Tier 4 (Content)**: Adjust prompt (truncate, summarize, rephrase)
+5. **Tier 5 (Fatal)**: Circuit break, stop retrying
+
+#### Key Types
+```rust
+enum LlmFailure {
+    NetworkError(String), Timeout, ServiceUnavailable,
+    RateLimited { retry_after_ms: Option<u64> }, QuotaExhausted,
+    ModelOverloaded(String), ContextTooLong { limit, actual },
+    ContentPolicyViolation(String), MalformedResponse, ParseError,
+    AuthenticationFailed, InvalidApiKey, AccountSuspended, ...
+}
+
+enum RecoveryOutcome {
+    Retry { delay, attempt, max_attempts },
+    Fallback { model, reason },
+    Adjust { action: TruncateContext | SummarizeContext | ... },
+    Abort { reason, is_permanent },
+}
+```
+
+### Bug Fixes
+
+#### 1. dispatch_hyle Missing --task Flag
+`src/orchestrator.rs:700` was passing prompt as positional arg instead of using `--task`:
+```rust
+// Before (broken)
+.arg(prompt)
+.arg("--trust")
+
+// After (fixed)
+.arg("--task")
+.arg(prompt)
+.arg("--trust")
+```
+
+#### 2. Job Cleanup Memory Leak
+Added background cleanup task to `src/api/main.rs` that removes completed/failed jobs older than 1 hour. Prevents unbounded HashMap growth.
+
+#### 3. parse_test_output False Positive
+`src/backburner.rs:98` was matching "test result: FAILED..." as a failed test name because it starts with "test " and contains "FAILED". Fixed by excluding lines starting with "test result:".
+
+### Files Changed
+- `src/failures.rs` (NEW): 700+ lines, 24 tests
+- `src/main.rs`: Added `mod failures;`
+- `src/api/main.rs`: Job cleanup task, path validation
+- `src/orchestrator.rs`: Fixed --task flag order
+- `src/backburner.rs`: Fixed parse_test_output bug
+- `OBLIGATIONS.md` (NEW): Technical debt ledger
+
+### Test Results
+All 319 tests pass:
+- 24 new failure taxonomy tests
+- 19 backburner tests (including fixed parse_test_output)
+- 64 cascade tests
+- 7 hyle-api tests
+- 12 user story tests
+
+---
+
 ## 2025-12-30: Internet Artpiece Philosophy
 
 ### Insight
