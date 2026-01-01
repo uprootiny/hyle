@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Labyrinth — hyle</title>
-    <meta name="description" content="Procedural text crawler with ASCII dungeons and Borges-inspired room descriptions">
+    <meta name="description" content="Descent through mystical strata - Tractatus, I Ching, Hermetic, Borges, Zen">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,11 +20,19 @@
             --accent: #10b981;
             --accent-bright: #34d399;
             --border: #1a1a20;
-            --blue: #3b82f6;
-            --orange: #f97316;
+            --item: #3b82f6;
+            --stairs: #eab308;
             --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
         }
+
+        /* Level themes */
+        .level-0 { --accent: #e0e0e0; --accent-bright: #ffffff; --bg-surface: #0a0a0a; } /* Tractatus: stark */
+        .level-1 { --accent: #dc2626; --accent-bright: #fbbf24; --bg-surface: #1a0a0a; } /* Hexagrams: red/gold */
+        .level-2 { --accent: #10b981; --accent-bright: #34d399; --bg-surface: #0a1a0a; } /* Hermetic: green */
+        .level-3 { --accent: #3b82f6; --accent-bright: #60a5fa; --bg-surface: #0a0a1a; } /* Library: blue */
+        .level-4 { --accent: #8b5cf6; --accent-bright: #a78bfa; --bg-surface: #0f0a1a; } /* Koans: purple */
+        .level-5 { --accent: #1a1a1a; --accent-bright: #333333; --bg-surface: #000000; } /* Void */
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -35,9 +43,9 @@
             font-size: 14px;
             line-height: 1.6;
             min-height: 100vh;
+            transition: background 0.5s;
         }
 
-        /* Nav */
         nav {
             padding: 1rem 1.5rem;
             display: flex;
@@ -60,7 +68,7 @@
             font-weight: 600;
         }
 
-        .brand .lambda { color: var(--accent); font-size: 1.25rem; }
+        .brand .lambda { color: var(--accent); font-size: 1.25rem; transition: color 0.3s; }
         .brand:hover .lambda { color: var(--accent-bright); }
 
         .back-link {
@@ -78,6 +86,31 @@
             padding: 2rem 1.5rem;
         }
 
+        #level-indicator {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-elevated);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        #level-name {
+            font-weight: 600;
+            color: var(--accent);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        #depth {
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
         #map {
             background: var(--bg-elevated);
             padding: 1.5rem;
@@ -89,6 +122,7 @@
             line-height: 1.3;
             margin-bottom: 1.5rem;
             overflow-x: auto;
+            transition: border-color 0.3s;
         }
 
         #description {
@@ -100,17 +134,29 @@
             min-height: 100px;
             font-size: 0.95rem;
             color: var(--text-secondary);
-            line-height: 1.7;
+            line-height: 1.8;
+            font-style: italic;
+            transition: border-color 0.3s, background 0.3s;
+        }
+
+        #status {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
         }
 
         #inventory {
             color: var(--text-muted);
-            font-size: 0.85rem;
-            margin-bottom: 1.5rem;
             font-family: var(--font-mono);
         }
 
         #inventory span { color: var(--accent); }
+
+        #hint {
+            color: var(--text-muted);
+            font-style: italic;
+        }
 
         #controls {
             display: flex;
@@ -146,13 +192,25 @@
             background: var(--bg-elevated);
         }
 
+        button.descend {
+            background: var(--accent);
+            color: var(--bg);
+            border-color: var(--accent);
+        }
+
+        button.descend:hover {
+            background: var(--accent-bright);
+            border-color: var(--accent-bright);
+        }
+
         .player { color: var(--accent-bright); }
         .wall { color: var(--text-muted); }
-        .door { color: var(--orange); }
-        .item { color: var(--blue); }
+        .item { color: var(--item); }
+        .stairs { color: var(--stairs); }
+        .key-item { color: var(--accent); }
     </style>
 </head>
-<body>
+<body class="level-0">
     <nav>
         <a href="/" class="brand">
             <span class="lambda">λ</span>
@@ -161,244 +219,514 @@
         <a href="/projects/" class="back-link">← Projects</a>
     </nav>
     <div id="game">
+        <div id="level-indicator">
+            <span id="level-name">I. Tractatus</span>
+            <span id="depth">depth 0</span>
+        </div>
         <div id="map"></div>
         <div id="description"></div>
-        <div id="inventory">inventory: <span id="inv">empty</span></div>
+        <div id="status">
+            <div id="inventory">carrying: <span id="inv">nothing</span></div>
+            <div id="hint"></div>
+        </div>
         <div id="controls">
             <button onclick="move('n')" id="btn-n">↑ north</button>
             <button onclick="move('s')" id="btn-s">↓ south</button>
             <button onclick="move('w')" id="btn-w">← west</button>
             <button onclick="move('e')" id="btn-e">→ east</button>
             <button onclick="take()">take</button>
-            <button onclick="look()">look</button>
+            <button onclick="descend()" id="btn-descend" class="descend" style="display:none">▼ descend</button>
         </div>
     </div>
 
     <script>
-        // Markov chain text generator (simplified Borges-style)
-        const corpus = [
-            "The library is unlimited and cyclical",
-            "In the vast library there are no two identical books",
-            "The universe which others call the Library",
-            "Mirrors and fatherhood are abominable",
-            "The labyrinth of symbols",
-            "Infinite corridors of hexagonal galleries",
-            "Books of apologies and prophecies",
-            "The faithless say that nonsense is normal in the Library",
-            "Perhaps my old age and fearfulness deceive me",
-            "I have wandered in search of a book",
-            "The certainty that everything has been written",
-            "A lamp illuminated the stairway",
-            "The spiral staircase sinks and soars",
-            "Every hexagon has twenty shelves",
-            "The Library exists ab aeterno",
-            "Blasphemous rumor spoke of the Man of the Book",
-            "In some shelf in some hexagon there exists a book",
-            "The universe suddenly usurped the unlimited dimensions of hope",
-            "There are official searchers, inquisitors",
-            "I know of districts where the young prostrate themselves before books"
-        ];
+    // ═══════════════════════════════════════════════════════════════
+    // REALMS - Each level has its own corpus, items, and theme
+    // ═══════════════════════════════════════════════════════════════
 
-        function buildMarkov(texts) {
-            const chain = {};
-            for (const text of texts) {
-                const words = text.toLowerCase().split(/\s+/);
-                for (let i = 0; i < words.length - 1; i++) {
-                    if (!chain[words[i]]) chain[words[i]] = [];
-                    chain[words[i]].push(words[i + 1]);
-                }
+    const REALMS = [
+        {
+            name: "I. Tractatus",
+            subtitle: "The limits of my language mean the limits of my world",
+            keyItem: "ladder",
+            items: ["picture", "fact", "proposition", "silence"],
+            corpus: [
+                "The world is all that is the case",
+                "The world is the totality of facts not of things",
+                "What is the case a fact is the existence of states of affairs",
+                "A state of affairs is a combination of objects",
+                "It is essential to things that they should be possible constituents of states of affairs",
+                "If I know an object I also know all its possible occurrences in states of affairs",
+                "Objects are simple",
+                "Objects make up the substance of the world",
+                "Space time and colour are forms of objects",
+                "A picture is a fact",
+                "A picture is a model of reality",
+                "A logical picture of facts is a thought",
+                "A thought is a proposition with a sense",
+                "In a proposition a thought finds an expression that can be perceived by the senses",
+                "We use the perceptible sign of a proposition as a projection of a possible situation",
+                "A proposition is a truth-function of elementary propositions",
+                "What can be shown cannot be said",
+                "Whereof one cannot speak thereof one must be silent",
+                "The solution of the problem of life is seen in the vanishing of the problem",
+                "There are indeed things that cannot be put into words"
+            ]
+        },
+        {
+            name: "II. Hexagrams",
+            subtitle: "The Changes have no consciousness, no action; still and unmoving",
+            keyItem: "yarrow",
+            items: ["coins", "tortoise", "dragon", "receptive"],
+            corpus: [
+                "The Creative works sublime success furthering through perseverance",
+                "The Receptive brings about sublime success furthering through the perseverance of a mare",
+                "Difficulty at the Beginning works supreme success furthering through perseverance",
+                "Thunder and rain fill the air with turbulent movement",
+                "Clouds and thunder signify Difficulty at the Beginning",
+                "Youthful Folly has success I do not seek the young fool the young fool seeks me",
+                "A spring wells up at the foot of the mountain the image of youth",
+                "Waiting with sincerity brings light and success perseverance brings good fortune",
+                "Clouds rise up to heaven the image of Waiting",
+                "Conflict you are sincere and are being obstructed",
+                "Heaven and water go their opposite ways the image of Conflict",
+                "The Army needs perseverance and a strong man good fortune without blame",
+                "In the middle of the earth is water the image of the Army",
+                "Holding Together brings good fortune inquire of the oracle once again",
+                "On the earth is water the image of Holding Together",
+                "The Taming Power of the Small has success dense clouds no rain from our western region",
+                "The wind drives across heaven the image of the Taming Power of the Small",
+                "Treading upon the tail of the tiger it does not bite the man success"
+            ]
+        },
+        {
+            name: "III. Hermetic",
+            subtitle: "As above, so below; as within, so without",
+            keyItem: "philosopher-stone",
+            items: ["mercury", "sulfur", "salt", "vessel"],
+            corpus: [
+                "True without falsehood certain and most true",
+                "What is above is like what is below and what is below is like what is above",
+                "To accomplish the miracle of the One Thing",
+                "As all things were from One by the mediation of One so all things arose from this One Thing by adaptation",
+                "The Sun is its father the Moon its mother",
+                "The Wind carried it in its belly the Earth is its nurse",
+                "The father of all perfection in the whole world is here",
+                "Its power is complete if it be turned into earth",
+                "Separate the earth from the fire the subtle from the gross",
+                "Gently and with great ingenuity it ascends from earth to heaven",
+                "Again it descends to earth and receives the power of the superiors and inferiors",
+                "Thus you will have the glory of the whole world",
+                "All obscurity will flee from you",
+                "This is the strong force of all forces overcoming every subtle thing and penetrating every solid",
+                "Thus the world was created",
+                "From this are wonderful adaptations of which this is the manner",
+                "Therefore I am called Hermes Trismegistus having three parts of the wisdom of the whole world",
+                "What I have to say about the operation of Sol is completed"
+            ]
+        },
+        {
+            name: "IV. Library",
+            subtitle: "The universe (which others call the Library)",
+            keyItem: "crimson-hexagon",
+            items: ["book", "mirror", "lamp", "compass"],
+            corpus: [
+                "The library is unlimited and cyclical",
+                "In the vast library there are no two identical books",
+                "The universe which others call the Library",
+                "Mirrors and fatherhood are abominable",
+                "The labyrinth of symbols",
+                "Infinite corridors of hexagonal galleries",
+                "Books of apologies and prophecies",
+                "The faithless say that nonsense is normal in the Library",
+                "Perhaps my old age and fearfulness deceive me",
+                "I have wandered in search of a book",
+                "The certainty that everything has been written negates us",
+                "A lamp illuminated the stairway endlessly",
+                "The spiral staircase sinks and soars into the remote distance",
+                "Every hexagon has twenty shelves five long shelves on each side",
+                "The Library exists ab aeterno",
+                "Blasphemous rumor spoke of the Man of the Book",
+                "In some shelf in some hexagon there exists a book which is the formula of all the others",
+                "The universe suddenly usurped the unlimited dimensions of hope",
+                "There are official searchers inquisitors",
+                "I know of districts where the young prostrate themselves before books"
+            ]
+        },
+        {
+            name: "V. Koans",
+            subtitle: "What is the sound of one hand clapping?",
+            keyItem: "mu",
+            items: ["bowl", "staff", "bell"],
+            corpus: [
+                "A monk asked Zhaozhou does a dog have Buddha nature",
+                "Zhaozhou answered Mu",
+                "What is the sound of one hand clapping",
+                "Before your parents were born what was your original face",
+                "If you meet the Buddha on the road kill him",
+                "The cypress tree in the garden",
+                "Sitting quietly doing nothing spring comes and the grass grows by itself",
+                "When you can do nothing what can you do",
+                "The wild geese do not intend to cast their reflection",
+                "The water has no mind to receive their image",
+                "Not thinking of good not thinking of evil what is your original face",
+                "All beings are Buddha",
+                "If all beings are Buddha why do we not see it",
+                "Because we are looking for it",
+                "The finger pointing at the moon is not the moon",
+                "To study the self is to forget the self",
+                "To forget the self is to be enlightened by all things",
+                "When you realize the truth the truth has already left no trace"
+            ]
+        },
+        {
+            name: "VI. Dissolve",
+            subtitle: "...",
+            keyItem: null,
+            items: [],
+            corpus: [
+                "",
+                "  ",
+                "   ",
+                "    ",
+                "     ",
+                ".",
+                "..",
+                "...",
+                " . ",
+                "  .  ",
+                "   .   "
+            ]
+        }
+    ];
+
+    // ═══════════════════════════════════════════════════════════════
+    // STATE
+    // ═══════════════════════════════════════════════════════════════
+
+    let level = 0;
+    let maze = [];
+    let player = { x: 1, y: 1 };
+    let items = [];
+    let inventory = [];
+    let rooms = {};
+    let stairsPos = null;
+    let markov = {};
+
+    const BASE_SIZE = 15;
+
+    function getSize() {
+        return BASE_SIZE + level * 4; // Mazes get larger as you descend
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MARKOV CHAIN
+    // ═══════════════════════════════════════════════════════════════
+
+    function buildMarkov(texts) {
+        const chain = {};
+        for (const text of texts) {
+            const words = text.toLowerCase().split(/\s+/).filter(w => w);
+            for (let i = 0; i < words.length - 1; i++) {
+                if (!chain[words[i]]) chain[words[i]] = [];
+                chain[words[i]].push(words[i + 1]);
             }
-            return chain;
+        }
+        return chain;
+    }
+
+    function generate(chain, length = 20) {
+        const keys = Object.keys(chain);
+        if (keys.length === 0) return "...";
+
+        let word = keys[Math.floor(Math.random() * keys.length)];
+        let result = [word];
+
+        for (let i = 0; i < length; i++) {
+            const next = chain[word];
+            if (!next || next.length === 0) {
+                word = keys[Math.floor(Math.random() * keys.length)];
+            } else {
+                word = next[Math.floor(Math.random() * next.length)];
+            }
+            result.push(word);
         }
 
-        function generate(chain, length = 20) {
-            const keys = Object.keys(chain);
-            let word = keys[Math.floor(Math.random() * keys.length)];
-            let result = [word];
-            for (let i = 0; i < length; i++) {
-                const next = chain[word];
-                if (!next || next.length === 0) {
-                    word = keys[Math.floor(Math.random() * keys.length)];
-                } else {
-                    word = next[Math.floor(Math.random() * next.length)];
+        // Capitalize first letter
+        result[0] = result[0].charAt(0).toUpperCase() + result[0].slice(1);
+        return result.join(' ') + '.';
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MAZE GENERATION
+    // ═══════════════════════════════════════════════════════════════
+
+    function initLevel() {
+        const realm = REALMS[level];
+        const W = getSize();
+        const H = getSize();
+
+        // Update theme
+        document.body.className = `level-${level}`;
+        document.getElementById('level-name').textContent = realm.name;
+        document.getElementById('depth').textContent = `depth ${level}`;
+
+        // Build markov chain for this level
+        markov = buildMarkov(realm.corpus);
+
+        // Generate maze
+        maze = Array(H).fill(null).map(() => Array(W).fill('#'));
+
+        function carve(x, y) {
+            maze[y][x] = '.';
+            const dirs = [[0,-2], [0,2], [-2,0], [2,0]].sort(() => Math.random() - 0.5);
+            for (const [dx, dy] of dirs) {
+                const nx = x + dx, ny = y + dy;
+                if (nx > 0 && nx < W-1 && ny > 0 && ny < H-1 && maze[ny][nx] === '#') {
+                    maze[y + dy/2][x + dx/2] = '.';
+                    carve(nx, ny);
                 }
-                result.push(word);
             }
-            return result.join(' ') + '.';
         }
 
-        const markov = buildMarkov(corpus);
+        carve(1, 1);
 
-        // Maze generation (recursive backtracking)
-        const W = 21, H = 21;
-        let maze = [];
-        let player = { x: 1, y: 1 };
-        let items = [];
-        let inventory = [];
-        let rooms = {};
-        let moves = 0;
+        // Place items
+        items = [];
+        const allItems = [...realm.items];
+        if (realm.keyItem) allItems.push(realm.keyItem);
 
-        function initMaze() {
-            maze = Array(H).fill(null).map(() => Array(W).fill('#'));
+        for (const itemName of allItems) {
+            let x, y, attempts = 0;
+            do {
+                x = Math.floor(Math.random() * (W-2)) + 1;
+                y = Math.floor(Math.random() * (H-2)) + 1;
+                attempts++;
+            } while ((maze[y][x] !== '.' || (x === 1 && y === 1)) && attempts < 100);
 
-            function carve(x, y) {
-                maze[y][x] = '.';
-                const dirs = [[0,-2], [0,2], [-2,0], [2,0]].sort(() => Math.random() - 0.5);
-                for (const [dx, dy] of dirs) {
-                    const nx = x + dx, ny = y + dy;
-                    if (nx > 0 && nx < W-1 && ny > 0 && ny < H-1 && maze[ny][nx] === '#') {
-                        maze[y + dy/2][x + dx/2] = '.';
-                        carve(nx, ny);
-                    }
-                }
+            if (maze[y][x] === '.') {
+                items.push({ x, y, name: itemName, isKey: itemName === realm.keyItem });
             }
+        }
 
-            carve(1, 1);
-
-            // Add items
-            items = [];
-            const itemNames = ['key', 'lamp', 'book', 'compass', 'scroll', 'mirror'];
-            for (let i = 0; i < 5; i++) {
-                let x, y;
-                do {
-                    x = Math.floor(Math.random() * (W-2)) + 1;
-                    y = Math.floor(Math.random() * (H-2)) + 1;
-                } while (maze[y][x] !== '.' || (x === 1 && y === 1));
-                items.push({ x, y, name: itemNames[i % itemNames.length] });
-            }
-
-            // Generate room descriptions
-            rooms = {};
+        // Place stairs (far from start)
+        if (level < REALMS.length - 1) {
+            let bestDist = 0;
+            stairsPos = null;
             for (let y = 1; y < H-1; y++) {
                 for (let x = 1; x < W-1; x++) {
                     if (maze[y][x] === '.') {
-                        rooms[`${x},${y}`] = generate(markov, 15 + Math.floor(Math.random() * 10));
+                        const dist = Math.abs(x - 1) + Math.abs(y - 1);
+                        if (dist > bestDist) {
+                            bestDist = dist;
+                            stairsPos = { x, y };
+                        }
                     }
                 }
             }
+        } else {
+            stairsPos = null;
+        }
 
-            player = { x: 1, y: 1 };
-            inventory = [];
-            moves = 0;
+        // Generate room descriptions
+        rooms = {};
+        for (let y = 1; y < H-1; y++) {
+            for (let x = 1; x < W-1; x++) {
+                if (maze[y][x] === '.') {
+                    rooms[`${x},${y}`] = generate(markov, 12 + Math.floor(Math.random() * 8));
+                }
+            }
+        }
+
+        player = { x: 1, y: 1 };
+        saveState();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // RENDERING
+    // ═══════════════════════════════════════════════════════════════
+
+    function render() {
+        const realm = REALMS[level];
+        const W = getSize();
+        const H = getSize();
+        const hasKey = inventory.includes(realm.keyItem);
+
+        let out = '';
+        for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+                if (x === player.x && y === player.y) {
+                    out += '<span class="player">@</span>';
+                } else if (stairsPos && x === stairsPos.x && y === stairsPos.y && hasKey) {
+                    out += '<span class="stairs">▼</span>';
+                } else if (items.some(i => i.x === x && i.y === y && i.isKey)) {
+                    out += '<span class="key-item">◆</span>';
+                } else if (items.some(i => i.x === x && i.y === y)) {
+                    out += '<span class="item">*</span>';
+                } else if (maze[y] && maze[y][x] === '#') {
+                    out += '<span class="wall">█</span>';
+                } else {
+                    out += ' ';
+                }
+            }
+            out += '\n';
+        }
+        document.getElementById('map').innerHTML = out;
+
+        // Description
+        const roomKey = `${player.x},${player.y}`;
+        let desc = rooms[roomKey] || '...';
+
+        const here = items.filter(i => i.x === player.x && i.y === player.y);
+        if (here.length) {
+            desc += `\n\nYou see: ${here.map(i => i.isKey ? `◆ ${i.name}` : i.name).join(', ')}`;
+        }
+
+        if (stairsPos && player.x === stairsPos.x && player.y === stairsPos.y) {
+            if (hasKey) {
+                desc += '\n\nStairs descend into darkness.';
+            } else {
+                desc += `\n\nThere is a sealed passage here. It requires the ${realm.keyItem}.`;
+            }
+        }
+
+        document.getElementById('description').textContent = desc;
+        document.getElementById('inv').textContent = inventory.length ? inventory.join(', ') : 'nothing';
+
+        // Hint
+        const hint = document.getElementById('hint');
+        if (!hasKey && realm.keyItem) {
+            hint.textContent = `seek the ${realm.keyItem}`;
+        } else if (hasKey && stairsPos) {
+            hint.textContent = 'find the stairs ▼';
+        } else if (level === REALMS.length - 1) {
+            hint.textContent = 'there is nothing more';
+        } else {
+            hint.textContent = '';
+        }
+
+        // Buttons
+        document.getElementById('btn-n').disabled = !canMove(0, -1);
+        document.getElementById('btn-s').disabled = !canMove(0, 1);
+        document.getElementById('btn-w').disabled = !canMove(-1, 0);
+        document.getElementById('btn-e').disabled = !canMove(1, 0);
+
+        const btnDescend = document.getElementById('btn-descend');
+        const canDescend = stairsPos && player.x === stairsPos.x && player.y === stairsPos.y && hasKey;
+        btnDescend.style.display = canDescend ? 'inline-block' : 'none';
+    }
+
+    function canMove(dx, dy) {
+        const W = getSize();
+        const H = getSize();
+        const nx = player.x + dx, ny = player.y + dy;
+        return nx >= 0 && nx < W && ny >= 0 && ny < H && maze[ny] && maze[ny][nx] !== '#';
+    }
+
+    function move(dir) {
+        const dirs = { n: [0,-1], s: [0,1], w: [-1,0], e: [1,0] };
+        const [dx, dy] = dirs[dir];
+        if (canMove(dx, dy)) {
+            player.x += dx;
+            player.y += dy;
             saveState();
-        }
-
-        function render() {
-            let out = '';
-            for (let y = 0; y < H; y++) {
-                for (let x = 0; x < W; x++) {
-                    if (x === player.x && y === player.y) {
-                        out += '<span class="player">@</span>';
-                    } else if (items.some(i => i.x === x && i.y === y)) {
-                        out += '<span class="item">*</span>';
-                    } else if (maze[y][x] === '#') {
-                        out += '<span class="wall">█</span>';
-                    } else {
-                        out += ' ';
-                    }
-                }
-                out += '\n';
-            }
-            document.getElementById('map').innerHTML = out;
-
-            const roomKey = `${player.x},${player.y}`;
-            let desc = rooms[roomKey] || 'An empty passage.';
-
-            const here = items.filter(i => i.x === player.x && i.y === player.y);
-            if (here.length) {
-                desc += `\n\nYou see: ${here.map(i => i.name).join(', ')}`;
-            }
-
-            document.getElementById('description').textContent = desc;
-            document.getElementById('inv').textContent = inventory.length ? inventory.join(', ') : 'empty';
-
-            // Update button states
-            document.getElementById('btn-n').disabled = !canMove(0, -1);
-            document.getElementById('btn-s').disabled = !canMove(0, 1);
-            document.getElementById('btn-w').disabled = !canMove(-1, 0);
-            document.getElementById('btn-e').disabled = !canMove(1, 0);
-        }
-
-        function canMove(dx, dy) {
-            const nx = player.x + dx, ny = player.y + dy;
-            return nx >= 0 && nx < W && ny >= 0 && ny < H && maze[ny][nx] !== '#';
-        }
-
-        function move(dir) {
-            const dirs = { n: [0,-1], s: [0,1], w: [-1,0], e: [1,0] };
-            const [dx, dy] = dirs[dir];
-            if (canMove(dx, dy)) {
-                player.x += dx;
-                player.y += dy;
-                moves++;
-                saveState();
-                render();
-            }
-        }
-
-        function take() {
-            const idx = items.findIndex(i => i.x === player.x && i.y === player.y);
-            if (idx >= 0) {
-                inventory.push(items[idx].name);
-                items.splice(idx, 1);
-                saveState();
-                render();
-            }
-        }
-
-        function look() {
-            const roomKey = `${player.x},${player.y}`;
-            rooms[roomKey] = generate(markov, 15 + Math.floor(Math.random() * 10));
             render();
         }
+    }
 
-        // State serialization to URL hash
-        function saveState() {
-            const state = {
-                p: [player.x, player.y],
-                i: inventory,
-                it: items.map(i => [i.x, i.y, i.name]),
-                m: moves
-            };
-            const encoded = btoa(JSON.stringify(state));
+    function take() {
+        const idx = items.findIndex(i => i.x === player.x && i.y === player.y);
+        if (idx >= 0) {
+            inventory.push(items[idx].name);
+            items.splice(idx, 1);
+            saveState();
+            render();
+        }
+    }
+
+    function descend() {
+        const realm = REALMS[level];
+        if (stairsPos && player.x === stairsPos.x && player.y === stairsPos.y && inventory.includes(realm.keyItem)) {
+            level++;
+            inventory = []; // Drop all items between levels
+            initLevel();
+            render();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // STATE PERSISTENCE
+    // ═══════════════════════════════════════════════════════════════
+
+    function saveState() {
+        const state = {
+            l: level,
+            p: [player.x, player.y],
+            i: inventory,
+            it: items.map(i => [i.x, i.y, i.name, i.isKey]),
+            s: stairsPos,
+            m: maze,
+            r: rooms
+        };
+        try {
+            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
             history.replaceState(null, '', '#' + encoded);
+        } catch (e) {
+            // State too large, skip
         }
+    }
 
-        function loadState() {
-            if (window.location.hash.length > 1) {
-                try {
-                    const state = JSON.parse(atob(window.location.hash.slice(1)));
-                    player = { x: state.p[0], y: state.p[1] };
-                    inventory = state.i || [];
-                    items = (state.it || []).map(([x, y, name]) => ({ x, y, name }));
-                    moves = state.m || 0;
-                    return true;
-                } catch (e) {
-                    return false;
-                }
+    function loadState() {
+        if (window.location.hash.length > 1) {
+            try {
+                const state = JSON.parse(decodeURIComponent(escape(atob(window.location.hash.slice(1)))));
+                level = state.l || 0;
+                player = { x: state.p[0], y: state.p[1] };
+                inventory = state.i || [];
+                items = (state.it || []).map(([x, y, name, isKey]) => ({ x, y, name, isKey }));
+                stairsPos = state.s;
+                maze = state.m;
+                rooms = state.r || {};
+                markov = buildMarkov(REALMS[level].corpus);
+                document.body.className = `level-${level}`;
+                document.getElementById('level-name').textContent = REALMS[level].name;
+                document.getElementById('depth').textContent = `depth ${level}`;
+                return true;
+            } catch (e) {
+                return false;
             }
-            return false;
         }
+        return false;
+    }
 
-        // Keyboard controls
-        document.addEventListener('keydown', (e) => {
-            const map = { ArrowUp: 'n', ArrowDown: 's', ArrowLeft: 'w', ArrowRight: 'e', w: 'n', s: 's', a: 'w', d: 'e' };
-            if (map[e.key]) {
-                e.preventDefault();
-                move(map[e.key]);
-            }
-            if (e.key === ' ' || e.key === 'Enter') {
-                e.preventDefault();
-                take();
-            }
-        });
+    // ═══════════════════════════════════════════════════════════════
+    // KEYBOARD CONTROLS
+    // ═══════════════════════════════════════════════════════════════
 
-        // Initialize
-        initMaze();
-        if (!loadState()) {
-            // Fresh start
+    document.addEventListener('keydown', (e) => {
+        const map = { ArrowUp: 'n', ArrowDown: 's', ArrowLeft: 'w', ArrowRight: 'e', w: 'n', s: 's', a: 'w', d: 'e' };
+        if (map[e.key]) {
+            e.preventDefault();
+            move(map[e.key]);
         }
-        render();
+        if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            take();
+        }
+        if (e.key === '>' || e.key === '.') {
+            e.preventDefault();
+            descend();
+        }
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // INITIALIZE
+    // ═══════════════════════════════════════════════════════════════
+
+    if (!loadState()) {
+        initLevel();
+    }
+    render();
     </script>
 </body>
 </html>
