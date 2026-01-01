@@ -34,7 +34,6 @@
             overflow: hidden;
         }
 
-        /* Nav */
         nav {
             position: fixed;
             top: 0;
@@ -69,7 +68,7 @@
 
         .back-link:hover { color: var(--accent); }
 
-        #map { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+        #globe { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
 
         #ui {
             position: fixed;
@@ -181,7 +180,7 @@
         </a>
         <a href="/projects/" class="back-link">← Projects</a>
     </nav>
-    <canvas id="map"></canvas>
+    <canvas id="globe"></canvas>
     <div id="ui">
         <div id="info">
             data: <a href="https://earthquake.usgs.gov">USGS</a>
@@ -200,60 +199,115 @@
     </div>
 
     <script>
-        const canvas = document.getElementById('map');
+        const canvas = document.getElementById('globe');
         const ctx = canvas.getContext('2d');
+
+        let width, height, centerX, centerY, scale;
+        let rotation = 0;
         let earthquakes = [];
         let rings = [];
         let soundEnabled = false;
         let audioCtx = null;
 
+        // Continent outlines (high resolution)
+        const continents = [
+            // North America
+            [[72,-170],[70,-168],[68,-166],[65,-168],[62,-166],[60,-163],[58,-158],[56,-154],[58,-150],[60,-146],[62,-142],[60,-138],[57,-135],[54,-132],[51,-130],[48,-128],[45,-125],[42,-124],[39,-124],[37,-123],[35,-121],[33,-118],[31,-117],[29,-114],[28,-111],[26,-109],[25,-106],[26,-102],[28,-98],[29,-95],[30,-92],[29,-89],[27,-85],[26,-82],[25,-80],[27,-80],[29,-81],[31,-83],[33,-85],[35,-87],[37,-88],[39,-87],[41,-84],[43,-81],[45,-77],[47,-73],[49,-68],[51,-64],[53,-60],[55,-58],[57,-56],[60,-58],[62,-62],[64,-66],[66,-68],[68,-70],[70,-73],[71,-78],[72,-85],[73,-92],[74,-100],[75,-110],[76,-120],[76,-132],[75,-145],[73,-155],[71,-165],[72,-170]],
+            // Central America
+            [[22,-105],[20,-105],[18,-103],[17,-101],[16,-98],[15,-95],[14,-92],[13,-88],[12,-85],[11,-83],[9,-82],[8,-80],[9,-78],[10,-76],[11,-75],[12,-74],[13,-72],[14,-70],[15,-72],[16,-75],[17,-78],[18,-82],[19,-85],[20,-88],[21,-92],[22,-97],[22,-102],[22,-105]],
+            // South America
+            [[12,-72],[10,-74],[8,-77],[6,-78],[4,-78],[2,-79],[0,-80],[-2,-80],[-5,-81],[-8,-79],[-10,-77],[-13,-76],[-16,-74],[-18,-72],[-20,-70],[-22,-68],[-25,-66],[-28,-65],[-31,-64],[-34,-63],[-37,-62],[-40,-63],[-43,-65],[-46,-67],[-49,-69],[-52,-70],[-54,-68],[-56,-66],[-55,-63],[-53,-60],[-50,-56],[-47,-53],[-44,-50],[-41,-47],[-38,-45],[-35,-43],[-32,-41],[-29,-39],[-26,-38],[-23,-38],[-20,-40],[-17,-41],[-14,-39],[-11,-37],[-8,-36],[-5,-36],[-2,-38],[1,-42],[4,-47],[6,-52],[8,-58],[10,-64],[11,-68],[12,-72]],
+            // Europe
+            [[71,28],[70,32],[68,28],[66,24],[64,21],[62,16],[60,10],[59,5],[58,0],[56,-3],[54,-6],[52,-8],[50,-9],[48,-7],[46,-4],[44,-1],[42,2],[40,-2],[38,-4],[36,-6],[35,-3],[36,0],[38,3],[40,5],[42,8],[44,10],[46,12],[48,14],[50,16],[52,18],[54,20],[56,22],[58,24],[60,26],[62,28],[64,30],[66,32],[68,30],[70,28],[71,28]],
+            // British Isles
+            [[59,-6],[58,-4],[57,-2],[56,0],[55,-1],[54,-3],[53,-5],[52,-6],[51,-8],[50,-6],[51,-4],[52,-2],[53,0],[54,1],[55,-1],[56,-3],[57,-5],[58,-5],[59,-6]],
+            // Africa
+            [[37,-10],[36,-6],[35,-2],[34,2],[33,6],[33,10],[34,15],[35,20],[36,25],[35,30],[33,32],[30,34],[27,35],[24,37],[21,38],[18,40],[15,42],[12,44],[9,45],[6,46],[3,45],[0,43],[-3,40],[-6,38],[-9,36],[-12,34],[-15,32],[-18,30],[-21,28],[-24,25],[-27,22],[-30,18],[-33,16],[-35,18],[-34,20],[-32,22],[-30,25],[-28,28],[-25,30],[-22,32],[-19,33],[-16,32],[-13,30],[-10,26],[-7,22],[-4,18],[-1,14],[2,10],[5,6],[8,2],[11,-2],[14,-6],[17,-10],[20,-14],[23,-16],[26,-14],[29,-12],[32,-10],[35,-9],[37,-10]],
+            // Madagascar
+            [[-12,49],[-14,50],[-17,50],[-20,48],[-23,47],[-25,45],[-24,43],[-22,44],[-19,45],[-16,47],[-13,48],[-12,49]],
+            // Asia
+            [[77,100],[76,110],[74,120],[71,130],[68,138],[65,142],[62,145],[59,148],[56,152],[53,158],[50,160],[47,155],[44,150],[41,145],[38,140],[35,136],[32,130],[29,122],[26,115],[23,108],[20,102],[17,98],[14,94],[11,96],[8,100],[6,102],[8,106],[11,110],[14,114],[17,116],[20,118],[17,120],[14,118],[11,115],[8,112],[5,108],[2,104],[-1,100],[-4,96],[0,90],[4,85],[8,80],[12,76],[16,73],[20,70],[24,68],[28,66],[32,62],[36,58],[40,54],[44,50],[48,46],[52,42],[56,38],[60,36],[64,38],[68,42],[71,50],[73,60],[75,72],[77,85],[78,95],[77,100]],
+            // India
+            [[35,75],[32,78],[28,82],[24,88],[20,92],[16,95],[12,92],[8,78],[10,76],[14,75],[18,73],[22,70],[26,68],[30,70],[34,72],[35,75]],
+            // Japan
+            [[45,145],[44,143],[42,141],[40,139],[38,137],[36,136],[34,134],[33,132],[34,130],[36,131],[38,133],[40,136],[42,140],[44,143],[45,145]],
+            // Indonesia
+            [[20,120],[18,122],[16,120],[14,118],[12,120],[10,118],[8,116],[6,118],[4,120],[2,118],[0,115],[-2,112],[-4,110],[-6,108],[-8,110],[-10,115],[-8,118],[-6,122],[-4,125],[-2,128],[0,130],[2,128],[4,125],[6,122],[8,120],[10,118],[12,116],[14,118],[16,120],[18,122],[20,120]],
+            // Australia
+            [[-11,143],[-12,146],[-14,148],[-17,150],[-20,152],[-24,153],[-28,153],[-32,152],[-35,150],[-38,148],[-39,145],[-38,142],[-36,138],[-34,134],[-32,130],[-29,126],[-26,122],[-22,118],[-18,115],[-15,116],[-13,118],[-12,122],[-11,128],[-10,134],[-11,139],[-11,143]],
+            // New Zealand
+            [[-34,172],[-36,174],[-38,176],[-40,178],[-43,175],[-46,170],[-46,167],[-44,168],[-41,172],[-38,176],[-35,175],[-34,172]],
+            // Greenland
+            [[84,-40],[82,-32],[80,-25],[78,-20],[76,-18],[74,-20],[72,-24],[70,-28],[68,-34],[66,-40],[65,-46],[66,-52],[68,-56],[70,-60],[72,-62],[74,-60],[76,-55],[78,-48],[80,-42],[82,-36],[84,-40]],
+            // Antarctica
+            [[-66,-60],[-68,-40],[-70,-20],[-70,0],[-70,20],[-70,40],[-68,60],[-68,80],[-70,100],[-72,120],[-74,140],[-76,160],[-78,180],[-76,-160],[-74,-140],[-72,-120],[-70,-100],[-68,-80],[-66,-60]]
+        ];
+
+        // Dymaxion-style stereographic projection
+        function project(lat, lon) {
+            const phi = (90 - lat) * Math.PI / 180;
+            const theta = (lon + rotation) * Math.PI / 180;
+
+            const x3 = Math.sin(phi) * Math.cos(theta);
+            const y3 = Math.cos(phi);
+            const z3 = Math.sin(phi) * Math.sin(theta);
+
+            // Tilt globe to show more landmass
+            const tilt = 0.4;
+            const y3t = y3 * Math.cos(tilt) - z3 * Math.sin(tilt);
+            const z3t = y3 * Math.sin(tilt) + z3 * Math.cos(tilt);
+
+            // Stereographic projection
+            const k = 2 / (1 + Math.max(0.01, 1 - z3t * 0.8));
+            const x = x3 * k;
+            const y = y3t * k;
+
+            return {
+                x: centerX + x * scale * 0.5,
+                y: centerY - y * scale * 0.5,
+                visible: z3t > -0.3,
+                depth: z3t
+            };
+        }
+
         function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            centerX = width / 2;
+            centerY = height / 2;
+            scale = Math.min(width, height) * 0.7;
         }
         resize();
         window.addEventListener('resize', resize);
 
-        // Mercator projection
-        function project(lat, lon) {
-            const x = (lon + 180) / 360 * canvas.width;
-            const latRad = lat * Math.PI / 180;
-            const mercN = Math.log(Math.tan(Math.PI/4 + latRad/2));
-            const y = canvas.height/2 - mercN * canvas.height / (2 * Math.PI);
-            return { x, y };
-        }
-
-        // Magnitude to color (matching CSS variables)
+        // Magnitude to color
         function magColor(mag) {
-            if (mag < 3) return '#10b981';  // accent green
-            if (mag < 5) return '#3b82f6';  // blue
-            if (mag < 7) return '#f97316';  // orange
-            return '#ef4444';  // red
+            if (mag < 3) return '#10b981';
+            if (mag < 5) return '#3b82f6';
+            if (mag < 7) return '#f97316';
+            return '#ef4444';
         }
 
-        // Magnitude to frequency (Hz)
+        // Magnitude to frequency
         function magFreq(mag) {
-            return 80 + (mag / 10) * 720; // 80Hz to 800Hz
+            return 80 + (mag / 10) * 720;
         }
 
-        // Depth to reverb (not actual reverb, just duration)
+        // Depth to duration
         function depthDuration(depth) {
-            return 0.1 + (depth / 700) * 2.9; // 0.1s to 3s
+            return 0.1 + (depth / 700) * 2.9;
         }
 
-        // Play sound for earthquake
         function playQuake(eq) {
             if (!soundEnabled || !audioCtx) return;
 
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
+            const pan = audioCtx.createStereoPanner();
 
             osc.type = 'sine';
             osc.frequency.value = magFreq(eq.mag);
-
-            // Stereo pan based on longitude
-            const pan = audioCtx.createStereoPanner();
-            pan.pan.value = (eq.lon / 180); // -1 to 1
+            pan.pan.value = Math.max(-1, Math.min(1, eq.lon / 180));
 
             const duration = depthDuration(eq.depth);
             const now = audioCtx.currentTime;
@@ -280,7 +334,6 @@
             }
         }
 
-        // Fetch earthquakes from USGS
         async function fetchQuakes() {
             try {
                 const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson');
@@ -295,21 +348,21 @@
                     time: f.properties.time
                 }));
 
-                // Find new earthquakes (ones we haven't seen)
                 const oldIds = new Set(earthquakes.map(e => e.id));
                 for (const eq of newQuakes) {
                     if (!oldIds.has(eq.id)) {
-                        // New earthquake - add ring and play sound
-                        const pos = project(eq.lat, eq.lon);
-                        rings.push({
-                            x: pos.x,
-                            y: pos.y,
-                            radius: 0,
-                            maxRadius: 50 + eq.mag * 20,
-                            color: magColor(eq.mag),
-                            alpha: 1
-                        });
-                        playQuake(eq);
+                        const p = project(eq.lat, eq.lon);
+                        if (p.visible) {
+                            rings.push({
+                                lat: eq.lat,
+                                lon: eq.lon,
+                                radius: 0,
+                                maxRadius: 30 + eq.mag * 15,
+                                color: magColor(eq.mag),
+                                alpha: 1
+                            });
+                            playQuake(eq);
+                        }
                     }
                 }
 
@@ -320,88 +373,111 @@
             }
         }
 
-        // Continent outlines (simplified)
-        const continents = [
-            // North America
-            [[71,-168],[66,-169],[60,-165],[55,-155],[60,-147],[55,-131],[49,-126],[42,-124],[36,-122],[31,-117],[25,-109],[26,-104],[29,-97],[28,-88],[25,-81],[29,-82],[35,-89],[40,-86],[47,-75],[52,-64],[59,-62],[65,-70],[71,-80],[76,-110],[76,-130],[73,-150],[71,-168]],
-            // South America
-            [[12,-72],[5,-78],[-4,-81],[-12,-77],[-20,-70],[-32,-64],[-44,-66],[-55,-66],[-52,-62],[-44,-55],[-36,-50],[-24,-43],[-12,-36],[0,-38],[8,-50],[12,-65],[12,-72]],
-            // Europe
-            [[71,28],[65,20],[58,5],[50,-6],[45,-2],[36,-6],[37,0],[46,10],[50,18],[56,25],[62,32],[68,30],[71,28]],
-            // Africa
-            [[37,-10],[31,2],[33,16],[36,25],[28,34],[16,40],[4,45],[-8,38],[-20,32],[-34,18],[-32,12],[-20,14],[-8,4],[4,-4],[16,-12],[28,-14],[37,-10]],
-            // Asia
-            [[77,100],[70,130],[61,148],[52,160],[44,148],[32,132],[20,108],[8,98],[8,104],[18,116],[10,118],[2,112],[-4,105],[0,90],[8,82],[20,72],[32,66],[44,52],[56,38],[64,38],[72,58],[78,95],[77,100]],
-            // Australia
-            [[-11,143],[-17,150],[-25,153],[-36,148],[-38,140],[-32,130],[-20,118],[-12,122],[-10,132],[-11,143]],
-            // Antarctica
-            [[-65,-60],[-70,-30],[-68,0],[-70,30],[-72,60],[-68,90],[-70,120],[-75,150],[-78,180],[-75,-150],[-70,-120],[-68,-90],[-65,-60]]
-        ];
-
-        // Draw frame
         function draw() {
-            ctx.fillStyle = '#0a0a0a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#050506';
+            ctx.fillRect(0, 0, width, height);
 
-            // Draw graticule (light grid)
+            // Globe glow
+            const glow = ctx.createRadialGradient(centerX, centerY, scale * 0.1, centerX, centerY, scale * 0.5);
+            glow.addColorStop(0, 'transparent');
+            glow.addColorStop(0.8, 'rgba(16, 185, 129, 0.02)');
+            glow.addColorStop(1, 'transparent');
+            ctx.fillStyle = glow;
+            ctx.fillRect(0, 0, width, height);
+
+            // Graticule
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
             ctx.lineWidth = 1;
-            ctx.beginPath();
-            for (let lat = -60; lat <= 80; lat += 30) {
-                const { y } = project(lat, -180);
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-            }
-            for (let lon = -180; lon <= 180; lon += 30) {
-                const { x } = project(0, lon);
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-            }
-            ctx.stroke();
 
-            // Draw filled continents
-            ctx.fillStyle = 'rgba(16, 185, 129, 0.06)';
-            ctx.strokeStyle = 'rgba(16, 185, 129, 0.2)';
-            ctx.lineWidth = 1;
-            for (const points of continents) {
+            for (let lat = -60; lat <= 60; lat += 20) {
                 ctx.beginPath();
                 let first = true;
-                for (const [lat, lon] of points) {
-                    const { x, y } = project(lat, lon);
-                    if (first) { ctx.moveTo(x, y); first = false; }
-                    else ctx.lineTo(x, y);
+                for (let lon = -180; lon <= 180; lon += 4) {
+                    const p = project(lat, lon);
+                    if (p.visible) {
+                        if (first) { ctx.moveTo(p.x, p.y); first = false; }
+                        else ctx.lineTo(p.x, p.y);
+                    } else first = true;
                 }
-                ctx.closePath();
-                ctx.fill();
                 ctx.stroke();
             }
 
-            // Draw earthquakes as dots
+            for (let lon = -180; lon < 180; lon += 20) {
+                ctx.beginPath();
+                let first = true;
+                for (let lat = -80; lat <= 80; lat += 4) {
+                    const p = project(lat, lon);
+                    if (p.visible) {
+                        if (first) { ctx.moveTo(p.x, p.y); first = false; }
+                        else ctx.lineTo(p.x, p.y);
+                    } else first = true;
+                }
+                ctx.stroke();
+            }
+
+            // Continents (filled)
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.25)';
+            ctx.lineWidth = 1;
+
+            for (const cont of continents) {
+                ctx.beginPath();
+                let first = true;
+                let started = false;
+                for (const [lat, lon] of cont) {
+                    const p = project(lat, lon);
+                    if (p.visible) {
+                        if (first) { ctx.moveTo(p.x, p.y); first = false; started = true; }
+                        else ctx.lineTo(p.x, p.y);
+                    } else {
+                        if (started) {
+                            ctx.closePath();
+                            ctx.fill();
+                            ctx.stroke();
+                            started = false;
+                        }
+                        first = true;
+                    }
+                }
+                if (started) {
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            // Earthquakes
             for (const eq of earthquakes) {
-                const { x, y } = project(eq.lat, eq.lon);
-                const radius = 2 + eq.mag;
+                const p = project(eq.lat, eq.lon);
+                if (!p.visible) continue;
+
+                const radius = 3 + eq.mag * 1.5;
+                const alpha = 0.5 + p.depth * 0.3;
 
                 ctx.beginPath();
-                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
                 ctx.fillStyle = magColor(eq.mag);
-                ctx.globalAlpha = 0.7;
+                ctx.globalAlpha = alpha;
                 ctx.fill();
                 ctx.globalAlpha = 1;
             }
 
-            // Draw and update rings
+            // Rings
             for (let i = rings.length - 1; i >= 0; i--) {
                 const ring = rings[i];
-                ring.radius += 2;
-                ring.alpha -= 0.02;
+                ring.radius += 1.5;
+                ring.alpha -= 0.015;
 
                 if (ring.alpha <= 0) {
                     rings.splice(i, 1);
                     continue;
                 }
 
+                const p = project(ring.lat, ring.lon);
+                if (!p.visible) continue;
+
                 ctx.beginPath();
-                ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, ring.radius, 0, Math.PI * 2);
                 ctx.strokeStyle = ring.color;
                 ctx.globalAlpha = ring.alpha;
                 ctx.lineWidth = 2;
@@ -409,12 +485,14 @@
                 ctx.globalAlpha = 1;
             }
 
+            // Slow rotation
+            rotation += 0.02;
+
             requestAnimationFrame(draw);
         }
 
-        // Initial fetch and start
         fetchQuakes();
-        setInterval(fetchQuakes, 30000); // Refresh every 30s
+        setInterval(fetchQuakes, 30000);
         draw();
     </script>
 </body>
