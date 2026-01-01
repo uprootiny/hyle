@@ -8,7 +8,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #050506;
@@ -24,15 +24,15 @@
             --stairs: #eab308;
             --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+            --font-prose: 'Crimson Pro', Georgia, serif;
         }
 
-        /* Level themes */
-        .level-0 { --accent: #e0e0e0; --accent-bright: #ffffff; --bg-surface: #0a0a0a; } /* Tractatus: stark */
-        .level-1 { --accent: #dc2626; --accent-bright: #fbbf24; --bg-surface: #1a0a0a; } /* Hexagrams: red/gold */
-        .level-2 { --accent: #10b981; --accent-bright: #34d399; --bg-surface: #0a1a0a; } /* Hermetic: green */
-        .level-3 { --accent: #3b82f6; --accent-bright: #60a5fa; --bg-surface: #0a0a1a; } /* Library: blue */
-        .level-4 { --accent: #8b5cf6; --accent-bright: #a78bfa; --bg-surface: #0f0a1a; } /* Koans: purple */
-        .level-5 { --accent: #1a1a1a; --accent-bright: #333333; --bg-surface: #000000; } /* Void */
+        .level-0 { --accent: #e0e0e0; --accent-bright: #ffffff; --bg-surface: #08080a; }
+        .level-1 { --accent: #dc2626; --accent-bright: #fbbf24; --bg-surface: #120808; }
+        .level-2 { --accent: #10b981; --accent-bright: #6ee7b7; --bg-surface: #081208; }
+        .level-3 { --accent: #6366f1; --accent-bright: #818cf8; --bg-surface: #080812; }
+        .level-4 { --accent: #a855f7; --accent-bright: #c084fc; --bg-surface: #100812; }
+        .level-5 { --accent: #1a1a1a; --accent-bright: #2a2a2a; --bg-surface: #000000; --text: #333; }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -43,7 +43,7 @@
             font-size: 14px;
             line-height: 1.6;
             min-height: 100vh;
-            transition: background 0.5s;
+            transition: all 0.8s;
         }
 
         nav {
@@ -52,7 +52,7 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border);
-            background: rgba(5,5,6,0.8);
+            background: rgba(5,5,6,0.9);
             backdrop-filter: blur(12px);
             position: sticky;
             top: 0;
@@ -68,7 +68,7 @@
             font-weight: 600;
         }
 
-        .brand .lambda { color: var(--accent); font-size: 1.25rem; transition: color 0.3s; }
+        .brand .lambda { color: var(--accent); font-size: 1.25rem; transition: color 0.5s; }
         .brand:hover .lambda { color: var(--accent-bright); }
 
         .back-link {
@@ -81,7 +81,7 @@
         .back-link:hover { color: var(--accent); }
 
         #game {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 2rem 1.5rem;
         }
@@ -89,9 +89,9 @@
         #level-indicator {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding: 0.75rem 1rem;
+            align-items: baseline;
+            margin-bottom: 1.5rem;
+            padding: 1rem 1.25rem;
             background: var(--bg-elevated);
             border-radius: 8px;
             border: 1px solid var(--border);
@@ -100,9 +100,17 @@
         #level-name {
             font-weight: 600;
             color: var(--accent);
+            font-size: 1rem;
+            letter-spacing: 0.05em;
+            transition: color 0.5s;
+        }
+
+        #level-subtitle {
+            color: var(--text-muted);
+            font-family: var(--font-prose);
+            font-style: italic;
             font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
+            margin-left: 1rem;
         }
 
         #depth {
@@ -118,25 +126,36 @@
             border: 1px solid var(--border);
             white-space: pre;
             font-family: var(--font-mono);
-            font-size: 14px;
-            line-height: 1.3;
+            font-size: 13px;
+            line-height: 1.2;
             margin-bottom: 1.5rem;
             overflow-x: auto;
-            transition: border-color 0.3s;
+            transition: all 0.5s;
         }
 
         #description {
-            padding: 1.25rem 1.5rem;
+            padding: 1.5rem 2rem;
             background: var(--bg-surface);
             border-left: 3px solid var(--accent);
             border-radius: 0 12px 12px 0;
             margin-bottom: 1.5rem;
-            min-height: 100px;
-            font-size: 0.95rem;
+            min-height: 140px;
+            font-family: var(--font-prose);
+            font-size: 1.1rem;
             color: var(--text-secondary);
-            line-height: 1.8;
-            font-style: italic;
-            transition: border-color 0.3s, background 0.3s;
+            line-height: 1.9;
+            transition: all 0.5s;
+        }
+
+        #mechanic-hint {
+            padding: 0.75rem 1rem;
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--accent);
+            display: none;
         }
 
         #status {
@@ -204,10 +223,47 @@
         }
 
         .player { color: var(--accent-bright); }
-        .wall { color: var(--text-muted); }
+        .wall { color: #2a2a30; }
+        .floor { color: #1a1a1e; }
         .item { color: var(--item); }
         .stairs { color: var(--stairs); }
         .key-item { color: var(--accent); }
+
+        #divination {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-elevated);
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            z-index: 200;
+            display: none;
+            min-width: 280px;
+        }
+
+        #divination h3 {
+            color: var(--accent);
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        #divination .hexagram {
+            font-size: 2rem;
+            letter-spacing: 0.5rem;
+            margin-bottom: 1rem;
+            font-family: var(--font-mono);
+        }
+
+        #divination p {
+            color: var(--text-muted);
+            font-family: var(--font-prose);
+            font-style: italic;
+        }
     </style>
 </head>
 <body class="level-0">
@@ -220,10 +276,14 @@
     </nav>
     <div id="game">
         <div id="level-indicator">
-            <span id="level-name">I. Tractatus</span>
-            <span id="depth">depth 0</span>
+            <div>
+                <span id="level-name">I. Tractatus</span>
+                <span id="level-subtitle"></span>
+            </div>
+            <span id="depth">stratum I</span>
         </div>
         <div id="map"></div>
+        <div id="mechanic-hint"></div>
         <div id="description"></div>
         <div id="status">
             <div id="inventory">carrying: <span id="inv">nothing</span></div>
@@ -238,119 +298,85 @@
             <button onclick="descend()" id="btn-descend" class="descend" style="display:none">▼ descend</button>
         </div>
     </div>
+    <div id="divination"></div>
 
     <script>
-    // ═══════════════════════════════════════════════════════════════
-    // REALMS - Each level has its own corpus, items, and theme
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
+    // REALMS - Extended corpuses with full passages for coherent Markov output
+    // ═══════════════════════════════════════════════════════════════════════════
 
     const REALMS = [
         {
             name: "I. Tractatus",
-            subtitle: "The limits of my language mean the limits of my world",
+            subtitle: "The limits of language are the limits of the world",
             keyItem: "ladder",
-            items: ["picture", "fact", "proposition", "silence"],
+            items: ["picture", "fact", "proposition"],
+            mechanic: "logic", // clear paths, binary existence
+            mechanicHint: "In this realm, paths are certain. What exists, exists wholly.",
             corpus: [
-                "The world is all that is the case",
-                "The world is the totality of facts not of things",
-                "What is the case a fact is the existence of states of affairs",
-                "A state of affairs is a combination of objects",
-                "It is essential to things that they should be possible constituents of states of affairs",
-                "If I know an object I also know all its possible occurrences in states of affairs",
-                "Objects are simple",
-                "Objects make up the substance of the world",
-                "Space time and colour are forms of objects",
-                "A picture is a fact",
-                "A picture is a model of reality",
-                "A logical picture of facts is a thought",
-                "A thought is a proposition with a sense",
-                "In a proposition a thought finds an expression that can be perceived by the senses",
-                "We use the perceptible sign of a proposition as a projection of a possible situation",
-                "A proposition is a truth-function of elementary propositions",
-                "What can be shown cannot be said",
-                "Whereof one cannot speak thereof one must be silent",
-                "The solution of the problem of life is seen in the vanishing of the problem",
-                "There are indeed things that cannot be put into words"
+                "The world is all that is the case. The world is the totality of facts, not of things. The world is determined by the facts, and by their being all the facts. For the totality of facts determines what is the case, and also whatever is not the case.",
+                "What is the case—a fact—is the existence of states of affairs. A state of affairs is a combination of objects. It is essential to things that they should be possible constituents of states of affairs. In logic nothing is accidental.",
+                "If I know an object I also know all its possible occurrences in states of affairs. Every one of these possibilities must be part of the nature of the object. A new possibility cannot be discovered later. Objects make up the substance of the world. That is why they cannot be composite.",
+                "Space, time, and colour are forms of objects. There must be objects if the world is to have an unalterable form. Objects, the unalterable, and the subsistent are one and the same. Objects are what is unalterable and subsistent; their configuration is what is changing and unstable.",
+                "A picture is a fact. A picture is a model of reality. In a picture objects have the elements of the picture corresponding to them. In a picture the elements of the picture are the representatives of objects. What any picture must have in common with reality is logical form.",
+                "A logical picture of facts is a thought. A thought contains the possibility of the situation of which it is the thought. What is thinkable is possible too. We cannot think what we cannot think; so what we cannot think we cannot say either.",
+                "A thought is a proposition with a sense. A proposition is a truth-function of elementary propositions. The general form of a truth-function is: this is the general form of a proposition. What can be shown cannot be said.",
+                "Whereof one cannot speak, thereof one must be silent. The solution of the problem of life is seen in the vanishing of the problem. There are indeed things that cannot be put into words. They make themselves manifest. They are what is mystical.",
+                "My propositions are elucidatory in this way: he who understands me finally recognizes them as senseless, when he has climbed out through them, on them, over them. He must so to speak throw away the ladder, after he has climbed up on it."
             ]
         },
         {
             name: "II. Hexagrams",
             subtitle: "The Changes have no consciousness, no action; still and unmoving",
             keyItem: "yarrow",
-            items: ["coins", "tortoise", "dragon", "receptive"],
+            items: ["coins", "tortoise", "dragon"],
+            mechanic: "divination", // movement determined by casting
+            mechanicHint: "Cast the coins before each step. The oracle guides your path.",
             corpus: [
-                "The Creative works sublime success furthering through perseverance",
-                "The Receptive brings about sublime success furthering through the perseverance of a mare",
-                "Difficulty at the Beginning works supreme success furthering through perseverance",
-                "Thunder and rain fill the air with turbulent movement",
-                "Clouds and thunder signify Difficulty at the Beginning",
-                "Youthful Folly has success I do not seek the young fool the young fool seeks me",
-                "A spring wells up at the foot of the mountain the image of youth",
-                "Waiting with sincerity brings light and success perseverance brings good fortune",
-                "Clouds rise up to heaven the image of Waiting",
-                "Conflict you are sincere and are being obstructed",
-                "Heaven and water go their opposite ways the image of Conflict",
-                "The Army needs perseverance and a strong man good fortune without blame",
-                "In the middle of the earth is water the image of the Army",
-                "Holding Together brings good fortune inquire of the oracle once again",
-                "On the earth is water the image of Holding Together",
-                "The Taming Power of the Small has success dense clouds no rain from our western region",
-                "The wind drives across heaven the image of the Taming Power of the Small",
-                "Treading upon the tail of the tiger it does not bite the man success"
+                "The Creative works sublime success, furthering through perseverance. The movement of heaven is full of power. Thus the superior man makes himself strong and untiring. The dragon appears in the field. It furthers one to see the great man. All day long the superior man is creatively active.",
+                "The Receptive brings about sublime success, furthering through the perseverance of a mare. If the superior man undertakes something and tries to lead, he goes astray; but if he follows, he finds guidance. The earth's condition is receptive devotion. Thus the superior man who has breadth of character carries the outer world.",
+                "Difficulty at the Beginning works supreme success, furthering through perseverance. Clouds and thunder: the image of Difficulty at the Beginning. Thus the superior man brings order out of confusion. Horse and wagon part. He seeks her who has no blame. It is wise to wait for the right time before acting.",
+                "Youthful Folly has success. It is not I who seek the young fool; the young fool seeks me. At the first oracle I inform him. If he asks two or three times, it is importunity. A spring wells up at the foot of the mountain, the image of youth. Thus the superior man fosters his character by thoroughness in all that he does.",
+                "Waiting with sincerity brings light and success. Perseverance brings good fortune. It furthers one to cross the great water. Clouds rise up to heaven: the image of Waiting. Thus the superior man eats and drinks, is joyous and of good cheer. Waiting in the meadow. It furthers one to abide in what endures.",
+                "Conflict: You are sincere and are being obstructed. A cautious halt halfway brings good fortune. Going through to the end brings misfortune. Heaven and water go their opposite ways: the image of Conflict. Thus in all his transactions the superior man carefully considers the beginning.",
+                "The Army needs perseverance and a strong man. In the middle of the earth is water: the image of the Army. Thus the superior man increases his masses by generosity toward the people. The army marches forth in proper order. If the order is not good, misfortune threatens.",
+                "Holding Together brings good fortune. Inquire of the oracle once again whether you possess sublimity, constancy, and perseverance; then there is no blame. On the earth is water: the image of Holding Together. Thus the kings of antiquity bestowed the different states as fiefs."
             ]
         },
         {
             name: "III. Hermetic",
             subtitle: "As above, so below; as within, so without",
             keyItem: "philosopher-stone",
-            items: ["mercury", "sulfur", "salt", "vessel"],
+            items: ["mercury", "sulfur", "salt"],
+            mechanic: "transmutation", // combine items to create key
+            mechanicHint: "Three principles unite: sulfur (soul), mercury (spirit), salt (body). Gather all three.",
             corpus: [
-                "True without falsehood certain and most true",
-                "What is above is like what is below and what is below is like what is above",
-                "To accomplish the miracle of the One Thing",
-                "As all things were from One by the mediation of One so all things arose from this One Thing by adaptation",
-                "The Sun is its father the Moon its mother",
-                "The Wind carried it in its belly the Earth is its nurse",
-                "The father of all perfection in the whole world is here",
-                "Its power is complete if it be turned into earth",
-                "Separate the earth from the fire the subtle from the gross",
-                "Gently and with great ingenuity it ascends from earth to heaven",
-                "Again it descends to earth and receives the power of the superiors and inferiors",
-                "Thus you will have the glory of the whole world",
-                "All obscurity will flee from you",
-                "This is the strong force of all forces overcoming every subtle thing and penetrating every solid",
-                "Thus the world was created",
-                "From this are wonderful adaptations of which this is the manner",
-                "Therefore I am called Hermes Trismegistus having three parts of the wisdom of the whole world",
-                "What I have to say about the operation of Sol is completed"
+                "True, without falsehood, certain and most true: what is above is like what is below, and what is below is like what is above, to accomplish the miracle of the One Thing. And as all things were from One, by the mediation of One, so all things arose from this One Thing by adaptation.",
+                "The Sun is its father, the Moon its mother. The Wind carried it in its belly, the Earth is its nurse. The father of all perfection in the whole world is here. Its power is complete if it be turned into earth. Separate the earth from the fire, the subtle from the gross, gently and with great ingenuity.",
+                "It ascends from earth to heaven, and again it descends to earth, and receives the power of the superiors and the inferiors. Thus you will have the glory of the whole world. All obscurity will flee from you. This is the strong force of all forces, overcoming every subtle thing and penetrating every solid.",
+                "Thus the world was created. From this are wonderful adaptations, of which this is the manner. Therefore I am called Hermes Trismegistus, having three parts of the wisdom of the whole world. What I have to say about the operation of Sol is completed.",
+                "Know then the greatest secret of the universe: that which is above is from that which is below, and that which is below is from that which is above, working the miracles of one thing. Its father is the Sun and its mother the Moon; the Wind carries it in its belly and its nurse is the Earth.",
+                "This thing is the strong fortitude of all fortitude, because it overcomes every subtle thing and penetrates every solid. Thus was the world created. Hence proceed wonders, which are here established. Therefore am I called Thrice-Great, having the three parts of the philosophy of the whole universe.",
+                "Combine the volatile with the fixed. Unite the masculine with the feminine. Marry the king to the queen. Let the red man take the white woman. Through putrefaction comes generation. Through death comes life. Through separation comes conjunction.",
+                "The stone which the builders rejected has become the cornerstone. In stercore invenitur—in filth it shall be found. That which is most common is most precious. The philosophers' stone is found everywhere, in all things, yet recognized by none but the wise."
             ]
         },
         {
             name: "IV. Library",
-            subtitle: "The universe (which others call the Library)",
+            subtitle: "The universe, which others call the Library",
             keyItem: "crimson-hexagon",
-            items: ["book", "mirror", "lamp", "compass"],
+            items: ["book", "mirror", "lamp"],
+            mechanic: "infinite", // rooms wrap around, occasional shifts
+            mechanicHint: "The Library is infinite and periodic. Walking far enough returns you to the beginning.",
             corpus: [
-                "The library is unlimited and cyclical",
-                "In the vast library there are no two identical books",
-                "The universe which others call the Library",
-                "Mirrors and fatherhood are abominable",
-                "The labyrinth of symbols",
-                "Infinite corridors of hexagonal galleries",
-                "Books of apologies and prophecies",
-                "The faithless say that nonsense is normal in the Library",
-                "Perhaps my old age and fearfulness deceive me",
-                "I have wandered in search of a book",
-                "The certainty that everything has been written negates us",
-                "A lamp illuminated the stairway endlessly",
-                "The spiral staircase sinks and soars into the remote distance",
-                "Every hexagon has twenty shelves five long shelves on each side",
-                "The Library exists ab aeterno",
-                "Blasphemous rumor spoke of the Man of the Book",
-                "In some shelf in some hexagon there exists a book which is the formula of all the others",
-                "The universe suddenly usurped the unlimited dimensions of hope",
-                "There are official searchers inquisitors",
-                "I know of districts where the young prostrate themselves before books"
+                "The universe, which others call the Library, is composed of an indefinite, perhaps infinite number of hexagonal galleries. In the center of each gallery is a ventilation shaft, bounded by a low railing. From any hexagon one can see the floors above and below—one after another, endlessly.",
+                "The arrangement of the galleries is always the same: Twenty bookshelves, five to each side, line four of the hexagon's six sides; the height of the bookshelves, floor to ceiling, is hardly greater than the height of a normal librarian. On each shelf rest thirty-two books of identical format.",
+                "Each book is four hundred ten pages; each page, forty lines, each line, approximately eighty black letters. There are also letters on the front cover of each book; those letters neither indicate nor prefigure what the pages inside will say. I know that such a lack of correspondence once struck men as mysterious.",
+                "The Library is total—perfect, complete, whole. Its bookshelves contain all possible combinations of the twenty-two orthographic symbols whose number, though vast, is not infinite—that is, all that is able to be expressed, in every language. All—the detailed history of the future, the autobiographies of the archangels.",
+                "When it was announced that the Library contained all books, the first reaction was unbounded joy. All men felt themselves the possessors of an intact and secret treasure. There was no personal problem, no world problem, whose eloquent solution did not exist—somewhere in some hexagon.",
+                "As was foreseeable, that unbounded hope was followed by a similarly unbounded despair. The certainty that some bookshelf in some hexagon contained precious books, yet that those precious books were forever out of reach, was almost unbearable.",
+                "I know of districts in which the young prostrate themselves before books and like savages kiss their pages, though they cannot read a single letter. Epidemics, heretical discords, pilgrimages that inevitably degenerate into banditry have decimated the population.",
+                "I suspect that the human species—the only one—teeters on the verge of extinction, yet the Library will endure: illuminated, solitary, infinite, perfectly still, armed with precious volumes, pointless, incorruptible, secret. I have just written the word 'infinite.' Infinite, I have not inserted that adjective out of mere rhetorical habit."
             ]
         },
         {
@@ -358,25 +384,18 @@
             subtitle: "What is the sound of one hand clapping?",
             keyItem: "mu",
             items: ["bowl", "staff", "bell"],
+            mechanic: "paradox", // key appears when you stop seeking
+            mechanicHint: "The key appears only to those who have stopped seeking it.",
             corpus: [
-                "A monk asked Zhaozhou does a dog have Buddha nature",
-                "Zhaozhou answered Mu",
-                "What is the sound of one hand clapping",
-                "Before your parents were born what was your original face",
-                "If you meet the Buddha on the road kill him",
-                "The cypress tree in the garden",
-                "Sitting quietly doing nothing spring comes and the grass grows by itself",
-                "When you can do nothing what can you do",
-                "The wild geese do not intend to cast their reflection",
-                "The water has no mind to receive their image",
-                "Not thinking of good not thinking of evil what is your original face",
-                "All beings are Buddha",
-                "If all beings are Buddha why do we not see it",
-                "Because we are looking for it",
-                "The finger pointing at the moon is not the moon",
-                "To study the self is to forget the self",
-                "To forget the self is to be enlightened by all things",
-                "When you realize the truth the truth has already left no trace"
+                "A monk asked Zhaozhou, 'Does a dog have Buddha nature or not?' Zhaozhou replied, 'Mu.' This 'Mu' is the barrier of the ancestral teachers. If you can pass through it, you will not only see Zhaozhou face to face, but you will walk hand in hand with all the ancestral teachers.",
+                "What is the sound of one hand clapping? If you say something, you miss it entirely. If you remain silent, you miss it equally. What will you do? This very mind that does not understand is it. There is nothing to attain, nothing to realize. Yet this nothing is not emptiness—it is the fullness of all things.",
+                "Before your father and mother were born, what was your original face? Not the face of flesh, not a face of no-flesh. Speaking of it is already wrong; not speaking of it is equally wrong. Words cannot reach it, silence cannot reach it. Where will you find your original face?",
+                "If you meet the Buddha on the road, kill him. If you meet your master, kill him. As long as you seek Buddha outside yourself, Buddha will always be outside yourself. The treasure house is within you—everything you need is already there.",
+                "Sitting quietly, doing nothing, spring comes, and the grass grows by itself. This is not laziness. This is not inaction. This is the great action that has no actor. Who is it that sits? Who is it that does nothing? Look! Already the grass has grown.",
+                "The cypress tree in the garden—this is the answer to all your questions. But what does it mean? If you seek the meaning, you have already lost it. The cypress tree is just the cypress tree. The moon is just the moon. Your face is just your face.",
+                "When you can do nothing, what can you do? When you have nowhere to go, where will you go? When you have no one to be, who will you be? These are not puzzles to be solved—they are doors to be walked through.",
+                "To study the self is to forget the self. To forget the self is to be enlightened by all things. To be enlightened by all things is to remove the barrier between self and other. When the barrier is removed, there is no Buddha, no sentient beings—only this, just this, this present moment, complete.",
+                "The wild geese do not intend to cast their reflection; the water has no mind to receive their image. When you can understand this, you will understand everything. The reflection appears without intention; the water receives without grasping. This is the natural way."
             ]
         },
         {
@@ -384,173 +403,430 @@
             subtitle: "...",
             keyItem: null,
             items: [],
+            mechanic: "void", // everything fades
+            mechanicHint: "",
             corpus: [
-                "",
-                "  ",
-                "   ",
-                "    ",
-                "     ",
-                ".",
-                "..",
-                "...",
-                " . ",
-                "  .  ",
-                "   .   "
+                "                                                    ",
+                "         .                                          ",
+                "                    .           .                   ",
+                "        .                               .           ",
+                "                         .                          ",
+                "    .          .                   .                ",
+                "                                            .       ",
+                "                  .         .                       ",
+                "       .                           .                ",
+                "                       .                            "
             ]
         }
     ];
 
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
     // STATE
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
 
     let level = 0;
     let maze = [];
-    let player = { x: 1, y: 1 };
+    let player = { x: 0, y: 0 };
     let items = [];
     let inventory = [];
     let rooms = {};
     let stairsPos = null;
-    let markov = {};
+    let seekingKey = true; // For Koans mechanic
+    let moveCount = 0;
 
-    const BASE_SIZE = 15;
+    const SIZES = [17, 19, 21, 23, 19, 15]; // Size per level
 
-    function getSize() {
-        return BASE_SIZE + level * 4; // Mazes get larger as you descend
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // MARKOV CHAIN
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BIGRAM MARKOV CHAIN - More coherent than single-word
+    // ═══════════════════════════════════════════════════════════════════════════
 
     function buildMarkov(texts) {
         const chain = {};
+        const starters = [];
+
         for (const text of texts) {
-            const words = text.toLowerCase().split(/\s+/).filter(w => w);
-            for (let i = 0; i < words.length - 1; i++) {
-                if (!chain[words[i]]) chain[words[i]] = [];
-                chain[words[i]].push(words[i + 1]);
+            const words = text.split(/\s+/).filter(w => w);
+            if (words.length < 3) continue;
+
+            // First two words can start a sequence
+            starters.push(words[0] + ' ' + words[1]);
+
+            for (let i = 0; i < words.length - 2; i++) {
+                const key = words[i] + ' ' + words[i + 1];
+                if (!chain[key]) chain[key] = [];
+                chain[key].push(words[i + 2]);
             }
         }
-        return chain;
+
+        return { chain, starters };
     }
 
-    function generate(chain, length = 20) {
-        const keys = Object.keys(chain);
-        if (keys.length === 0) return "...";
+    function generate(markov, minWords = 30, maxWords = 50) {
+        const { chain, starters } = markov;
+        if (starters.length === 0) return "...";
 
-        let word = keys[Math.floor(Math.random() * keys.length)];
-        let result = [word];
+        // Pick random starter
+        let current = starters[Math.floor(Math.random() * starters.length)];
+        let result = current.split(' ');
+        let targetLength = minWords + Math.floor(Math.random() * (maxWords - minWords));
 
-        for (let i = 0; i < length; i++) {
-            const next = chain[word];
+        for (let i = 0; i < targetLength; i++) {
+            const next = chain[current];
             if (!next || next.length === 0) {
-                word = keys[Math.floor(Math.random() * keys.length)];
+                // Restart from a new starter
+                current = starters[Math.floor(Math.random() * starters.length)];
+                const words = current.split(' ');
+                result.push('—', words[0], words[1]);
             } else {
-                word = next[Math.floor(Math.random() * next.length)];
+                const word = next[Math.floor(Math.random() * next.length)];
+                result.push(word);
+                const parts = current.split(' ');
+                current = parts[1] + ' ' + word;
             }
-            result.push(word);
         }
 
-        // Capitalize first letter
-        result[0] = result[0].charAt(0).toUpperCase() + result[0].slice(1);
-        return result.join(' ') + '.';
+        // Find a good ending point (period, question mark, etc.)
+        let text = result.join(' ');
+        const lastPeriod = Math.max(
+            text.lastIndexOf('.'),
+            text.lastIndexOf('?'),
+            text.lastIndexOf('!')
+        );
+
+        if (lastPeriod > text.length * 0.5) {
+            text = text.slice(0, lastPeriod + 1);
+        } else if (!text.endsWith('.')) {
+            text += '.';
+        }
+
+        return text;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // MAZE GENERATION
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MAZE GENERATION - Better connected rooms using Kruskal's algorithm
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    function generateMaze(W, H) {
+        // Initialize with walls
+        const grid = Array(H).fill(null).map(() => Array(W).fill('#'));
+
+        // Create rooms at odd coordinates
+        const cells = [];
+        for (let y = 1; y < H - 1; y += 2) {
+            for (let x = 1; x < W - 1; x += 2) {
+                grid[y][x] = '.';
+                cells.push({ x, y, set: cells.length });
+            }
+        }
+
+        // Create list of walls between adjacent cells
+        const walls = [];
+        for (let y = 1; y < H - 1; y += 2) {
+            for (let x = 1; x < W - 1; x += 2) {
+                if (x + 2 < W - 1) walls.push({ x1: x, y1: y, x2: x + 2, y2: y, wx: x + 1, wy: y });
+                if (y + 2 < H - 1) walls.push({ x1: x, y1: y, x2: x, y2: y + 2, wx: x, wy: y + 1 });
+            }
+        }
+
+        // Shuffle walls
+        for (let i = walls.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [walls[i], walls[j]] = [walls[j], walls[i]];
+        }
+
+        // Union-Find helpers
+        function findCell(x, y) {
+            return cells.find(c => c.x === x && c.y === y);
+        }
+
+        function findSet(cell) {
+            if (cell.set !== cells.indexOf(cell)) {
+                const parent = cells[cell.set];
+                cell.set = findSet(parent);
+            }
+            return cell.set;
+        }
+
+        function union(cell1, cell2) {
+            const set1 = findSet(cell1);
+            const set2 = findSet(cell2);
+            if (set1 !== set2) {
+                cells[set1].set = set2;
+                return true;
+            }
+            return false;
+        }
+
+        // Process walls (Kruskal's algorithm)
+        for (const wall of walls) {
+            const cell1 = findCell(wall.x1, wall.y1);
+            const cell2 = findCell(wall.x2, wall.y2);
+
+            if (union(cell1, cell2)) {
+                grid[wall.wy][wall.wx] = '.';
+            }
+        }
+
+        // Add some extra passages for loops (makes it less linear)
+        const extraWalls = walls.filter(w => grid[w.wy][w.wx] === '#');
+        const extraCount = Math.floor(extraWalls.length * 0.15);
+        for (let i = 0; i < extraCount && i < extraWalls.length; i++) {
+            const w = extraWalls[Math.floor(Math.random() * extraWalls.length)];
+            grid[w.wy][w.wx] = '.';
+        }
+
+        return grid;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LEVEL INITIALIZATION
+    // ═══════════════════════════════════════════════════════════════════════════
 
     function initLevel() {
         const realm = REALMS[level];
-        const W = getSize();
-        const H = getSize();
+        const W = SIZES[level];
+        const H = SIZES[level];
 
         // Update theme
         document.body.className = `level-${level}`;
         document.getElementById('level-name').textContent = realm.name;
-        document.getElementById('depth').textContent = `depth ${level}`;
+        document.getElementById('level-subtitle').textContent = realm.subtitle;
+        document.getElementById('depth').textContent = `stratum ${['I', 'II', 'III', 'IV', 'V', 'VI'][level]}`;
 
-        // Build markov chain for this level
-        markov = buildMarkov(realm.corpus);
+        // Show mechanic hint
+        const hintEl = document.getElementById('mechanic-hint');
+        if (realm.mechanicHint) {
+            hintEl.textContent = realm.mechanicHint;
+            hintEl.style.display = 'block';
+        } else {
+            hintEl.style.display = 'none';
+        }
+
+        // Build markov chain
+        const markov = buildMarkov(realm.corpus);
 
         // Generate maze
-        maze = Array(H).fill(null).map(() => Array(W).fill('#'));
+        maze = generateMaze(W, H);
 
-        function carve(x, y) {
-            maze[y][x] = '.';
-            const dirs = [[0,-2], [0,2], [-2,0], [2,0]].sort(() => Math.random() - 0.5);
-            for (const [dx, dy] of dirs) {
-                const nx = x + dx, ny = y + dy;
-                if (nx > 0 && nx < W-1 && ny > 0 && ny < H-1 && maze[ny][nx] === '#') {
-                    maze[y + dy/2][x + dx/2] = '.';
-                    carve(nx, ny);
-                }
+        // Find all floor tiles
+        const floors = [];
+        for (let y = 1; y < H - 1; y++) {
+            for (let x = 1; x < W - 1; x++) {
+                if (maze[y][x] === '.') floors.push({ x, y });
             }
         }
 
-        carve(1, 1);
+        // Shuffle floors for random placement
+        for (let i = floors.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [floors[i], floors[j]] = [floors[j], floors[i]];
+        }
+
+        // Place player near top-left
+        const startCandidates = floors.filter(f => f.x < W / 3 && f.y < H / 3);
+        const start = startCandidates.length > 0 ? startCandidates[0] : floors[0];
+        player = { x: start.x, y: start.y };
 
         // Place items
         items = [];
+        let floorIdx = 0;
+
         const allItems = [...realm.items];
         if (realm.keyItem) allItems.push(realm.keyItem);
 
         for (const itemName of allItems) {
-            let x, y, attempts = 0;
-            do {
-                x = Math.floor(Math.random() * (W-2)) + 1;
-                y = Math.floor(Math.random() * (H-2)) + 1;
-                attempts++;
-            } while ((maze[y][x] !== '.' || (x === 1 && y === 1)) && attempts < 100);
-
-            if (maze[y][x] === '.') {
-                items.push({ x, y, name: itemName, isKey: itemName === realm.keyItem });
+            // Find a floor tile not occupied by player
+            while (floorIdx < floors.length) {
+                const f = floors[floorIdx++];
+                if (f.x !== player.x || f.y !== player.y) {
+                    items.push({
+                        x: f.x,
+                        y: f.y,
+                        name: itemName,
+                        isKey: itemName === realm.keyItem,
+                        visible: realm.mechanic !== 'paradox' || itemName !== realm.keyItem
+                    });
+                    break;
+                }
             }
         }
 
-        // Place stairs (far from start)
+        // Place stairs far from start
         if (level < REALMS.length - 1) {
-            let bestDist = 0;
-            stairsPos = null;
-            for (let y = 1; y < H-1; y++) {
-                for (let x = 1; x < W-1; x++) {
-                    if (maze[y][x] === '.') {
-                        const dist = Math.abs(x - 1) + Math.abs(y - 1);
-                        if (dist > bestDist) {
-                            bestDist = dist;
-                            stairsPos = { x, y };
-                        }
-                    }
-                }
-            }
+            const farFloors = floors
+                .filter(f => f.x !== player.x || f.y !== player.y)
+                .filter(f => !items.some(i => i.x === f.x && i.y === f.y))
+                .sort((a, b) => {
+                    const da = Math.abs(a.x - player.x) + Math.abs(a.y - player.y);
+                    const db = Math.abs(b.x - player.x) + Math.abs(b.y - player.y);
+                    return db - da;
+                });
+            stairsPos = farFloors[0] || floors[floors.length - 1];
         } else {
             stairsPos = null;
         }
 
         // Generate room descriptions
         rooms = {};
-        for (let y = 1; y < H-1; y++) {
-            for (let x = 1; x < W-1; x++) {
-                if (maze[y][x] === '.') {
-                    rooms[`${x},${y}`] = generate(markov, 12 + Math.floor(Math.random() * 8));
+        for (const f of floors) {
+            rooms[`${f.x},${f.y}`] = generate(markov, 25, 45);
+        }
+
+        seekingKey = true;
+        moveCount = 0;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LEVEL-SPECIFIC MECHANICS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    function applyMechanic(dir) {
+        const realm = REALMS[level];
+
+        switch (realm.mechanic) {
+            case 'divination':
+                return divinationMove(dir);
+            case 'infinite':
+                return infiniteMove(dir);
+            case 'paradox':
+                return paradoxMove(dir);
+            case 'void':
+                return voidMove(dir);
+            default:
+                return { dir, message: null };
+        }
+    }
+
+    function divinationMove(dir) {
+        // Cast coins to determine if movement is altered
+        const coins = [Math.random() > 0.5, Math.random() > 0.5, Math.random() > 0.5];
+        const value = coins.filter(c => c).length;
+
+        // Show divination briefly
+        const divEl = document.getElementById('divination');
+        const hexagram = coins.map(c => c ? '⚊' : '⚋').join(' ');
+        const directions = ['n', 'e', 's', 'w'];
+
+        if (value === 0 || value === 3) {
+            // Changing line - redirect
+            const newDir = directions[(directions.indexOf(dir) + (value === 3 ? 1 : 3)) % 4];
+            divEl.innerHTML = `<h3>The Oracle Speaks</h3><div class="hexagram">${hexagram}</div><p>The way shifts ${value === 3 ? 'rightward' : 'leftward'}.</p>`;
+            divEl.style.display = 'block';
+            setTimeout(() => { divEl.style.display = 'none'; }, 1200);
+            return { dir: newDir, message: null };
+        } else {
+            divEl.innerHTML = `<h3>The Oracle Speaks</h3><div class="hexagram">${hexagram}</div><p>The path is clear.</p>`;
+            divEl.style.display = 'block';
+            setTimeout(() => { divEl.style.display = 'none'; }, 800);
+            return { dir, message: null };
+        }
+    }
+
+    function infiniteMove(dir) {
+        // Library wraps around
+        const W = SIZES[level];
+        const H = SIZES[level];
+        const dirs = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
+        const [dx, dy] = dirs[dir];
+
+        let nx = player.x + dx;
+        let ny = player.y + dy;
+
+        // Wrap around
+        if (nx < 1) nx = W - 2;
+        if (nx > W - 2) nx = 1;
+        if (ny < 1) ny = H - 2;
+        if (ny > H - 2) ny = 1;
+
+        // If wrapped position is a wall, find nearest floor
+        if (maze[ny][nx] === '#') {
+            for (let r = 1; r < W; r++) {
+                for (const [ddx, ddy] of [[0,0], [1,0], [-1,0], [0,1], [0,-1]]) {
+                    const tx = ((nx + ddx * r - 1 + W - 2) % (W - 2)) + 1;
+                    const ty = ((ny + ddy * r - 1 + H - 2) % (H - 2)) + 1;
+                    if (maze[ty][tx] === '.') {
+                        player.x = tx;
+                        player.y = ty;
+                        return { dir: null, message: "The corridors fold upon themselves. You emerge elsewhere." };
+                    }
                 }
             }
         }
 
-        player = { x: 1, y: 1 };
-        saveState();
+        player.x = nx;
+        player.y = ny;
+        return { dir: null, message: null };
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    function paradoxMove(dir) {
+        moveCount++;
+
+        // The key only appears after many moves without seeking
+        const keyItem = items.find(i => i.isKey);
+        if (keyItem && !keyItem.visible) {
+            // Key becomes visible after 15+ moves if player hasn't been near it
+            const dist = Math.abs(keyItem.x - player.x) + Math.abs(keyItem.y - player.y);
+            if (moveCount > 15 && dist > 5) {
+                keyItem.visible = true;
+                return { dir, message: "You've stopped seeking. Something appears at the edge of perception." };
+            }
+        }
+
+        return { dir, message: null };
+    }
+
+    function voidMove(dir) {
+        // In void, movement sometimes fails or goes wrong direction
+        if (Math.random() < 0.3) {
+            const directions = ['n', 'e', 's', 'w'];
+            return { dir: directions[Math.floor(Math.random() * 4)], message: null };
+        }
+
+        // Walls sometimes become permeable
+        const dirs = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
+        const [dx, dy] = dirs[dir];
+        const nx = player.x + dx;
+        const ny = player.y + dy;
+
+        if (maze[ny] && maze[ny][nx] === '#' && Math.random() < 0.2) {
+            // Pass through wall
+            player.x = nx;
+            player.y = ny;
+            return { dir: null, message: null };
+        }
+
+        return { dir, message: null };
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TRANSMUTATION (Hermetic level)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    function checkTransmutation() {
+        if (level !== 2) return; // Only Hermetic level
+
+        const hasSulfur = inventory.includes('sulfur');
+        const hasMercury = inventory.includes('mercury');
+        const hasSalt = inventory.includes('salt');
+
+        if (hasSulfur && hasMercury && hasSalt && !inventory.includes('philosopher-stone')) {
+            // Transmute!
+            inventory = inventory.filter(i => i !== 'sulfur' && i !== 'mercury' && i !== 'salt');
+            inventory.push('philosopher-stone');
+            return "The three principles unite! Sulfur, mercury, and salt dissolve into the philosopher's stone.";
+        }
+        return null;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // RENDERING
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
 
     function render() {
         const realm = REALMS[level];
-        const W = getSize();
-        const H = getSize();
-        const hasKey = inventory.includes(realm.keyItem);
+        const W = SIZES[level];
+        const H = SIZES[level];
+        const hasKey = realm.keyItem ? inventory.includes(realm.keyItem) : false;
 
         let out = '';
         for (let y = 0; y < H; y++) {
@@ -559,12 +835,14 @@
                     out += '<span class="player">@</span>';
                 } else if (stairsPos && x === stairsPos.x && y === stairsPos.y && hasKey) {
                     out += '<span class="stairs">▼</span>';
-                } else if (items.some(i => i.x === x && i.y === y && i.isKey)) {
+                } else if (items.some(i => i.x === x && i.y === y && i.isKey && i.visible)) {
                     out += '<span class="key-item">◆</span>';
-                } else if (items.some(i => i.x === x && i.y === y)) {
-                    out += '<span class="item">*</span>';
+                } else if (items.some(i => i.x === x && i.y === y && !i.isKey)) {
+                    out += '<span class="item">∗</span>';
                 } else if (maze[y] && maze[y][x] === '#') {
                     out += '<span class="wall">█</span>';
+                } else if (maze[y] && maze[y][x] === '.') {
+                    out += '<span class="floor">·</span>';
                 } else {
                     out += ' ';
                 }
@@ -577,16 +855,16 @@
         const roomKey = `${player.x},${player.y}`;
         let desc = rooms[roomKey] || '...';
 
-        const here = items.filter(i => i.x === player.x && i.y === player.y);
+        const here = items.filter(i => i.x === player.x && i.y === player.y && (i.visible !== false));
         if (here.length) {
-            desc += `\n\nYou see: ${here.map(i => i.isKey ? `◆ ${i.name}` : i.name).join(', ')}`;
+            desc += `\n\nHere lies: ${here.map(i => i.isKey ? `◆ ${i.name}` : i.name).join(', ')}.`;
         }
 
         if (stairsPos && player.x === stairsPos.x && player.y === stairsPos.y) {
             if (hasKey) {
-                desc += '\n\nStairs descend into darkness.';
-            } else {
-                desc += `\n\nThere is a sealed passage here. It requires the ${realm.keyItem}.`;
+                desc += '\n\nStairs spiral downward into deeper darkness.';
+            } else if (realm.keyItem) {
+                desc += `\n\nA sealed passage. It awaits the ${realm.keyItem}.`;
             }
         }
 
@@ -595,12 +873,29 @@
 
         // Hint
         const hint = document.getElementById('hint');
-        if (!hasKey && realm.keyItem) {
+        if (level === 2) {
+            // Hermetic level hint
+            const hasStone = inventory.includes('philosopher-stone');
+            if (!hasStone) {
+                const has = [
+                    inventory.includes('sulfur') ? 'sulfur' : null,
+                    inventory.includes('mercury') ? 'mercury' : null,
+                    inventory.includes('salt') ? 'salt' : null
+                ].filter(Boolean);
+                if (has.length === 0) {
+                    hint.textContent = 'gather the three principles';
+                } else if (has.length < 3) {
+                    hint.textContent = `${has.join(' + ')} — seek the rest`;
+                }
+            } else {
+                hint.textContent = 'the stone is yours — find the way down';
+            }
+        } else if (!hasKey && realm.keyItem) {
             hint.textContent = `seek the ${realm.keyItem}`;
         } else if (hasKey && stairsPos) {
-            hint.textContent = 'find the stairs ▼';
+            hint.textContent = 'descend ▼';
         } else if (level === REALMS.length - 1) {
-            hint.textContent = 'there is nothing more';
+            hint.textContent = '';
         } else {
             hint.textContent = '';
         }
@@ -617,99 +912,91 @@
     }
 
     function canMove(dx, dy) {
-        const W = getSize();
-        const H = getSize();
-        const nx = player.x + dx, ny = player.y + dy;
+        const realm = REALMS[level];
+        const W = SIZES[level];
+        const H = SIZES[level];
+        const nx = player.x + dx;
+        const ny = player.y + dy;
+
+        // Infinite library wraps
+        if (realm.mechanic === 'infinite') return true;
+
+        // Void level is more permeable
+        if (realm.mechanic === 'void') return true;
+
         return nx >= 0 && nx < W && ny >= 0 && ny < H && maze[ny] && maze[ny][nx] !== '#';
     }
 
     function move(dir) {
-        const dirs = { n: [0,-1], s: [0,1], w: [-1,0], e: [1,0] };
-        const [dx, dy] = dirs[dir];
-        if (canMove(dx, dy)) {
-            player.x += dx;
-            player.y += dy;
-            saveState();
-            render();
+        const result = applyMechanic(dir);
+        let message = result.message;
+
+        if (result.dir !== null) {
+            const dirs = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
+            const [dx, dy] = dirs[result.dir];
+
+            if (canMove(dx, dy)) {
+                player.x += dx;
+                player.y += dy;
+            }
         }
+
+        if (message) {
+            // Could show message in description
+        }
+
+        render();
     }
 
     function take() {
-        const idx = items.findIndex(i => i.x === player.x && i.y === player.y);
-        if (idx >= 0) {
-            inventory.push(items[idx].name);
-            items.splice(idx, 1);
-            saveState();
+        const visibleItems = items.filter(i => i.x === player.x && i.y === player.y && (i.visible !== false));
+        if (visibleItems.length > 0) {
+            for (const item of visibleItems) {
+                inventory.push(item.name);
+                const idx = items.indexOf(item);
+                if (idx >= 0) items.splice(idx, 1);
+            }
+
+            // Check for transmutation
+            const transMsg = checkTransmutation();
+            if (transMsg) {
+                alert(transMsg);
+            }
+
             render();
         }
     }
 
     function descend() {
         const realm = REALMS[level];
-        if (stairsPos && player.x === stairsPos.x && player.y === stairsPos.y && inventory.includes(realm.keyItem)) {
+        const hasKey = realm.keyItem ? inventory.includes(realm.keyItem) : true;
+
+        if (stairsPos && player.x === stairsPos.x && player.y === stairsPos.y && hasKey) {
             level++;
-            inventory = []; // Drop all items between levels
+            inventory = [];
             initLevel();
             render();
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // STATE PERSISTENCE
-    // ═══════════════════════════════════════════════════════════════
-
-    function saveState() {
-        const state = {
-            l: level,
-            p: [player.x, player.y],
-            i: inventory,
-            it: items.map(i => [i.x, i.y, i.name, i.isKey]),
-            s: stairsPos,
-            m: maze,
-            r: rooms
-        };
-        try {
-            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
-            history.replaceState(null, '', '#' + encoded);
-        } catch (e) {
-            // State too large, skip
-        }
-    }
-
-    function loadState() {
-        if (window.location.hash.length > 1) {
-            try {
-                const state = JSON.parse(decodeURIComponent(escape(atob(window.location.hash.slice(1)))));
-                level = state.l || 0;
-                player = { x: state.p[0], y: state.p[1] };
-                inventory = state.i || [];
-                items = (state.it || []).map(([x, y, name, isKey]) => ({ x, y, name, isKey }));
-                stairsPos = state.s;
-                maze = state.m;
-                rooms = state.r || {};
-                markov = buildMarkov(REALMS[level].corpus);
-                document.body.className = `level-${level}`;
-                document.getElementById('level-name').textContent = REALMS[level].name;
-                document.getElementById('depth').textContent = `depth ${level}`;
-                return true;
-            } catch (e) {
-                return false;
-            }
-        }
-        return false;
-    }
-
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
     // KEYBOARD CONTROLS
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
 
     document.addEventListener('keydown', (e) => {
-        const map = { ArrowUp: 'n', ArrowDown: 's', ArrowLeft: 'w', ArrowRight: 'e', w: 'n', s: 's', a: 'w', d: 'e' };
+        if (e.target.tagName === 'INPUT') return;
+
+        const map = {
+            ArrowUp: 'n', ArrowDown: 's', ArrowLeft: 'w', ArrowRight: 'e',
+            w: 'n', s: 's', a: 'w', d: 'e',
+            k: 'n', j: 's', h: 'w', l: 'e'
+        };
+
         if (map[e.key]) {
             e.preventDefault();
             move(map[e.key]);
         }
-        if (e.key === ' ' || e.key === 'Enter') {
+        if (e.key === ' ' || e.key === 'Enter' || e.key === 'g') {
             e.preventDefault();
             take();
         }
@@ -719,13 +1006,11 @@
         }
     });
 
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
     // INITIALIZE
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
 
-    if (!loadState()) {
-        initLevel();
-    }
+    initLevel();
     render();
     </script>
 </body>
