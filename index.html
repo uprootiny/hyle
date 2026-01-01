@@ -3,26 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>hyle</title>
+    <title>hyle - Rust-native code assistant</title>
+    <meta name="description" content="A minimal, fast code assistant built in Rust. TUI interface, multi-model support, and Unix philosophy.">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
     <style>
 :root {
-    --bg: #09090b;
-    --bg-card: #0f0f11;
-    --bg-hover: #141418;
-    --border: #1c1c22;
-    --border-subtle: #18181c;
-    --text: #e4e4e7;
-    --text-dim: #71717a;
-    --text-muted: #52525b;
+    --bg: #0a0a0b;
+    --bg-card: #111113;
+    --bg-code: #0d0d0f;
+    --border: #1e1e24;
+    --text: #e8e8ec;
+    --text-dim: #8b8b96;
+    --text-muted: #5c5c66;
     --accent: #4ade80;
-    --accent-dim: rgba(74, 222, 128, 0.15);
+    --accent-hover: #22c55e;
+    --accent-dim: rgba(74, 222, 128, 0.12);
     --blue: #60a5fa;
-    --blue-dim: rgba(96, 165, 250, 0.15);
     --purple: #a78bfa;
-    --amber: #fbbf24;
-    --red: #f87171;
-    --red-dim: rgba(248, 113, 113, 0.15);
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -30,1231 +29,618 @@
 html { scroll-behavior: smooth; }
 
 body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
-    line-height: 1.6;
-    min-height: 100vh;
+    line-height: 1.7;
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
 }
 
-.app {
-    display: grid;
-    grid-template-columns: 1fr 380px;
-    min-height: 100vh;
-}
+a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+a:hover { color: var(--accent-hover); }
 
-/* ═══════════════════════════════════════════════════════════════
-   LEFT: Main content
-   ═══════════════════════════════════════════════════════════════ */
-
-.main {
-    padding: 2rem;
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    overflow-y: auto;
-}
-
-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.brand {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.brand .lambda {
-    font-size: 1.75rem;
-    color: var(--accent);
-    text-shadow: 0 0 20px var(--accent-dim);
-    transition: all 0.3s ease;
-}
-
-.brand:hover .lambda {
-    text-shadow: 0 0 30px rgba(74, 222, 128, 0.4);
-    transform: scale(1.05);
-}
-
-.brand h1 {
-    font-size: 1.25rem;
-    font-weight: 500;
-    letter-spacing: -0.02em;
-}
-
-nav {
-    display: flex;
-    gap: 1.25rem;
-    font-size: 0.8rem;
-}
-
-nav a {
-    color: var(--text-dim);
-    text-decoration: none;
-    padding: 0.35rem 0.6rem;
+code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--bg-code);
+    padding: 0.15em 0.4em;
     border-radius: 4px;
-    transition: all 0.2s ease;
+    border: 1px solid var(--border);
 }
 
-nav a:hover {
+/* Layout */
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+/* Hero */
+.hero {
+    padding: 6rem 0 4rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+}
+
+.hero-logo {
+    font-size: 4rem;
+    color: var(--accent);
+    text-shadow: 0 0 60px var(--accent-dim);
+    margin-bottom: 1rem;
+    display: inline-block;
+    animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.75rem;
+}
+
+.hero .tagline {
+    font-size: 1.25rem;
+    color: var(--text-dim);
+    max-width: 500px;
+    margin: 0 auto 2rem;
+}
+
+.hero-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+}
+.btn-primary:hover {
+    background: var(--accent-hover);
+    color: var(--bg);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px var(--accent-dim);
+}
+
+.btn-secondary {
+    background: var(--bg-card);
     color: var(--text);
-    background: var(--bg-hover);
+    border: 1px solid var(--border);
+}
+.btn-secondary:hover {
+    background: var(--border);
+    color: var(--text);
+    border-color: var(--text-muted);
 }
 
-/* Sketch Input */
-.sketch-form {
+/* Features */
+.features {
+    padding: 4rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.features h2 {
+    font-size: 1.5rem;
+    font-weight: 500;
+    margin-bottom: 2rem;
+    color: var(--text-dim);
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.feature {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 1.5rem;
-    transition: border-color 0.2s ease;
 }
 
-.sketch-form:focus-within {
-    border-color: var(--border);
-    box-shadow: 0 0 0 1px var(--accent-dim);
+.feature-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
 }
 
-.sketch-form h2 {
-    font-size: 0.85rem;
+.feature h3 {
+    font-size: 1rem;
     font-weight: 500;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.feature p {
+    font-size: 0.9rem;
     color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    line-height: 1.6;
 }
 
-.sketch-input {
-    width: 100%;
-    min-height: 130px;
-    background: var(--bg);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    padding: 1rem;
-    color: var(--text);
-    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
-    font-size: 0.85rem;
-    resize: vertical;
-    transition: all 0.2s ease;
+/* Install */
+.install {
+    padding: 4rem 0;
+    border-bottom: 1px solid var(--border);
 }
 
-.sketch-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-dim);
-}
-
-.sketch-input::placeholder {
-    color: var(--text-muted);
-    opacity: 0.6;
-}
-
-.sketch-input.shake {
-    animation: shake 0.4s ease;
-    border-color: var(--amber);
-}
-
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    20% { transform: translateX(-6px); }
-    40% { transform: translateX(6px); }
-    60% { transform: translateX(-4px); }
-    80% { transform: translateX(4px); }
-}
-
-.form-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 1rem;
-}
-
-.char-count {
-    font-size: 0.75rem;
-    color: var(--text-dim);
-    font-family: monospace;
-}
-
-.submit-btn {
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    padding: 0.6rem 1.5rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.submit-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    transform: translateX(-100%);
-    transition: transform 0.4s ease;
-}
-
-.submit-btn:hover {
-    background: #22c55e;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px var(--accent-dim);
-}
-
-.submit-btn:hover::before {
-    transform: translateX(100%);
-}
-
-.submit-btn:active {
-    transform: translateY(0);
-}
-
-.submit-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-}
-
-.submit-btn.loading {
-    pointer-events: none;
-}
-
-.submit-btn.loading::after {
-    content: '';
-    width: 14px;
-    height: 14px;
-    border: 2px solid transparent;
-    border-top-color: currentColor;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-left: 8px;
-    display: inline-block;
-    vertical-align: middle;
-}
-
-.kbd-hint {
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    margin-left: 0.5rem;
-}
-
-/* Gallery */
-.gallery {
-    flex: 1;
-}
-
-.gallery h2 {
-    font-size: 0.75rem;
+.install h2 {
+    font-size: 1.5rem;
     font-weight: 500;
-    color: var(--text-dim);
-    margin-bottom: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    margin-bottom: 2rem;
 }
 
-.projects {
+.install-methods {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 2rem;
+}
+
+.install-method h3 {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+}
+
+.code-block {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    overflow-x: auto;
+    position: relative;
+}
+
+.code-block .prompt {
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.code-block .cmd {
+    color: var(--accent);
+}
+
+.code-block .arg {
+    color: var(--blue);
+}
+
+.code-block .comment {
+    color: var(--text-muted);
+}
+
+.copy-btn {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: var(--border);
+    border: none;
+    color: var(--text-dim);
+    padding: 0.35rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.code-block:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background: var(--text-muted); color: var(--bg); }
+
+/* Downloads */
+.downloads {
+    margin-top: 1.5rem;
+}
+
+.download-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
 }
 
-.project-card {
+.download-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
     background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-    overflow: hidden;
-    transition: all 0.25s ease;
-    cursor: pointer;
-}
-
-.project-card:hover {
-    border-color: var(--border);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-}
-
-.project-thumb {
-    aspect-ratio: 16/10;
-    background: #000;
-    overflow: hidden;
-    position: relative;
-}
-
-.project-thumb::after {
-    content: '↗';
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 24px;
-    height: 24px;
-    background: rgba(0,0,0,0.7);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    color: var(--text);
-    opacity: 0;
-    transform: translate(4px, -4px);
-    transition: all 0.2s ease;
-}
-
-.project-card:hover .project-thumb::after {
-    opacity: 1;
-    transform: translate(0, 0);
-}
-
-.project-thumb iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-    pointer-events: none;
-    transform: scale(1.02);
-    transition: transform 0.3s ease;
-}
-
-.project-card:hover .project-thumb iframe {
-    transform: scale(1.05);
-}
-
-.project-meta {
-    padding: 0.85rem;
-    background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.1));
-}
-
-.project-name {
-    font-size: 0.8rem;
-    font-weight: 600;
-    margin-bottom: 0.3rem;
-    color: var(--text);
-}
-
-.project-desc {
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    line-height: 1.4;
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   RIGHT: Cascade sidebar
-   ═══════════════════════════════════════════════════════════════ */
-
-.cascade-panel {
-    background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg) 100%);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.cascade-header {
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--border-subtle);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--bg-card);
-}
-
-.cascade-title {
-    font-size: 0.85rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    letter-spacing: -0.01em;
-}
-
-.cascade-status {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--text-muted);
-    transition: all 0.4s ease;
-}
-
-.cascade-status.idle {
-    background: var(--text-muted);
-    animation: breathe 3s ease-in-out infinite;
-}
-
-.cascade-status.active {
-    background: var(--blue);
-    box-shadow: 0 0 16px var(--blue), 0 0 4px var(--blue);
-    animation: pulse 1.2s ease-in-out infinite;
-}
-
-.cascade-status.done {
-    background: var(--accent);
-    box-shadow: 0 0 8px var(--accent-dim);
-}
-
-.cascade-status.error {
-    background: var(--red);
-    box-shadow: 0 0 8px var(--red-dim);
-}
-
-@keyframes breathe {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 0.7; }
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.6; transform: scale(0.9); }
-}
-
-.cascade-stats {
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    font-family: 'SF Mono', monospace;
-    padding: 0.25rem 0.5rem;
-    background: var(--bg);
-    border-radius: 4px;
-}
-
-/* Progress bar */
-.cascade-progress {
-    height: 2px;
-    background: var(--border);
-    overflow: hidden;
-}
-
-.cascade-progress-bar {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, var(--blue), var(--purple), var(--accent));
-    background-size: 200% 100%;
-    animation: shimmer 2s linear infinite;
-    transition: width 0.3s ease-out;
-}
-
-@keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-
-/* Stages */
-.cascade-stages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem;
-    position: relative;
-}
-
-.cascade-stages::before {
-    content: '';
-    position: absolute;
-    left: 1.5rem;
-    top: 1rem;
-    bottom: 1rem;
-    width: 1px;
-    background: linear-gradient(to bottom, var(--border-subtle), transparent);
-    pointer-events: none;
-}
-
-.stage {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.85rem;
-    padding: 0.75rem 0.5rem;
+    border: 1px solid var(--border);
     border-radius: 8px;
-    margin-bottom: 4px;
-    background: transparent;
-    transition: all 0.2s ease;
-    position: relative;
+    padding: 1rem;
+    transition: all 0.2s;
 }
 
-.stage:hover {
-    background: rgba(255,255,255,0.02);
-}
-
-.stage-icon {
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-    flex-shrink: 0;
-    position: relative;
-    z-index: 1;
-    background: var(--bg-card);
-    border-radius: 50%;
-}
-
-.stage-icon.pending {
-    color: var(--text-muted);
-}
-
-.stage-icon.running {
-    color: var(--blue);
-    background: var(--blue-dim);
-}
-
-.stage-icon.done {
-    color: var(--accent);
+.download-item:hover {
+    border-color: var(--accent);
     background: var(--accent-dim);
 }
 
-.stage-icon.error {
-    color: var(--red);
-    background: var(--red-dim);
+.download-icon {
+    font-size: 1.5rem;
 }
 
-/* Stage animations */
-.stage {
-    max-height: 80px;
-    opacity: 1;
-    transition: all 0.3s ease;
+.download-info {
+    flex: 1;
 }
 
-.stage.folded {
-    max-height: 0;
-    opacity: 0;
-    padding: 0;
-    margin: 0;
+.download-info .platform {
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.download-info .arch {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+/* Usage */
+.usage {
+    padding: 4rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.usage h2 {
+    font-size: 1.5rem;
+    font-weight: 500;
+    margin-bottom: 2rem;
+}
+
+.usage-examples {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.usage-example h3 {
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.usage-example h3::before {
+    content: '→';
+    color: var(--accent);
+}
+
+/* Demo */
+.demo {
+    padding: 4rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.demo h2 {
+    font-size: 1.5rem;
+    font-weight: 500;
+    margin-bottom: 2rem;
+}
+
+.terminal {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 12px;
     overflow: hidden;
 }
 
-.stage.expanded {
-    animation: unfold 0.3s ease-out;
-}
-
-@keyframes unfold {
-    from {
-        max-height: 0;
-        opacity: 0;
-        transform: translateY(-8px);
-    }
-    to {
-        max-height: 80px;
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.stage-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.stage-name {
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text);
-}
-
-.stage-detail {
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    margin-top: 3px;
-    font-family: 'SF Mono', monospace;
-}
-
-.stage-detail .model { color: var(--purple); }
-.stage-detail .tokens { color: var(--accent); }
-.stage-detail .file { color: var(--amber); }
-
-.stage-detail a,
-.log-msg a {
-    color: inherit;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-    text-underline-offset: 2px;
-}
-
-.stage-detail a:hover,
-.log-msg a:hover {
-    text-decoration-style: solid;
-    opacity: 0.9;
-}
-
-.stage-time {
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    min-width: 45px;
-    text-align: right;
-    font-family: 'SF Mono', monospace;
-}
-
-/* Log stream */
-.cascade-log {
-    border-top: 1px solid var(--border-subtle);
-    background: var(--bg);
-    max-height: 160px;
-    overflow-y: auto;
-    font-family: 'SF Mono', 'JetBrains Mono', monospace;
-    font-size: 0.65rem;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
-}
-
-.cascade-log::-webkit-scrollbar {
-    width: 4px;
-}
-
-.cascade-log::-webkit-scrollbar-thumb {
+.terminal-header {
     background: var(--border);
-    border-radius: 2px;
-}
-
-.log-entry {
-    padding: 0.35rem 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.015);
+    padding: 0.75rem 1rem;
     display: flex;
-    gap: 0.75rem;
-    animation: slideIn 0.25s ease-out;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateX(-8px);
-        background: var(--blue-dim);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-        background: transparent;
-    }
+.terminal-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
 }
+.terminal-dot.red { background: #f87171; }
+.terminal-dot.yellow { background: #fbbf24; }
+.terminal-dot.green { background: #4ade80; }
 
-.log-ts {
+.terminal-title {
+    flex: 1;
+    text-align: center;
+    font-size: 0.8rem;
     color: var(--text-muted);
-    min-width: 60px;
-    opacity: 0.6;
 }
 
-.log-msg {
+.terminal-body {
+    padding: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.8;
+    min-height: 300px;
+}
+
+.terminal-line {
+    margin-bottom: 0.25rem;
+}
+
+.terminal-prompt {
+    color: var(--accent);
+}
+
+.terminal-output {
     color: var(--text-dim);
+    padding-left: 1rem;
 }
 
-.log-msg.info { color: var(--text-dim); }
-.log-msg.model { color: var(--purple); }
-.log-msg.token { color: var(--accent); }
-.log-msg.check { color: var(--accent); font-weight: 500; }
-.log-msg.warn { color: var(--amber); }
-.log-msg.error { color: var(--red); font-weight: 500; }
+.terminal-cascade {
+    color: var(--blue);
+}
+
+.terminal-success {
+    color: var(--accent);
+}
 
 /* Footer */
-.cascade-footer {
-    padding: 0.85rem 1.25rem;
-    border-top: 1px solid var(--border-subtle);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    font-family: 'SF Mono', monospace;
-    background: var(--bg-card);
+footer {
+    padding: 3rem 0;
+    text-align: center;
 }
 
-.cascade-footer span {
-    padding: 0.2rem 0.4rem;
-    background: var(--bg);
-    border-radius: 3px;
+footer p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+footer a {
+    color: var(--text-dim);
+}
+
+footer a:hover {
+    color: var(--accent);
+}
+
+.footer-links {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
 }
 
 /* Responsive */
-@media (max-width: 960px) {
-    .app {
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr auto;
-    }
-
-    .main {
-        padding: 1.5rem;
-    }
-
-    .cascade-panel {
-        border-left: none;
-        border-top: 1px solid var(--border);
-        max-height: 45vh;
-    }
-
-    nav {
-        gap: 0.5rem;
-    }
-
-    nav a {
-        padding: 0.25rem 0.4rem;
-        font-size: 0.75rem;
-    }
-}
-
-@media (max-width: 600px) {
-    .main {
-        padding: 1rem;
-        gap: 1.5rem;
-    }
-
-    header {
-        flex-direction: column;
-        gap: 1rem;
-        align-items: flex-start;
-    }
-
-    .projects {
-        grid-template-columns: 1fr;
-    }
-
-    .cascade-stages::before {
-        left: 1.25rem;
-    }
-}
-
-/* Focus visible */
-:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
-button:focus-visible,
-textarea:focus-visible {
-    outline: none;
-}
-
-/* Selection */
-::selection {
-    background: var(--accent-dim);
-    color: var(--text);
+@media (max-width: 640px) {
+    .container { padding: 0 1.25rem; }
+    .hero { padding: 4rem 0 3rem; }
+    .hero h1 { font-size: 2rem; }
+    .hero .tagline { font-size: 1.1rem; }
+    .features, .install, .usage, .demo { padding: 3rem 0; }
+    .hero-buttons { flex-direction: column; align-items: center; }
 }
     </style>
 </head>
 <body>
 
-<div class="app">
-    <main class="main">
-        <header>
-            <div class="brand">
-                <span class="lambda">λ</span>
-                <h1>hyle</h1>
-            </div>
-            <nav>
-                <a href="https://github.com/uprootiny/hyle">source</a>
-                <a href="https://drops.hyperstitious.org/">outputs</a>
-                <a href="https://hyle.hyperstitious.org/api/models">models</a>
-            </nav>
-        </header>
-
-        <section class="sketch-form">
-            <h2>describe your artpiece</h2>
-            <textarea class="sketch-input" id="sketchInput" placeholder="seismic data sonification: fetch USGS earthquake feed, map magnitude to pitch, depth to reverb. visualize as expanding rings on a dymaxion projection..."></textarea>
-            <div class="form-actions">
-                <span class="char-count"><span id="charCount">0</span> chars</span>
-                <button class="submit-btn" id="submitBtn">generate</button>
-            </div>
-        </section>
-
-        <section class="gallery">
-            <h2>recent outputs</h2>
-            <div class="projects" id="projectGrid">
-                <article class="project-card">
-                    <div class="project-thumb">
-                        <iframe src="https://drops.hyperstitious.org/seismic-7edb/" loading="lazy"></iframe>
-                    </div>
-                    <div class="project-meta">
-                        <div class="project-name">seismic-7edb</div>
-                        <div class="project-desc">USGS earthquake sonification with dymaxion projection</div>
-                    </div>
-                </article>
-                <article class="project-card">
-                    <div class="project-thumb">
-                        <iframe src="https://drops.hyperstitious.org/datacenters/" loading="lazy"></iframe>
-                    </div>
-                    <div class="project-meta">
-                        <div class="project-name">datacenters</div>
-                        <div class="project-desc">Global datacenter infrastructure visualization</div>
-                    </div>
-                </article>
-                <article class="project-card">
-                    <div class="project-thumb">
-                        <iframe src="https://drops.hyperstitious.org/maze-e869/" loading="lazy"></iframe>
-                    </div>
-                    <div class="project-meta">
-                        <div class="project-name">maze-e869</div>
-                        <div class="project-desc">Generative flower labyrinth with procedural paths</div>
-                    </div>
-                </article>
-                <article class="project-card">
-                    <div class="project-thumb">
-                        <iframe src="https://drops.hyperstitious.org/llm-dissection/" loading="lazy"></iframe>
-                    </div>
-                    <div class="project-meta">
-                        <div class="project-name">llm-dissection</div>
-                        <div class="project-desc">Neural network architecture visualization</div>
-                    </div>
-                </article>
-            </div>
-        </section>
-    </main>
-
-    <aside class="cascade-panel">
-        <div class="cascade-header">
-            <div class="cascade-title">
-                <span class="cascade-status" id="cascadeStatus"></span>
-                <span>cascade</span>
-            </div>
-            <div class="cascade-stats" id="cascadeStats">ready</div>
+<section class="hero">
+    <div class="container">
+        <div class="hero-logo">λ</div>
+        <h1>hyle</h1>
+        <p class="tagline">A minimal, fast code assistant built in Rust. TUI interface, multi-model routing, and Unix philosophy.</p>
+        <div class="hero-buttons">
+            <a href="https://github.com/uprootiny/hyle" class="btn btn-primary">
+                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                View on GitHub
+            </a>
+            <a href="#install" class="btn btn-secondary">
+                Quick Install
+            </a>
         </div>
-        <div class="cascade-progress">
-            <div class="cascade-progress-bar" id="progressBar"></div>
+    </div>
+</section>
+
+<section class="features">
+    <div class="container">
+        <h2>Why hyle?</h2>
+        <div class="feature-grid">
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <h3>Native Performance</h3>
+                <p>Built in Rust with zero runtime dependencies. Starts instantly, runs efficiently.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔄</div>
+                <h3>Multi-Model Routing</h3>
+                <p>Automatic fallback across OpenRouter models with intelligent rate-limit handling.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🖥️</div>
+                <h3>TUI Interface</h3>
+                <p>Full terminal UI with syntax highlighting, cascade visualization, and keyboard shortcuts.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔧</div>
+                <h3>Tool Integration</h3>
+                <p>Read, write, edit, grep, glob, bash - all tools LLMs need to work with your code.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📊</div>
+                <h3>Model Tracking</h3>
+                <p>Reliability scoring per model. Automatic penalty for hallucinations and failures.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <h3>Safety Guards</h3>
+                <p>Write safety checks, injection detection, and destructive command blocking.</p>
+            </div>
         </div>
-        <div class="cascade-stages" id="stageList"></div>
-        <div class="cascade-log" id="logStream"></div>
-        <div class="cascade-footer">
-            <span id="elapsedTime">0.0s</span>
-            <span id="modelName">—</span>
+    </div>
+</section>
+
+<section class="install" id="install">
+    <div class="container">
+        <h2>Installation</h2>
+        <div class="install-methods">
+            <div class="install-method">
+                <h3>From Source (Recommended)</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <span class="prompt">$</span> <span class="cmd">git clone</span> <span class="arg">https://github.com/uprootiny/hyle.git</span><br>
+                    <span class="prompt">$</span> <span class="cmd">cd</span> hyle<br>
+                    <span class="prompt">$</span> <span class="cmd">cargo build</span> <span class="arg">--release</span><br>
+                    <span class="prompt">$</span> <span class="cmd">cp</span> target/release/hyle <span class="arg">~/.local/bin/</span>
+                </div>
+            </div>
+
+            <div class="install-method">
+                <h3>Pre-built Binaries</h3>
+                <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1rem;">
+                    Download from GitHub Actions artifacts or releases:
+                </p>
+                <div class="download-grid">
+                    <a href="https://github.com/uprootiny/hyle/actions" class="download-item">
+                        <div class="download-icon">🐧</div>
+                        <div class="download-info">
+                            <div class="platform">Linux</div>
+                            <div class="arch">x86_64</div>
+                        </div>
+                    </a>
+                    <a href="https://github.com/uprootiny/hyle/actions" class="download-item">
+                        <div class="download-icon">🍎</div>
+                        <div class="download-info">
+                            <div class="platform">macOS</div>
+                            <div class="arch">x86_64 / aarch64</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="install-method">
+                <h3>Configuration</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <span class="comment"># Set your OpenRouter API key</span><br>
+                    <span class="prompt">$</span> <span class="cmd">export</span> OPENROUTER_API_KEY=<span class="arg">"sk-or-..."</span><br>
+                    <br>
+                    <span class="comment"># Or add to your shell config</span><br>
+                    <span class="prompt">$</span> <span class="cmd">echo</span> <span class="arg">'export OPENROUTER_API_KEY="sk-or-..."'</span> >> ~/.bashrc
+                </div>
+            </div>
         </div>
-    </aside>
-</div>
+    </div>
+</section>
+
+<section class="usage">
+    <div class="container">
+        <h2>Usage Examples</h2>
+        <div class="usage-examples">
+            <div class="usage-example">
+                <h3>Interactive TUI Mode</h3>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">hyle</span>
+                </div>
+            </div>
+
+            <div class="usage-example">
+                <h3>One-shot Query</h3>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">hyle</span> <span class="arg">"explain this codebase"</span>
+                </div>
+            </div>
+
+            <div class="usage-example">
+                <h3>Pipe Input</h3>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">cat</span> src/main.rs | <span class="cmd">hyle</span> <span class="arg">"review this code"</span>
+                </div>
+            </div>
+
+            <div class="usage-example">
+                <h3>Specific Model</h3>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">hyle</span> <span class="arg">--model</span> mistralai/devstral-small <span class="arg">"fix the bug"</span>
+                </div>
+            </div>
+
+            <div class="usage-example">
+                <h3>List Available Models</h3>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">hyle</span> <span class="arg">models</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="demo">
+    <div class="container">
+        <h2>In Action</h2>
+        <div class="terminal">
+            <div class="terminal-header">
+                <div class="terminal-dot red"></div>
+                <div class="terminal-dot yellow"></div>
+                <div class="terminal-dot green"></div>
+                <div class="terminal-title">hyle — ~/projects/myapp</div>
+            </div>
+            <div class="terminal-body">
+                <div class="terminal-line"><span class="terminal-prompt">λ</span> add error handling to the api module</div>
+                <div class="terminal-line terminal-cascade">⠋ parse → route → generate</div>
+                <div class="terminal-line terminal-output">Using model: mistralai/devstral-small</div>
+                <div class="terminal-line terminal-output"></div>
+                <div class="terminal-line terminal-output">I'll add proper error handling to the API module.</div>
+                <div class="terminal-line terminal-output"></div>
+                <div class="terminal-line terminal-output">```json</div>
+                <div class="terminal-line terminal-output">{"tool": "read", "args": {"path": "src/api.rs"}}</div>
+                <div class="terminal-line terminal-output">```</div>
+                <div class="terminal-line terminal-output"></div>
+                <div class="terminal-line terminal-success">✓ read src/api.rs (142 lines)</div>
+                <div class="terminal-line terminal-output"></div>
+                <div class="terminal-line terminal-output">I see the current implementation. Let me add Result types</div>
+                <div class="terminal-line terminal-output">and proper error propagation...</div>
+                <div class="terminal-line terminal-output"></div>
+                <div class="terminal-line terminal-cascade">✓ 847tok 3.2s</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <div class="container">
+        <div class="footer-links">
+            <a href="https://github.com/uprootiny/hyle">GitHub</a>
+            <a href="https://github.com/uprootiny/hyle/issues">Issues</a>
+            <a href="https://github.com/uprootiny/hyle/actions">CI/Artifacts</a>
+            <a href="/projects/">Projects</a>
+        </div>
+        <p>
+            Built with Rust. Following the Unix philosophy.<br>
+            <a href="https://github.com/uprootiny/hyle/blob/master/LICENSE">MIT License</a>
+        </p>
+    </div>
+</footer>
 
 <script>
-const API = 'https://hyle.hyperstitious.org';
-
-const $ = id => document.getElementById(id);
-const sketchInput = $('sketchInput');
-const submitBtn = $('submitBtn');
-const charCount = $('charCount');
-const cascadeStatus = $('cascadeStatus');
-const cascadeStats = $('cascadeStats');
-const progressBar = $('progressBar');
-const stageList = $('stageList');
-const logStream = $('logStream');
-const elapsedTime = $('elapsedTime');
-const modelName = $('modelName');
-
-let building = false;
-let startTime = 0;
-let pollInterval = null;
-let rafId = null;
-
-// Update char count with debounce
-let charDebounce = null;
-sketchInput.addEventListener('input', () => {
-    clearTimeout(charDebounce);
-    charDebounce = setTimeout(() => {
-        charCount.textContent = sketchInput.value.length;
-    }, 16);
-});
-
-// Keyboard shortcut: Cmd/Ctrl+Enter to submit
-sketchInput.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        submitBtn.click();
-    }
-});
-
-// Project card click handlers
-document.querySelectorAll('.project-card').forEach(card => {
-    card.addEventListener('click', () => {
-        const iframe = card.querySelector('iframe');
-        if (iframe) {
-            window.open(iframe.src, '_blank');
-        }
-    });
-});
-
-// Submit handler
-const MIN_CHARS = 10;
-
-submitBtn.addEventListener('click', async () => {
-    const sketch = sketchInput.value.trim();
-
-    if (building) return;
-
-    if (sketch.length < MIN_CHARS) {
-        sketchInput.classList.add('shake');
-        log(`need at least ${MIN_CHARS} characters (have ${sketch.length})`, 'warn');
-        setTimeout(() => sketchInput.classList.remove('shake'), 500);
-        sketchInput.focus();
-        return;
-    }
-
-    building = true;
-    submitBtn.disabled = true;
-    submitBtn.classList.add('loading');
-    startBuild(sketch);
-});
-
-// Braille spinners from cascade.rs
-const SPINNERS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-let spinnerIdx = 0;
-let spinnerInterval = null;
-
-// Log prefixes matching cascade.rs
-const LOG_PREFIX = {
-    info: '·',
-    model: '⚡',
-    token: '↳',
-    check: '✓',
-    warn: '⚠',
-    error: '✗'
-};
-
-function ts() {
-    return new Date().toLocaleTimeString('en-US', { hour12: false });
+function copyCode(btn) {
+    const block = btn.parentElement;
+    const text = block.textContent
+        .replace('Copy', '')
+        .replace(/\$ /g, '')
+        .replace(/# .+\n/g, '')
+        .trim();
+    navigator.clipboard.writeText(text);
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
 }
-
-function linkify(text) {
-    return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
-}
-
-function log(msg, type = 'info') {
-    const prefix = LOG_PREFIX[type] || '·';
-    const entry = document.createElement('div');
-    entry.className = 'log-entry';
-    entry.innerHTML = `<span class="log-ts">${ts()}</span><span class="log-msg ${type}">${prefix} ${linkify(msg)}</span>`;
-    logStream.appendChild(entry);
-    logStream.scrollTop = logStream.scrollHeight;
-    while (logStream.children.length > 50) logStream.firstChild.remove();
-}
-
-function setStage(name, status, detail = '', time = '') {
-    let stage = stageList.querySelector(`[data-stage="${name}"]`);
-    const isNew = !stage;
-
-    if (isNew) {
-        stage = document.createElement('div');
-        stage.className = 'stage expanded';
-        stage.dataset.stage = name;
-        stage.innerHTML = `
-            <span class="stage-icon pending">○</span>
-            <div class="stage-content">
-                <div class="stage-name">${name}</div>
-                <div class="stage-detail"></div>
-            </div>
-            <div class="stage-time"></div>
-        `;
-        stageList.appendChild(stage);
-    }
-
-    const icon = stage.querySelector('.stage-icon');
-    const detailEl = stage.querySelector('.stage-detail');
-    const timeEl = stage.querySelector('.stage-time');
-
-    icon.className = `stage-icon ${status}`;
-
-    // Use braille spinner for running, static icons for others
-    if (status === 'running') {
-        // Start spinner if not already running
-        if (!spinnerInterval) {
-            spinnerInterval = setInterval(() => {
-                spinnerIdx = (spinnerIdx + 1) % SPINNERS.length;
-                document.querySelectorAll('.stage-icon.running').forEach(el => {
-                    el.textContent = SPINNERS[spinnerIdx];
-                });
-            }, 80);
-        }
-        icon.textContent = SPINNERS[spinnerIdx];
-    } else {
-        icon.textContent = status === 'done' ? '✓' : status === 'error' ? '✗' : '○';
-    }
-
-    if (detail) detailEl.innerHTML = linkify(detail);
-    if (time) timeEl.textContent = time;
-}
-
-function setCascadeState(state) {
-    cascadeStatus.className = `cascade-status ${state}`;
-}
-
-function updateTimer() {
-    if (!building) return;
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    elapsedTime.textContent = `${elapsed}s`;
-    rafId = requestAnimationFrame(updateTimer);
-}
-
-async function startBuild(sketch) {
-    // Reset UI
-    stageList.innerHTML = '';
-    logStream.innerHTML = '';
-    setProgress(0);
-    setCascadeState('active');
-    cascadeStats.textContent = 'initializing...';
-    modelName.textContent = '—';
-    startTime = Date.now();
-
-    // Start smooth timer
-    rafId = requestAnimationFrame(updateTimer);
-
-    log('submitting sketch...', 'info');
-    setStage('submit', 'running', 'sending to API');
-
-    try {
-        const res = await fetch(`${API}/api/sketch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sketch })
-        });
-
-        if (!res.ok) {
-            const err = await res.text();
-            throw new Error(err);
-        }
-
-        const data = await res.json();
-        log(`job created: ${data.job_id.slice(0, 8)}...`, 'check');
-        setStage('submit', 'done', `job ${data.job_id.slice(0, 8)}`, '✓');
-        setProgress(10);
-
-        // Start polling
-        pollJob(data.job_id);
-
-    } catch (err) {
-        log(`error: ${err.message}`, 'error');
-        setStage('submit', 'error', err.message);
-        setCascadeState('error');
-        cascadeStats.textContent = 'failed';
-        endBuild();
-    }
-}
-
-const POLL_TIMEOUT_MS = 120000; // 2 minutes max
-const POLL_INTERVAL_MS = 2000;
-
-async function pollJob(jobId) {
-    let lastStatus = '';
-    let modelsTried = 0;
-    let pollCount = 0;
-    let errorCount = 0;
-    const maxErrors = 5;
-
-    pollInterval = setInterval(async () => {
-        pollCount++;
-        const elapsed = Date.now() - startTime;
-
-        // Timeout check
-        if (elapsed > POLL_TIMEOUT_MS) {
-            log('timeout: build took too long', 'error');
-            setStage('generate', 'error', 'timeout after 2 minutes');
-            setCascadeState('error');
-            cascadeStats.textContent = 'timeout';
-            endBuild();
-            return;
-        }
-
-        // Show progress heartbeat every 10s
-        if (pollCount % 5 === 0 && lastStatus === 'building') {
-            log(`still generating... (${Math.floor(elapsed/1000)}s)`, 'info');
-        }
-
-        try {
-            const res = await fetch(`${API}/api/jobs/${jobId}`);
-            const data = await res.json();
-
-            // Handle not_found (job expired or never existed)
-            if (data.status === 'not_found') {
-                errorCount++;
-                if (errorCount >= maxErrors) {
-                    log('job lost: server may have restarted', 'error');
-                    setStage('generate', 'error', 'job not found');
-                    setCascadeState('error');
-                    cascadeStats.textContent = 'lost';
-                    endBuild();
-                }
-                return;
-            }
-
-            errorCount = 0; // Reset on successful response
-
-            // Update models tried
-            if (data.models_tried && data.models_tried.length > modelsTried) {
-                const newModels = data.models_tried.slice(modelsTried);
-                newModels.forEach(m => {
-                    const name = m.split('/').pop().split(':')[0];
-                    log(`trying: ${name}`, 'model');
-                });
-                modelsTried = data.models_tried.length;
-                const currentModel = data.models_tried[data.models_tried.length - 1];
-                modelName.textContent = currentModel?.split('/').pop().split(':')[0] || '—';
-            }
-
-            // Update stages based on status
-            if (data.status !== lastStatus) {
-                lastStatus = data.status;
-
-                switch (data.status) {
-                    case 'queued':
-                        setStage('queue', 'running', 'waiting for slot');
-                        setProgress(15);
-                        cascadeStats.textContent = 'queued';
-                        break;
-
-                    case 'building':
-                        setStage('queue', 'done', '', '✓');
-                        setStage('generate', 'running', `<span class="model">${modelName.textContent}</span>`);
-                        setProgress(40);
-                        cascadeStats.textContent = `${modelsTried} model(s)`;
-                        log('LLM generating...', 'info');
-                        break;
-
-                    case 'deploying':
-                        setStage('generate', 'done', `<span class="tokens">${modelsTried} attempt(s)</span>`, '✓');
-                        setStage('deploy', 'running', 'copying files');
-                        setProgress(80);
-                        cascadeStats.textContent = 'deploying';
-                        log('deploying to server...', 'info');
-                        break;
-
-                    case 'live':
-                        const liveUrl = data.url || 'deployed';
-                        setStage('deploy', 'done', `<span class="file"><a href="${liveUrl}" target="_blank">${liveUrl}</a></span>`, '✓');
-                        setProgress(100);
-                        setCascadeState('done');
-                        cascadeStats.textContent = 'complete';
-                        log(`live: ${liveUrl}`, 'check');
-                        if (data.model_used) {
-                            modelName.textContent = data.model_used.split('/').pop().split(':')[0];
-                        }
-                        // Add to gallery
-                        addProjectToGallery({
-                            url: liveUrl,
-                            name: null, // Will extract from URL
-                            desc: sketchInput.value.trim().slice(0, 80) + (sketchInput.value.length > 80 ? '...' : '')
-                        });
-                        endBuild();
-                        break;
-
-                    case 'failed':
-                        const errMsg = data.error || 'unknown error';
-                        setStage('generate', 'error', errMsg);
-                        setCascadeState('error');
-                        cascadeStats.textContent = 'failed';
-                        log(`failed: ${errMsg}`, 'error');
-                        endBuild();
-                        break;
-                }
-            }
-
-        } catch (err) {
-            errorCount++;
-            log(`network error (${errorCount}/${maxErrors})`, 'warn');
-            if (errorCount >= maxErrors) {
-                log('too many errors, stopping', 'error');
-                setStage('generate', 'error', 'network failure');
-                setCascadeState('error');
-                cascadeStats.textContent = 'error';
-                endBuild();
-            }
-        }
-    }, POLL_INTERVAL_MS);
-}
-
-function endBuild() {
-    clearInterval(pollInterval);
-    clearInterval(spinnerInterval);
-    spinnerInterval = null;
-    cancelAnimationFrame(rafId);
-    building = false;
-    submitBtn.disabled = false;
-    submitBtn.classList.remove('loading');
-}
-
-// Smooth progress interpolation
-let currentProgress = 0;
-function setProgress(target) {
-    const animate = () => {
-        const diff = target - currentProgress;
-        if (Math.abs(diff) < 0.5) {
-            currentProgress = target;
-            progressBar.style.width = `${target}%`;
-            return;
-        }
-        currentProgress += diff * 0.15;
-        progressBar.style.width = `${currentProgress}%`;
-        requestAnimationFrame(animate);
-    };
-    requestAnimationFrame(animate);
-}
-
-// Gallery management
-const projectGrid = $('projectGrid');
-const STORAGE_KEY = 'hyle_recent_projects';
-
-function loadRecentProjects() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            const projects = JSON.parse(saved);
-            projects.forEach(p => addProjectToGallery(p, false));
-        }
-    } catch (e) {
-        console.warn('Failed to load projects:', e);
-    }
-}
-
-function saveRecentProjects() {
-    try {
-        const cards = projectGrid.querySelectorAll('.project-card.user-created');
-        const projects = Array.from(cards).map(card => ({
-            url: card.dataset.url,
-            name: card.querySelector('.project-name').textContent,
-            desc: card.querySelector('.project-desc').textContent
-        }));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(projects.slice(0, 10)));
-    } catch (e) {
-        console.warn('Failed to save projects:', e);
-    }
-}
-
-function addProjectToGallery(project, save = true) {
-    const { url, name, desc } = project;
-    if (!url) return;
-
-    // Extract name from URL if not provided
-    const displayName = name || url.replace(/https?:\/\//, '').replace('.hyperstitious.org', '').replace(/\/$/, '');
-    const displayDesc = desc || 'Generated artpiece';
-
-    const card = document.createElement('article');
-    card.className = 'project-card user-created';
-    card.dataset.url = url;
-    card.innerHTML = `
-        <div class="project-thumb">
-            <iframe src="${url}" loading="lazy"></iframe>
-        </div>
-        <div class="project-meta">
-            <div class="project-name">${displayName}</div>
-            <div class="project-desc">${displayDesc}</div>
-        </div>
-    `;
-    card.addEventListener('click', () => window.open(url, '_blank'));
-
-    // Insert at the beginning
-    projectGrid.insertBefore(card, projectGrid.firstChild);
-
-    // Animate in
-    card.style.opacity = '0';
-    card.style.transform = 'scale(0.9)';
-    requestAnimationFrame(() => {
-        card.style.transition = 'all 0.3s ease';
-        card.style.opacity = '1';
-        card.style.transform = 'scale(1)';
-    });
-
-    if (save) saveRecentProjects();
-}
-
-// Initial log
-log('cascade ready', 'info');
-setCascadeState('idle');
-loadRecentProjects();
 </script>
 
 </body>
