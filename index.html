@@ -3,91 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>hyle - Rust-native code assistant</title>
-    <meta name="description" content="A minimal, fast code assistant built in Rust. TUI interface, multi-model support, and Unix philosophy.">
+    <title>hyle — Rust-native code assistant</title>
+    <meta name="description" content="A minimal, blazing-fast code assistant. Multi-model routing, TUI interface, built for developers who value simplicity.">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
 :root {
-    --bg: #0a0a0b;
-    --bg-card: #111113;
-    --bg-code: #0d0d0f;
-    --border: #1e1e24;
-    --text: #e8e8ec;
-    --text-dim: #8b8b96;
-    --text-muted: #5c5c66;
-    --accent: #4ade80;
-    --accent-hover: #22c55e;
-    --accent-dim: rgba(74, 222, 128, 0.12);
-    --blue: #60a5fa;
-    --purple: #a78bfa;
-    --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+    --bg-deep: #050506;
+    --bg: #09090b;
+    --bg-elevated: #0f0f12;
+    --bg-hover: #151519;
+    --border: #1a1a20;
+    --border-bright: #2a2a35;
+    --text: #f0f0f3;
+    --text-secondary: #a0a0ab;
+    --text-muted: #606068;
+    --accent: #10b981;
+    --accent-bright: #34d399;
+    --accent-glow: rgba(16, 185, 129, 0.15);
+    --accent-glow-strong: rgba(16, 185, 129, 0.3);
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --orange: #f97316;
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html {
+    scroll-behavior: smooth;
+    font-size: 16px;
+}
 
 body {
     font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
-    line-height: 1.7;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
 }
 
-a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
-a:hover { color: var(--accent-hover); }
+/* Animated background grid */
+.bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: -1;
+}
 
-code {
-    font-family: var(--font-mono);
-    font-size: 0.9em;
-    background: var(--bg-code);
-    padding: 0.15em 0.4em;
-    border-radius: 4px;
-    border: 1px solid var(--border);
+.bg-glow {
+    position: fixed;
+    top: -50%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 150%;
+    height: 100%;
+    background: radial-gradient(ellipse at center, var(--accent-glow) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.5;
 }
 
 /* Layout */
 .container {
-    max-width: 900px;
+    max-width: 1100px;
     margin: 0 auto;
     padding: 0 2rem;
 }
 
-/* Hero */
-.hero {
-    padding: 6rem 0 4rem;
-    text-align: center;
+a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+a:hover {
+    color: var(--accent-bright);
+}
+
+/* Navigation */
+nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 1rem 0;
+    background: rgba(9, 9, 11, 0.8);
+    backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border);
 }
 
-.hero-logo {
-    font-size: 4rem;
-    color: var(--accent);
-    text-shadow: 0 0 60px var(--accent-dim);
-    margin-bottom: 1rem;
-    display: inline-block;
-    animation: pulse 3s ease-in-out infinite;
+nav .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+.nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--text);
+}
+
+.nav-brand .lambda {
+    font-size: 1.5rem;
+    color: var(--accent);
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+}
+
+.nav-links a {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 0.5rem 0;
+    position: relative;
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--accent);
+    transition: width 0.3s ease;
+}
+
+.nav-links a:hover {
+    color: var(--text);
+}
+
+.nav-links a:hover::after {
+    width: 100%;
+}
+
+/* Hero */
+.hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 8rem 2rem 6rem;
+    position: relative;
+}
+
+.hero-content {
+    max-width: 800px;
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    padding: 0.5rem 1rem;
+    border-radius: 100px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+}
+
+.hero-badge .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.hero-logo {
+    font-size: 6rem;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+    display: block;
+    text-shadow: 0 0 80px var(--accent-glow-strong);
+    animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
 }
 
 .hero h1 {
-    font-size: 2.5rem;
-    font-weight: 600;
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-weight: 700;
     letter-spacing: -0.03em;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, var(--text) 0%, var(--text-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
-.hero .tagline {
+.hero h1 span {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-bright) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+.hero-description {
     font-size: 1.25rem;
-    color: var(--text-dim);
-    max-width: 500px;
-    margin: 0 auto 2rem;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin: 0 auto 3rem;
+    line-height: 1.8;
 }
 
 .hero-buttons {
@@ -95,119 +241,232 @@ code {
     gap: 1rem;
     justify-content: center;
     flex-wrap: wrap;
+    margin-bottom: 4rem;
 }
 
 .btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    font-weight: 500;
+    gap: 0.6rem;
+    padding: 0.9rem 1.8rem;
+    border-radius: 10px;
+    font-weight: 600;
     font-size: 0.95rem;
-    transition: all 0.2s;
+    transition: all 0.25s ease;
+    border: none;
+    cursor: pointer;
 }
 
 .btn-primary {
-    background: var(--accent);
-    color: var(--bg);
+    background: linear-gradient(135deg, var(--accent) 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 4px 20px var(--accent-glow);
 }
+
 .btn-primary:hover {
-    background: var(--accent-hover);
-    color: var(--bg);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 20px var(--accent-dim);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px var(--accent-glow-strong);
+    color: white;
 }
 
 .btn-secondary {
-    background: var(--bg-card);
+    background: var(--bg-elevated);
     color: var(--text);
     border: 1px solid var(--border);
 }
+
 .btn-secondary:hover {
-    background: var(--border);
+    background: var(--bg-hover);
+    border-color: var(--border-bright);
     color: var(--text);
-    border-color: var(--text-muted);
+}
+
+.btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Quick install preview */
+.hero-install {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 1rem;
+    color: var(--text-secondary);
+}
+
+.hero-install code {
+    color: var(--accent);
+}
+
+.hero-install .copy-hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+/* Section styling */
+section {
+    padding: 6rem 0;
+}
+
+section:nth-child(even) {
+    background: var(--bg-deep);
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.section-label {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-bottom: 1rem;
+}
+
+.section-title {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+}
+
+.section-description {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin: 0 auto;
 }
 
 /* Features */
-.features {
-    padding: 4rem 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.features h2 {
-    font-size: 1.5rem;
-    font-weight: 500;
-    margin-bottom: 2rem;
-    color: var(--text-dim);
-}
-
-.feature-grid {
+.features-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 1.5rem;
 }
 
-.feature {
-    background: var(--bg-card);
+.feature-card {
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.5rem;
+    border-radius: 16px;
+    padding: 2rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.feature-card:hover {
+    border-color: var(--border-bright);
+    transform: translateY(-4px);
+}
+
+.feature-card:hover::before {
+    opacity: 1;
 }
 
 .feature-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--accent-glow);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 1.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.feature-card h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
     margin-bottom: 0.75rem;
 }
 
-.feature h3 {
-    font-size: 1rem;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
+.feature-card p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.7;
 }
 
-.feature p {
-    font-size: 0.9rem;
-    color: var(--text-dim);
-    line-height: 1.6;
-}
-
-/* Install */
-.install {
-    padding: 4rem 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.install h2 {
-    font-size: 1.5rem;
-    font-weight: 500;
-    margin-bottom: 2rem;
-}
-
-.install-methods {
+/* Installation */
+.install-grid {
     display: grid;
     gap: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
 }
 
-.install-method h3 {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.75rem;
+.install-step {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+}
+
+.install-step-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.install-step-number {
+    width: 32px;
+    height: 32px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.install-step h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
 }
 
 .code-block {
-    background: var(--bg-code);
+    background: var(--bg-deep);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
     font-family: var(--font-mono);
     font-size: 0.9rem;
     overflow-x: auto;
     position: relative;
+}
+
+.code-block .line {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.code-block .line:last-child {
+    margin-bottom: 0;
 }
 
 .code-block .prompt {
@@ -216,135 +475,154 @@ code {
 }
 
 .code-block .cmd {
-    color: var(--accent);
+    color: var(--accent-bright);
 }
 
 .code-block .arg {
     color: var(--blue);
 }
 
-.code-block .comment {
-    color: var(--text-muted);
+.code-block .string {
+    color: var(--orange);
 }
 
-.copy-btn {
+.code-block .comment {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.copy-button {
     position: absolute;
     top: 0.75rem;
     right: 0.75rem;
-    background: var(--border);
-    border: none;
-    color: var(--text-dim);
-    padding: 0.35rem 0.6rem;
-    border-radius: 4px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
     font-size: 0.75rem;
+    font-family: var(--font-sans);
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: all 0.2s ease;
 }
 
-.code-block:hover .copy-btn { opacity: 1; }
-.copy-btn:hover { background: var(--text-muted); color: var(--bg); }
+.code-block:hover .copy-button {
+    opacity: 1;
+}
+
+.copy-button:hover {
+    background: var(--border);
+    color: var(--text);
+}
 
 /* Downloads */
-.downloads {
-    margin-top: 1.5rem;
-}
-
-.download-grid {
+.downloads-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1rem;
+    margin-top: 2rem;
 }
 
-.download-item {
+.download-card {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    background: var(--bg-card);
+    gap: 1rem;
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1rem;
-    transition: all 0.2s;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    transition: all 0.2s ease;
 }
 
-.download-item:hover {
+.download-card:hover {
     border-color: var(--accent);
-    background: var(--accent-dim);
+    background: var(--accent-glow);
 }
 
 .download-icon {
-    font-size: 1.5rem;
+    font-size: 2rem;
 }
 
-.download-info {
-    flex: 1;
+.download-info h4 {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
 }
 
-.download-info .platform {
-    font-weight: 500;
-    font-size: 0.9rem;
+.download-info p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
 }
 
-.download-info .arch {
-    font-size: 0.8rem;
-    color: var(--text-dim);
+.download-arrow {
+    margin-left: auto;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
 }
 
-/* Usage */
-.usage {
-    padding: 4rem 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.usage h2 {
-    font-size: 1.5rem;
-    font-weight: 500;
-    margin-bottom: 2rem;
-}
-
-.usage-examples {
-    display: grid;
-    gap: 1.5rem;
-}
-
-.usage-example h3 {
-    font-size: 0.95rem;
-    font-weight: 500;
-    margin-bottom: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.usage-example h3::before {
-    content: '→';
+.download-card:hover .download-arrow {
+    transform: translateX(4px);
     color: var(--accent);
 }
 
-/* Demo */
-.demo {
-    padding: 4rem 0;
-    border-bottom: 1px solid var(--border);
+/* Usage examples */
+.usage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
 }
 
-.demo h2 {
-    font-size: 1.5rem;
-    font-weight: 500;
-    margin-bottom: 2rem;
-}
-
-.terminal {
-    background: var(--bg-code);
+.usage-card {
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
 }
 
-.terminal-header {
-    background: var(--border);
-    padding: 0.75rem 1rem;
+.usage-card-header {
+    padding: 1rem 1.25rem;
+    background: var(--bg-hover);
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+    font-size: 0.9rem;
     display: flex;
     align-items: center;
+    gap: 0.5rem;
+}
+
+.usage-card-header::before {
+    content: '→';
+    color: var(--accent);
+}
+
+.usage-card .code-block {
+    border: none;
+    border-radius: 0;
+    margin: 0;
+}
+
+/* Terminal demo */
+.terminal {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    max-width: 900px;
+    margin: 0 auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.terminal-header {
+    background: var(--bg-elevated);
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.terminal-dots {
+    display: flex;
     gap: 0.5rem;
 }
 
@@ -353,272 +631,360 @@ code {
     height: 12px;
     border-radius: 50%;
 }
-.terminal-dot.red { background: #f87171; }
-.terminal-dot.yellow { background: #fbbf24; }
-.terminal-dot.green { background: #4ade80; }
+
+.terminal-dot.red { background: #ef4444; }
+.terminal-dot.yellow { background: #eab308; }
+.terminal-dot.green { background: #22c55e; }
 
 .terminal-title {
     flex: 1;
     text-align: center;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: var(--text-muted);
+    font-family: var(--font-mono);
 }
 
 .terminal-body {
-    padding: 1.5rem;
+    padding: 1.5rem 2rem;
     font-family: var(--font-mono);
-    font-size: 0.85rem;
-    line-height: 1.8;
-    min-height: 300px;
+    font-size: 0.9rem;
+    line-height: 1.9;
+    min-height: 350px;
 }
 
 .terminal-line {
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.15rem;
 }
 
-.terminal-prompt {
-    color: var(--accent);
-}
-
-.terminal-output {
-    color: var(--text-dim);
-    padding-left: 1rem;
-}
-
-.terminal-cascade {
-    color: var(--blue);
-}
-
-.terminal-success {
-    color: var(--accent);
-}
+.t-prompt { color: var(--accent-bright); }
+.t-input { color: var(--text); }
+.t-dim { color: var(--text-muted); }
+.t-blue { color: var(--blue); }
+.t-success { color: var(--accent); }
+.t-output { color: var(--text-secondary); padding-left: 1.5rem; display: block; }
 
 /* Footer */
 footer {
-    padding: 3rem 0;
-    text-align: center;
+    padding: 4rem 0;
+    border-top: 1px solid var(--border);
 }
 
-footer p {
-    font-size: 0.85rem;
-    color: var(--text-muted);
+.footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
 }
 
-footer a {
-    color: var(--text-dim);
+.footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
-footer a:hover {
+.footer-brand .lambda {
+    font-size: 1.5rem;
     color: var(--accent);
+}
+
+.footer-brand span {
+    font-weight: 600;
 }
 
 .footer-links {
     display: flex;
     gap: 2rem;
-    justify-content: center;
-    margin-bottom: 1.5rem;
+    list-style: none;
+}
+
+.footer-links a {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.footer-links a:hover {
+    color: var(--accent);
+}
+
+.footer-copy {
+    width: 100%;
+    text-align: center;
+    padding-top: 2rem;
+    margin-top: 2rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
 }
 
 /* Responsive */
-@media (max-width: 640px) {
-    .container { padding: 0 1.25rem; }
-    .hero { padding: 4rem 0 3rem; }
-    .hero h1 { font-size: 2rem; }
-    .hero .tagline { font-size: 1.1rem; }
-    .features, .install, .usage, .demo { padding: 3rem 0; }
-    .hero-buttons { flex-direction: column; align-items: center; }
+@media (max-width: 768px) {
+    nav .container { padding: 0 1rem; }
+    .nav-links { display: none; }
+    .hero { padding: 6rem 1rem 4rem; }
+    .hero-logo { font-size: 4rem; }
+    section { padding: 4rem 0; }
+    .features-grid { grid-template-columns: 1fr; }
+    .usage-grid { grid-template-columns: 1fr; }
+    .footer-content { justify-content: center; text-align: center; }
+    .footer-links { justify-content: center; }
 }
     </style>
 </head>
 <body>
 
-<section class="hero">
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+
+<nav>
     <div class="container">
-        <div class="hero-logo">λ</div>
-        <h1>hyle</h1>
-        <p class="tagline">A minimal, fast code assistant built in Rust. TUI interface, multi-model routing, and Unix philosophy.</p>
+        <a href="#" class="nav-brand">
+            <span class="lambda">λ</span>
+            <span>hyle</span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="#features">Features</a></li>
+            <li><a href="#install">Install</a></li>
+            <li><a href="#usage">Usage</a></li>
+            <li><a href="https://github.com/uprootiny/hyle">GitHub</a></li>
+        </ul>
+    </div>
+</nav>
+
+<section class="hero">
+    <div class="hero-content">
+        <div class="hero-badge">
+            <span class="dot"></span>
+            Built with Rust
+        </div>
+        <span class="hero-logo">λ</span>
+        <h1>Code assistance,<br><span>done right.</span></h1>
+        <p class="hero-description">
+            A minimal, blazing-fast code assistant with multi-model routing,
+            TUI interface, and Unix philosophy. No bloat, just results.
+        </p>
         <div class="hero-buttons">
-            <a href="https://github.com/uprootiny/hyle" class="btn btn-primary">
-                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                View on GitHub
+            <a href="#install" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Install Now
             </a>
-            <a href="#install" class="btn btn-secondary">
-                Quick Install
+            <a href="https://github.com/uprootiny/hyle" class="btn btn-secondary">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                View Source
             </a>
+        </div>
+        <div class="hero-install">
+            <code>cargo install --git https://github.com/uprootiny/hyle</code>
+            <span class="copy-hint">or scroll for options ↓</span>
         </div>
     </div>
 </section>
 
-<section class="features">
+<section id="features">
     <div class="container">
-        <h2>Why hyle?</h2>
-        <div class="feature-grid">
-            <div class="feature">
+        <div class="section-header">
+            <span class="section-label">Features</span>
+            <h2 class="section-title">Everything you need, nothing you don't</h2>
+            <p class="section-description">Built for developers who value speed, simplicity, and control.</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
                 <div class="feature-icon">⚡</div>
                 <h3>Native Performance</h3>
-                <p>Built in Rust with zero runtime dependencies. Starts instantly, runs efficiently.</p>
+                <p>Pure Rust, zero runtime dependencies. Sub-millisecond startup, efficient memory usage, and responsive even on modest hardware.</p>
             </div>
-            <div class="feature">
-                <div class="feature-icon">🔄</div>
+            <div class="feature-card">
+                <div class="feature-icon">🔀</div>
                 <h3>Multi-Model Routing</h3>
-                <p>Automatic fallback across OpenRouter models with intelligent rate-limit handling.</p>
+                <p>Automatic fallback across OpenRouter models. When one hits rate limits or fails, seamlessly switches to the next best option.</p>
             </div>
-            <div class="feature">
+            <div class="feature-card">
                 <div class="feature-icon">🖥️</div>
                 <h3>TUI Interface</h3>
-                <p>Full terminal UI with syntax highlighting, cascade visualization, and keyboard shortcuts.</p>
+                <p>Full-featured terminal UI with syntax highlighting, cascade visualization, keyboard shortcuts, and Unicode support.</p>
             </div>
-            <div class="feature">
+            <div class="feature-card">
                 <div class="feature-icon">🔧</div>
                 <h3>Tool Integration</h3>
-                <p>Read, write, edit, grep, glob, bash - all tools LLMs need to work with your code.</p>
+                <p>Read, write, edit, grep, glob, bash — all the tools LLMs need to navigate and modify your codebase effectively.</p>
             </div>
-            <div class="feature">
+            <div class="feature-card">
                 <div class="feature-icon">📊</div>
                 <h3>Model Tracking</h3>
-                <p>Reliability scoring per model. Automatic penalty for hallucinations and failures.</p>
+                <p>Per-model reliability scoring with automatic penalties for hallucinations, failures, and destructive suggestions.</p>
             </div>
-            <div class="feature">
-                <div class="feature-icon">🔒</div>
+            <div class="feature-card">
+                <div class="feature-icon">🛡️</div>
                 <h3>Safety Guards</h3>
-                <p>Write safety checks, injection detection, and destructive command blocking.</p>
+                <p>Write safety checks, injection detection, destructive command blocking, and atomic file operations to protect your code.</p>
             </div>
         </div>
     </div>
 </section>
 
-<section class="install" id="install">
+<section id="install">
     <div class="container">
-        <h2>Installation</h2>
-        <div class="install-methods">
-            <div class="install-method">
-                <h3>Prerequisites</h3>
+        <div class="section-header">
+            <span class="section-label">Installation</span>
+            <h2 class="section-title">Up and running in minutes</h2>
+            <p class="section-description">Choose your preferred installation method.</p>
+        </div>
+        <div class="install-grid">
+            <div class="install-step">
+                <div class="install-step-header">
+                    <span class="install-step-number">1</span>
+                    <h3>Install Rust (if needed)</h3>
+                </div>
                 <div class="code-block">
-                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                    <span class="comment"># Install Rust (if not already installed)</span><br>
-                    <span class="prompt">$</span> <span class="cmd">curl</span> <span class="arg">--proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs</span> | sh<br>
-                    <span class="prompt">$</span> <span class="cmd">rustup</span> default stable
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">curl</span> <span class="arg">--proto '=https' --tlsv1.2 -sSf</span> https://sh.rustup.rs | sh</span>
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">rustup</span> default stable</span>
                 </div>
             </div>
-
-            <div class="install-method">
-                <h3>From Source</h3>
+            <div class="install-step">
+                <div class="install-step-header">
+                    <span class="install-step-number">2</span>
+                    <h3>Build from source</h3>
+                </div>
                 <div class="code-block">
-                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                    <span class="prompt">$</span> <span class="cmd">git clone</span> <span class="arg">https://github.com/uprootiny/hyle.git</span><br>
-                    <span class="prompt">$</span> <span class="cmd">cd</span> hyle<br>
-                    <span class="prompt">$</span> <span class="cmd">cargo build</span> <span class="arg">--release</span><br>
-                    <span class="prompt">$</span> <span class="cmd">cp</span> target/release/hyle <span class="arg">~/.local/bin/</span>
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">git clone</span> <span class="arg">https://github.com/uprootiny/hyle.git</span></span>
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">cd</span> hyle</span>
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">cargo build</span> <span class="arg">--release</span></span>
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">cp</span> target/release/hyle <span class="arg">~/.local/bin/</span></span>
                 </div>
             </div>
-
-            <div class="install-method">
-                <h3>Pre-built Binaries</h3>
-                <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1rem;">
-                    Download from GitHub Actions artifacts or releases:
-                </p>
-                <div class="download-grid">
-                    <a href="https://github.com/uprootiny/hyle/actions" class="download-item">
-                        <div class="download-icon">🐧</div>
-                        <div class="download-info">
-                            <div class="platform">Linux</div>
-                            <div class="arch">x86_64</div>
-                        </div>
-                    </a>
-                    <a href="https://github.com/uprootiny/hyle/actions" class="download-item">
-                        <div class="download-icon">🍎</div>
-                        <div class="download-info">
-                            <div class="platform">macOS</div>
-                            <div class="arch">x86_64 / aarch64</div>
-                        </div>
-                    </a>
+            <div class="install-step">
+                <div class="install-step-header">
+                    <span class="install-step-number">3</span>
+                    <h3>Configure your API key</h3>
+                </div>
+                <div class="code-block">
+                    <button class="copy-button" onclick="copyCode(this)">Copy</button>
+                    <span class="line"><span class="comment"># Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)</span></span>
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">export</span> OPENROUTER_API_KEY=<span class="string">"sk-or-v1-..."</span></span>
                 </div>
             </div>
+        </div>
 
-            <div class="install-method">
-                <h3>Configuration</h3>
+        <div class="section-header" style="margin-top: 4rem;">
+            <h3 class="section-title" style="font-size: 1.5rem;">Or download pre-built binaries</h3>
+        </div>
+        <div class="downloads-grid">
+            <a href="https://github.com/uprootiny/hyle/actions" class="download-card">
+                <span class="download-icon">🐧</span>
+                <div class="download-info">
+                    <h4>Linux</h4>
+                    <p>x86_64 (glibc)</p>
+                </div>
+                <span class="download-arrow">→</span>
+            </a>
+            <a href="https://github.com/uprootiny/hyle/actions" class="download-card">
+                <span class="download-icon">🍎</span>
+                <div class="download-info">
+                    <h4>macOS Intel</h4>
+                    <p>x86_64</p>
+                </div>
+                <span class="download-arrow">→</span>
+            </a>
+            <a href="https://github.com/uprootiny/hyle/actions" class="download-card">
+                <span class="download-icon">🍎</span>
+                <div class="download-info">
+                    <h4>macOS Apple Silicon</h4>
+                    <p>aarch64</p>
+                </div>
+                <span class="download-arrow">→</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section id="usage">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-label">Usage</span>
+            <h2 class="section-title">Simple by design</h2>
+            <p class="section-description">Just type what you want to do.</p>
+        </div>
+        <div class="usage-grid">
+            <div class="usage-card">
+                <div class="usage-card-header">Interactive TUI mode</div>
                 <div class="code-block">
-                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                    <span class="comment"># Set your OpenRouter API key</span><br>
-                    <span class="prompt">$</span> <span class="cmd">export</span> OPENROUTER_API_KEY=<span class="arg">"sk-or-..."</span><br>
-                    <br>
-                    <span class="comment"># Or add to your shell config</span><br>
-                    <span class="prompt">$</span> <span class="cmd">echo</span> <span class="arg">'export OPENROUTER_API_KEY="sk-or-..."'</span> >> ~/.bashrc
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">hyle</span></span>
+                </div>
+            </div>
+            <div class="usage-card">
+                <div class="usage-card-header">One-shot query</div>
+                <div class="code-block">
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">hyle</span> <span class="string">"explain this codebase"</span></span>
+                </div>
+            </div>
+            <div class="usage-card">
+                <div class="usage-card-header">Pipe input</div>
+                <div class="code-block">
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">cat</span> src/main.rs | <span class="cmd">hyle</span> <span class="string">"review this"</span></span>
+                </div>
+            </div>
+            <div class="usage-card">
+                <div class="usage-card-header">Specific model</div>
+                <div class="code-block">
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">hyle</span> <span class="arg">--model</span> mistralai/devstral-small</span>
+                </div>
+            </div>
+            <div class="usage-card">
+                <div class="usage-card-header">List models</div>
+                <div class="code-block">
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">hyle</span> <span class="arg">models</span></span>
+                </div>
+            </div>
+            <div class="usage-card">
+                <div class="usage-card-header">Doctor check</div>
+                <div class="code-block">
+                    <span class="line"><span class="prompt">$</span> <span class="cmd">hyle</span> <span class="arg">doctor</span></span>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
-<section class="usage">
+<section id="demo">
     <div class="container">
-        <h2>Usage Examples</h2>
-        <div class="usage-examples">
-            <div class="usage-example">
-                <h3>Interactive TUI Mode</h3>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">hyle</span>
-                </div>
-            </div>
-
-            <div class="usage-example">
-                <h3>One-shot Query</h3>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">hyle</span> <span class="arg">"explain this codebase"</span>
-                </div>
-            </div>
-
-            <div class="usage-example">
-                <h3>Pipe Input</h3>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">cat</span> src/main.rs | <span class="cmd">hyle</span> <span class="arg">"review this code"</span>
-                </div>
-            </div>
-
-            <div class="usage-example">
-                <h3>Specific Model</h3>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">hyle</span> <span class="arg">--model</span> mistralai/devstral-small <span class="arg">"fix the bug"</span>
-                </div>
-            </div>
-
-            <div class="usage-example">
-                <h3>List Available Models</h3>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">hyle</span> <span class="arg">models</span>
-                </div>
-            </div>
+        <div class="section-header">
+            <span class="section-label">Demo</span>
+            <h2 class="section-title">See it in action</h2>
         </div>
-    </div>
-</section>
-
-<section class="demo">
-    <div class="container">
-        <h2>In Action</h2>
         <div class="terminal">
             <div class="terminal-header">
-                <div class="terminal-dot red"></div>
-                <div class="terminal-dot yellow"></div>
-                <div class="terminal-dot green"></div>
-                <div class="terminal-title">hyle — ~/projects/myapp</div>
+                <div class="terminal-dots">
+                    <span class="terminal-dot red"></span>
+                    <span class="terminal-dot yellow"></span>
+                    <span class="terminal-dot green"></span>
+                </div>
+                <span class="terminal-title">hyle — ~/projects/myapp</span>
             </div>
             <div class="terminal-body">
-                <div class="terminal-line"><span class="terminal-prompt">λ</span> add error handling to the api module</div>
-                <div class="terminal-line terminal-cascade">⠋ parse → route → generate</div>
-                <div class="terminal-line terminal-output">Using model: mistralai/devstral-small</div>
-                <div class="terminal-line terminal-output"></div>
-                <div class="terminal-line terminal-output">I'll add proper error handling to the API module.</div>
-                <div class="terminal-line terminal-output"></div>
-                <div class="terminal-line terminal-output">```json</div>
-                <div class="terminal-line terminal-output">{"tool": "read", "args": {"path": "src/api.rs"}}</div>
-                <div class="terminal-line terminal-output">```</div>
-                <div class="terminal-line terminal-output"></div>
-                <div class="terminal-line terminal-success">✓ read src/api.rs (142 lines)</div>
-                <div class="terminal-line terminal-output"></div>
-                <div class="terminal-line terminal-output">I see the current implementation. Let me add Result types</div>
-                <div class="terminal-line terminal-output">and proper error propagation...</div>
-                <div class="terminal-line terminal-output"></div>
-                <div class="terminal-line terminal-cascade">✓ 847tok 3.2s</div>
+                <div class="terminal-line"><span class="t-prompt">λ</span> <span class="t-input">add error handling to the api module</span></div>
+                <div class="terminal-line"><span class="t-blue">⠋ parse → route → generate</span></div>
+                <span class="t-output t-dim">Using model: mistralai/devstral-small</span>
+                <span class="t-output"></span>
+                <span class="t-output">I'll add proper error handling to the API module.</span>
+                <span class="t-output"></span>
+                <span class="t-output t-dim">```json</span>
+                <span class="t-output t-dim">{"tool": "read", "args": {"path": "src/api.rs"}}</span>
+                <span class="t-output t-dim">```</span>
+                <span class="t-output"></span>
+                <span class="t-output t-success">✓ read src/api.rs (142 lines)</span>
+                <span class="t-output"></span>
+                <span class="t-output">I see unwrap() calls that could panic. Let me add Result</span>
+                <span class="t-output">types and proper error propagation using thiserror...</span>
+                <span class="t-output"></span>
+                <div class="terminal-line"><span class="t-success">✓ 847 tokens • 3.2s</span></div>
             </div>
         </div>
     </div>
@@ -626,30 +992,37 @@ footer a:hover {
 
 <footer>
     <div class="container">
-        <div class="footer-links">
-            <a href="https://github.com/uprootiny/hyle">GitHub</a>
-            <a href="https://github.com/uprootiny/hyle/issues">Issues</a>
-            <a href="https://github.com/uprootiny/hyle/actions">CI/Artifacts</a>
-            <a href="/projects/">Projects</a>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <span class="lambda">λ</span>
+                <span>hyle</span>
+            </div>
+            <ul class="footer-links">
+                <li><a href="https://github.com/uprootiny/hyle">GitHub</a></li>
+                <li><a href="https://github.com/uprootiny/hyle/issues">Issues</a></li>
+                <li><a href="https://github.com/uprootiny/hyle/actions">CI / Artifacts</a></li>
+                <li><a href="/projects/">Projects</a></li>
+            </ul>
         </div>
-        <p>
+        <div class="footer-copy">
             Built with Rust. Following the Unix philosophy.<br>
             <a href="https://github.com/uprootiny/hyle/blob/master/LICENSE">MIT License</a>
-        </p>
+        </div>
     </div>
 </footer>
 
 <script>
 function copyCode(btn) {
-    const block = btn.parentElement;
-    const text = block.textContent
-        .replace('Copy', '')
-        .replace(/\$ /g, '')
-        .replace(/# .+\n/g, '')
-        .trim();
-    navigator.clipboard.writeText(text);
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = 'Copy', 1500);
+    const block = btn.closest('.code-block');
+    const lines = block.querySelectorAll('.line');
+    const text = Array.from(lines).map(l => {
+        return l.textContent.replace(/^\$ /, '').trim();
+    }).filter(l => !l.startsWith('#')).join('\n');
+
+    navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
 }
 </script>
 
