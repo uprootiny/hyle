@@ -492,7 +492,17 @@ footer a:hover {
         <h2>Installation</h2>
         <div class="install-methods">
             <div class="install-method">
-                <h3>From Source (Recommended)</h3>
+                <h3>Prerequisites</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <span class="comment"># Install Rust (if not already installed)</span><br>
+                    <span class="prompt">$</span> <span class="cmd">curl</span> <span class="arg">--proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs</span> | sh<br>
+                    <span class="prompt">$</span> <span class="cmd">rustup</span> default stable
+                </div>
+            </div>
+
+            <div class="install-method">
+                <h3>From Source</h3>
                 <div class="code-block">
                     <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                     <span class="prompt">$</span> <span class="cmd">git clone</span> <span class="arg">https://github.com/uprootiny/hyle.git</span><br>
