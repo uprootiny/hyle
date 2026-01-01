@@ -20,6 +20,8 @@
             --accent: #10b981;
             --accent-bright: #34d399;
             --border: #1a1a20;
+            --wall: #1a1a1e;
+            --floor: #0d0d10;
             --item: #3b82f6;
             --stairs: #eab308;
             --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -27,12 +29,12 @@
             --font-prose: 'Crimson Pro', Georgia, serif;
         }
 
-        .level-0 { --accent: #e0e0e0; --accent-bright: #ffffff; --bg-surface: #08080a; }
-        .level-1 { --accent: #dc2626; --accent-bright: #fbbf24; --bg-surface: #120808; }
-        .level-2 { --accent: #10b981; --accent-bright: #6ee7b7; --bg-surface: #081208; }
-        .level-3 { --accent: #6366f1; --accent-bright: #818cf8; --bg-surface: #080812; }
-        .level-4 { --accent: #a855f7; --accent-bright: #c084fc; --bg-surface: #100812; }
-        .level-5 { --accent: #1a1a1a; --accent-bright: #2a2a2a; --bg-surface: #000000; --text: #333; }
+        .level-0 { --accent: #e0e0e0; --accent-bright: #ffffff; --bg-surface: #08080a; --wall: #18181c; }
+        .level-1 { --accent: #dc2626; --accent-bright: #fbbf24; --bg-surface: #120808; --wall: #1c1414; }
+        .level-2 { --accent: #10b981; --accent-bright: #6ee7b7; --bg-surface: #081208; --wall: #141c14; }
+        .level-3 { --accent: #6366f1; --accent-bright: #818cf8; --bg-surface: #080812; --wall: #14141c; }
+        .level-4 { --accent: #a855f7; --accent-bright: #c084fc; --bg-surface: #100812; --wall: #1a141c; }
+        .level-5 { --accent: #1a1a1a; --accent-bright: #2a2a2a; --bg-surface: #000000; --text: #333; --wall: #080808; }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -119,27 +121,48 @@
             font-size: 0.8rem;
         }
 
-        #map {
+        /* Graphical Maze */
+        #maze-container {
             background: var(--bg-elevated);
             padding: 1.5rem;
             border-radius: 12px;
             border: 1px solid var(--border);
-            white-space: pre;
-            font-family: var(--font-mono);
-            font-size: 13px;
-            line-height: 1.2;
             margin-bottom: 1.5rem;
-            overflow-x: auto;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #maze-canvas {
+            display: block;
+            image-rendering: pixelated;
+            border-radius: 4px;
+        }
+
+        #proposition {
+            padding: 1rem 1.25rem;
+            background: var(--bg-surface);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
             transition: all 0.5s;
+        }
+
+        #proposition .number {
+            font-weight: 600;
+            margin-right: 0.5rem;
         }
 
         #description {
             padding: 1.5rem 2rem;
             background: var(--bg-surface);
-            border-left: 3px solid var(--accent);
+            border-left: 3px solid var(--border);
             border-radius: 0 12px 12px 0;
             margin-bottom: 1.5rem;
-            min-height: 140px;
+            min-height: 120px;
             font-family: var(--font-prose);
             font-size: 1.1rem;
             color: var(--text-secondary);
@@ -222,13 +245,6 @@
             border-color: var(--accent-bright);
         }
 
-        .player { color: var(--accent-bright); }
-        .wall { color: #2a2a30; }
-        .floor { color: #1a1a1e; }
-        .item { color: var(--item); }
-        .stairs { color: var(--stairs); }
-        .key-item { color: var(--accent); }
-
         #divination {
             position: fixed;
             top: 50%;
@@ -282,7 +298,10 @@
             </div>
             <span id="depth">stratum I</span>
         </div>
-        <div id="map"></div>
+        <div id="maze-container">
+            <canvas id="maze-canvas"></canvas>
+        </div>
+        <div id="proposition"></div>
         <div id="mechanic-hint"></div>
         <div id="description"></div>
         <div id="status">
@@ -302,7 +321,180 @@
 
     <script>
     // ═══════════════════════════════════════════════════════════════════════════
-    // REALMS - Extended corpuses with full passages for coherent Markov output
+    // TRACTATUS LOGICO-PHILOSOPHICUS - Complete propositions in order
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    const TRACTATUS = [
+        { n: "1", t: "The world is all that is the case." },
+        { n: "1.1", t: "The world is the totality of facts, not of things." },
+        { n: "1.11", t: "The world is determined by the facts, and by their being all the facts." },
+        { n: "1.12", t: "For the totality of facts determines what is the case, and also whatever is not the case." },
+        { n: "1.13", t: "The facts in logical space are the world." },
+        { n: "1.2", t: "The world divides into facts." },
+        { n: "1.21", t: "Each item can be the case or not the case while everything else remains the same." },
+        { n: "2", t: "What is the case—a fact—is the existence of states of affairs." },
+        { n: "2.01", t: "A state of affairs (a state of things) is a combination of objects (things)." },
+        { n: "2.011", t: "It is essential to things that they should be possible constituents of states of affairs." },
+        { n: "2.012", t: "In logic nothing is accidental: if a thing can occur in a state of affairs, the possibility of the state of affairs must be written into the thing itself." },
+        { n: "2.0121", t: "It would seem to be a sort of accident, if it turned out that a situation would fit a thing that could already exist entirely on its own." },
+        { n: "2.0122", t: "Things are independent in so far as they can occur in all possible situations, but this form of independence is a form of connexion with states of affairs, a form of dependence." },
+        { n: "2.0123", t: "If I know an object I also know all its possible occurrences in states of affairs." },
+        { n: "2.0124", t: "If all objects are given, then at the same time all possible states of affairs are also given." },
+        { n: "2.013", t: "Each thing is, as it were, in a space of possible states of affairs. This space I can imagine empty, but I cannot imagine the thing without the space." },
+        { n: "2.014", t: "Objects contain the possibility of all situations." },
+        { n: "2.0141", t: "The possibility of its occurring in states of affairs is the form of an object." },
+        { n: "2.02", t: "Objects are simple." },
+        { n: "2.021", t: "Objects make up the substance of the world. That is why they cannot be composite." },
+        { n: "2.0211", t: "If the world had no substance, then whether a proposition had sense would depend on whether another proposition was true." },
+        { n: "2.0212", t: "In that case we could not sketch any picture of the world (true or false)." },
+        { n: "2.022", t: "It is obvious that an imagined world, however different it may be from the real one, must have something—a form—in common with it." },
+        { n: "2.023", t: "Objects are just what constitute this unalterable form." },
+        { n: "2.0231", t: "The substance of the world can only determine a form, and not any material properties." },
+        { n: "2.0232", t: "In a manner of speaking, objects are colourless." },
+        { n: "2.0233", t: "If two objects have the same logical form, the only distinction between them, apart from their external properties, is that they are different." },
+        { n: "2.024", t: "Substance is what subsists independently of what is the case." },
+        { n: "2.025", t: "It is form and content." },
+        { n: "2.0251", t: "Space, time, and colour (being coloured) are forms of objects." },
+        { n: "2.026", t: "There must be objects, if the world is to have an unalterable form." },
+        { n: "2.027", t: "Objects, the unalterable, and the subsistent are one and the same." },
+        { n: "2.0271", t: "Objects are what is unalterable and subsistent; their configuration is what is changing and unstable." },
+        { n: "2.0272", t: "The configuration of objects produces states of affairs." },
+        { n: "2.03", t: "In a state of affairs objects fit into one another like the links of a chain." },
+        { n: "2.031", t: "In a state of affairs objects stand in a determinate relation to one another." },
+        { n: "2.032", t: "The determinate way in which objects are connected in a state of affairs is the structure of the state of affairs." },
+        { n: "2.033", t: "Form is the possibility of structure." },
+        { n: "2.034", t: "The structure of a fact consists of the structures of states of affairs." },
+        { n: "2.04", t: "The totality of existing states of affairs is the world." },
+        { n: "2.05", t: "The totality of existing states of affairs also determines which states of affairs do not exist." },
+        { n: "2.06", t: "The existence and non-existence of states of affairs is reality." },
+        { n: "2.061", t: "States of affairs are independent of one another." },
+        { n: "2.062", t: "From the existence or non-existence of one state of affairs it is impossible to infer the existence or non-existence of another." },
+        { n: "2.063", t: "The sum-total of reality is the world." },
+        { n: "2.1", t: "We picture facts to ourselves." },
+        { n: "2.11", t: "A picture presents a situation in logical space, the existence and non-existence of states of affairs." },
+        { n: "2.12", t: "A picture is a model of reality." },
+        { n: "2.13", t: "In a picture objects have the elements of the picture corresponding to them." },
+        { n: "2.131", t: "In a picture the elements of the picture are the representatives of objects." },
+        { n: "2.14", t: "What constitutes a picture is that its elements are related to one another in a determinate way." },
+        { n: "2.141", t: "A picture is a fact." },
+        { n: "2.15", t: "The fact that the elements of a picture are related to one another in a determinate way represents that things are related to one another in the same way." },
+        { n: "2.151", t: "Pictorial form is the possibility that things are related to one another in the same way as the elements of the picture." },
+        { n: "2.1511", t: "That is how a picture is attached to reality; it reaches right out to it." },
+        { n: "2.1512", t: "It is laid against reality like a measure." },
+        { n: "2.15121", t: "Only the end-points of the graduating lines actually touch the object that is to be measured." },
+        { n: "2.1513", t: "So a picture, conceived in this way, also includes the pictorial relationship, which makes it into a picture." },
+        { n: "2.1514", t: "The pictorial relationship consists of the correlations of the picture's elements with things." },
+        { n: "2.1515", t: "These correlations are, as it were, the feelers of the picture's elements, with which the picture touches reality." },
+        { n: "2.16", t: "If a fact is to be a picture, it must have something in common with what it depicts." },
+        { n: "2.161", t: "There must be something identical in a picture and what it depicts, to enable the one to be a picture of the other at all." },
+        { n: "2.17", t: "What a picture must have in common with reality, in order to be able to depict it—correctly or incorrectly—in the way it does, is its pictorial form." },
+        { n: "2.171", t: "A picture can depict any reality whose form it has." },
+        { n: "2.172", t: "A picture cannot, however, depict its pictorial form: it displays it." },
+        { n: "2.173", t: "A picture represents its subject from a position outside it. (Its standpoint is its representational form.)" },
+        { n: "2.174", t: "A picture cannot, however, place itself outside its representational form." },
+        { n: "2.18", t: "What any picture, of whatever form, must have in common with reality, in order to be able to depict it—correctly or incorrectly—in any way at all, is logical form, i.e. the form of reality." },
+        { n: "2.181", t: "A picture whose pictorial form is logical form is called a logical picture." },
+        { n: "2.182", t: "Every picture is at the same time a logical one. (On the other hand, not every picture is, for example, a spatial one.)" },
+        { n: "2.19", t: "Logical pictures can depict the world." },
+        { n: "2.2", t: "A picture has logico-pictorial form in common with what it depicts." },
+        { n: "2.201", t: "A picture depicts reality by representing a possibility of existence and non-existence of states of affairs." },
+        { n: "2.202", t: "A picture represents a possible situation in logical space." },
+        { n: "2.203", t: "A picture contains the possibility of the situation that it represents." },
+        { n: "2.21", t: "A picture agrees with reality or fails to agree; it is correct or incorrect, true or false." },
+        { n: "2.22", t: "What a picture represents it represents independently of its truth or falsity, by means of its pictorial form." },
+        { n: "2.221", t: "What a picture represents is its sense." },
+        { n: "2.222", t: "The agreement or disagreement of its sense with reality constitutes its truth or falsity." },
+        { n: "2.223", t: "In order to tell whether a picture is true or false we must compare it with reality." },
+        { n: "2.224", t: "It is impossible to tell from the picture alone whether it is true or false." },
+        { n: "2.225", t: "There are no pictures that are true a priori." },
+        { n: "3", t: "A logical picture of facts is a thought." },
+        { n: "3.01", t: "The totality of true thoughts is a picture of the world." },
+        { n: "3.02", t: "A thought contains the possibility of the situation of which it is the thought. What is thinkable is possible too." },
+        { n: "3.03", t: "Thought can never be of anything illogical, since, if it were, we should have to think illogically." },
+        { n: "3.031", t: "It used to be said that God could create anything except what would be contrary to the laws of logic. The truth is that we could not say what an 'illogical' world would look like." },
+        { n: "3.032", t: "It is as impossible to represent in language anything that 'contradicts logic' as it is in geometry to represent by its coordinates a figure that contradicts the laws of space." },
+        { n: "3.04", t: "If a thought were correct a priori, it would be a thought whose possibility ensured its truth." },
+        { n: "3.05", t: "A priori knowledge that a thought was true would be possible only if its truth were recognizable from the thought itself (without anything to compare it with)." },
+        { n: "4", t: "A thought is a proposition with a sense." },
+        { n: "4.001", t: "The totality of propositions is language." },
+        { n: "4.002", t: "Man possesses the ability to construct languages capable of expressing every sense, without having any idea how each word has meaning or what its meaning is." },
+        { n: "4.003", t: "Most of the propositions and questions to be found in philosophical works are not false but nonsensical." },
+        { n: "4.01", t: "A proposition is a picture of reality." },
+        { n: "4.011", t: "At first sight a proposition—one set out on the printed page, for example—does not seem to be a picture of the reality with which it is concerned." },
+        { n: "4.012", t: "It is obvious that a proposition of the form 'aRb' strikes us as a picture. In this case the sign is obviously a likeness of what is signified." },
+        { n: "4.02", t: "We can see this from the fact that we understand the sense of a propositional sign without its having been explained to us." },
+        { n: "4.021", t: "A proposition is a picture of reality: for if I understand a proposition, I know the situation that it represents." },
+        { n: "4.022", t: "A proposition shows its sense." },
+        { n: "4.023", t: "A proposition must restrict reality to two alternatives: yes or no." },
+        { n: "4.024", t: "To understand a proposition means to know what is the case if it is true." },
+        { n: "4.025", t: "When translating one language into another, we do not proceed by translating each proposition of the one into a proposition of the other." },
+        { n: "4.026", t: "The meanings of simple signs (words) must be explained to us if we are to understand them." },
+        { n: "4.027", t: "It belongs to the essence of a proposition that it should be able to communicate a new sense to us." },
+        { n: "5", t: "A proposition is a truth-function of elementary propositions." },
+        { n: "5.1", t: "Truth-functions can be arranged in series." },
+        { n: "5.2", t: "The structures of propositions stand in internal relations to one another." },
+        { n: "5.3", t: "All propositions are results of truth-operations on elementary propositions." },
+        { n: "5.4", t: "At this point it becomes manifest that there are no 'logical objects' or 'logical constants' (in Frege's and Russell's sense)." },
+        { n: "5.5", t: "Every truth-function is a result of successive applications of the operation to elementary propositions." },
+        { n: "5.6", t: "The limits of my language mean the limits of my world." },
+        { n: "5.61", t: "Logic pervades the world: the limits of the world are also its limits." },
+        { n: "5.62", t: "This remark provides the key to the problem, how much truth there is in solipsism." },
+        { n: "5.621", t: "The world and life are one." },
+        { n: "5.63", t: "I am my world. (The microcosm.)" },
+        { n: "5.631", t: "There is no such thing as the subject that thinks or entertains ideas." },
+        { n: "5.632", t: "The subject does not belong to the world: rather, it is a limit of the world." },
+        { n: "5.633", t: "Where in the world is a metaphysical subject to be found?" },
+        { n: "5.634", t: "Whatever we see could be other than it is." },
+        { n: "5.64", t: "Here it can be seen that solipsism, when its implications are followed out strictly, coincides with pure realism. The self of solipsism shrinks to a point without extension, and there remains the reality co-ordinated with it." },
+        { n: "6", t: "The general form of a truth-function is: this is the general form of a proposition." },
+        { n: "6.1", t: "The propositions of logic are tautologies." },
+        { n: "6.11", t: "Therefore the propositions of logic say nothing. (They are the analytic propositions.)" },
+        { n: "6.12", t: "The fact that the propositions of logic are tautologies shows the formal—logical—properties of language and the world." },
+        { n: "6.13", t: "Logic is not a body of doctrine, but a mirror-image of the world." },
+        { n: "6.2", t: "Mathematics is a logical method." },
+        { n: "6.21", t: "A proposition of mathematics does not express a thought." },
+        { n: "6.22", t: "The logic of the world, which is shown in tautologies by the propositions of logic, is shown in equations by mathematics." },
+        { n: "6.3", t: "The exploration of logic means the exploration of everything that is subject to law." },
+        { n: "6.31", t: "The so-called law of induction cannot possibly be a law of logic, since it is obviously a proposition with sense." },
+        { n: "6.32", t: "The law of causality is not a law but the form of a law." },
+        { n: "6.33", t: "We do not have an a priori belief in a law of conservation." },
+        { n: "6.34", t: "All such propositions, including the principle of sufficient reason, the laws of continuity and of least effort in nature, etc.—all these are a priori insights about the forms in which the propositions of science can be cast." },
+        { n: "6.35", t: "Although the spots in our picture are geometrical figures, nevertheless geometry can obviously say nothing at all about their actual form and position." },
+        { n: "6.36", t: "If there were a law of causality, it might be put in the following way: There are laws of nature." },
+        { n: "6.361", t: "One might say, using Hertz's terminology, that only connexions that are subject to law are thinkable." },
+        { n: "6.362", t: "What can be described can happen too: and what the law of causality is meant to exclude cannot even be described." },
+        { n: "6.363", t: "The procedure of induction consists in accepting as true the simplest law that can be reconciled with our experiences." },
+        { n: "6.37", t: "There is no compulsion making one thing happen because another has happened. The only necessity that exists is logical necessity." },
+        { n: "6.371", t: "The whole modern conception of the world is founded on the illusion that the so-called laws of nature are the explanations of natural phenomena." },
+        { n: "6.372", t: "Thus people today stop at the laws of nature, treating them as something inviolable, just as God and Fate were treated in past ages." },
+        { n: "6.373", t: "The world is independent of my will." },
+        { n: "6.374", t: "Even if all that we wish for were to happen, still this would only be a favour granted by fate, so to speak." },
+        { n: "6.375", t: "Just as the only necessity that exists is logical necessity, so too the only impossibility that exists is logical impossibility." },
+        { n: "6.4", t: "All propositions are of equal value." },
+        { n: "6.41", t: "The sense of the world must lie outside the world." },
+        { n: "6.42", t: "So too it is impossible for there to be propositions of ethics." },
+        { n: "6.421", t: "It is clear that ethics cannot be put into words." },
+        { n: "6.422", t: "When an ethical law of the form, 'Thou shalt...' is laid down, one's first thought is, 'And what if I do not do it?'" },
+        { n: "6.423", t: "It is impossible to speak about the will in so far as it is the subject of ethical attributes." },
+        { n: "6.43", t: "If the good or bad exercise of the will does alter the world, it can alter only the limits of the world, not the facts." },
+        { n: "6.431", t: "So too at death the world does not alter, but comes to an end." },
+        { n: "6.4311", t: "Death is not an event in life: we do not live to experience death." },
+        { n: "6.4312", t: "Not only is there no guarantee of the temporal immortality of the human soul, but this assumption completely fails to accomplish the purpose for which it has always been intended." },
+        { n: "6.432", t: "How things are in the world is a matter of complete indifference for what is higher. God does not reveal himself in the world." },
+        { n: "6.44", t: "It is not how things are in the world that is mystical, but that it exists." },
+        { n: "6.45", t: "To view the world sub specie aeterni is to view it as a whole—a limited whole." },
+        { n: "6.5", t: "When the answer cannot be put into words, neither can the question be put into words." },
+        { n: "6.51", t: "Scepticism is not irrefutable, but obviously nonsensical, when it tries to raise doubts where no questions can be asked." },
+        { n: "6.52", t: "We feel that even when all possible scientific questions have been answered, the problems of life remain completely untouched." },
+        { n: "6.521", t: "The solution of the problem of life is seen in the vanishing of the problem." },
+        { n: "6.522", t: "There are, indeed, things that cannot be put into words. They make themselves manifest. They are what is mystical." },
+        { n: "6.53", t: "The correct method in philosophy would really be the following: to say nothing except what can be said, and then, whenever someone else wanted to say something metaphysical, to demonstrate to him that he had failed to give a meaning to certain signs in his propositions." },
+        { n: "6.54", t: "My propositions serve as elucidations in the following way: anyone who understands me eventually recognizes them as nonsensical, when he has used them—as steps—to climb up beyond them. (He must, so to speak, throw away the ladder after he has climbed up it.)" },
+        { n: "7", t: "What we cannot speak about we must pass over in silence." }
+    ];
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // REALMS - Extended corpuses for other levels
     // ═══════════════════════════════════════════════════════════════════════════
 
     const REALMS = [
@@ -311,36 +503,25 @@
             subtitle: "The limits of language are the limits of the world",
             keyItem: "ladder",
             items: ["picture", "fact", "proposition"],
-            mechanic: "logic", // clear paths, binary existence
-            mechanicHint: "In this realm, paths are certain. What exists, exists wholly.",
-            corpus: [
-                "The world is all that is the case. The world is the totality of facts, not of things. The world is determined by the facts, and by their being all the facts. For the totality of facts determines what is the case, and also whatever is not the case.",
-                "What is the case—a fact—is the existence of states of affairs. A state of affairs is a combination of objects. It is essential to things that they should be possible constituents of states of affairs. In logic nothing is accidental.",
-                "If I know an object I also know all its possible occurrences in states of affairs. Every one of these possibilities must be part of the nature of the object. A new possibility cannot be discovered later. Objects make up the substance of the world. That is why they cannot be composite.",
-                "Space, time, and colour are forms of objects. There must be objects if the world is to have an unalterable form. Objects, the unalterable, and the subsistent are one and the same. Objects are what is unalterable and subsistent; their configuration is what is changing and unstable.",
-                "A picture is a fact. A picture is a model of reality. In a picture objects have the elements of the picture corresponding to them. In a picture the elements of the picture are the representatives of objects. What any picture must have in common with reality is logical form.",
-                "A logical picture of facts is a thought. A thought contains the possibility of the situation of which it is the thought. What is thinkable is possible too. We cannot think what we cannot think; so what we cannot think we cannot say either.",
-                "A thought is a proposition with a sense. A proposition is a truth-function of elementary propositions. The general form of a truth-function is: this is the general form of a proposition. What can be shown cannot be said.",
-                "Whereof one cannot speak, thereof one must be silent. The solution of the problem of life is seen in the vanishing of the problem. There are indeed things that cannot be put into words. They make themselves manifest. They are what is mystical.",
-                "My propositions are elucidatory in this way: he who understands me finally recognizes them as senseless, when he has climbed out through them, on them, over them. He must so to speak throw away the ladder, after he has climbed up on it."
-            ]
+            mechanic: "tractatus",
+            mechanicHint: "Each step reveals a new proposition. Progress through the numbered sequence."
         },
         {
             name: "II. Hexagrams",
             subtitle: "The Changes have no consciousness, no action; still and unmoving",
             keyItem: "yarrow",
             items: ["coins", "tortoise", "dragon"],
-            mechanic: "divination", // movement determined by casting
+            mechanic: "divination",
             mechanicHint: "Cast the coins before each step. The oracle guides your path.",
             corpus: [
-                "The Creative works sublime success, furthering through perseverance. The movement of heaven is full of power. Thus the superior man makes himself strong and untiring. The dragon appears in the field. It furthers one to see the great man. All day long the superior man is creatively active.",
-                "The Receptive brings about sublime success, furthering through the perseverance of a mare. If the superior man undertakes something and tries to lead, he goes astray; but if he follows, he finds guidance. The earth's condition is receptive devotion. Thus the superior man who has breadth of character carries the outer world.",
-                "Difficulty at the Beginning works supreme success, furthering through perseverance. Clouds and thunder: the image of Difficulty at the Beginning. Thus the superior man brings order out of confusion. Horse and wagon part. He seeks her who has no blame. It is wise to wait for the right time before acting.",
-                "Youthful Folly has success. It is not I who seek the young fool; the young fool seeks me. At the first oracle I inform him. If he asks two or three times, it is importunity. A spring wells up at the foot of the mountain, the image of youth. Thus the superior man fosters his character by thoroughness in all that he does.",
-                "Waiting with sincerity brings light and success. Perseverance brings good fortune. It furthers one to cross the great water. Clouds rise up to heaven: the image of Waiting. Thus the superior man eats and drinks, is joyous and of good cheer. Waiting in the meadow. It furthers one to abide in what endures.",
-                "Conflict: You are sincere and are being obstructed. A cautious halt halfway brings good fortune. Going through to the end brings misfortune. Heaven and water go their opposite ways: the image of Conflict. Thus in all his transactions the superior man carefully considers the beginning.",
-                "The Army needs perseverance and a strong man. In the middle of the earth is water: the image of the Army. Thus the superior man increases his masses by generosity toward the people. The army marches forth in proper order. If the order is not good, misfortune threatens.",
-                "Holding Together brings good fortune. Inquire of the oracle once again whether you possess sublimity, constancy, and perseverance; then there is no blame. On the earth is water: the image of Holding Together. Thus the kings of antiquity bestowed the different states as fiefs."
+                "The Creative works sublime success, furthering through perseverance. The movement of heaven is full of power. Thus the superior man makes himself strong and untiring. The dragon appears in the field. It furthers one to see the great man.",
+                "The Receptive brings about sublime success, furthering through the perseverance of a mare. If the superior man undertakes something and tries to lead, he goes astray; but if he follows, he finds guidance.",
+                "Difficulty at the Beginning works supreme success, furthering through perseverance. Clouds and thunder: the image of Difficulty at the Beginning. Thus the superior man brings order out of confusion.",
+                "Youthful Folly has success. It is not I who seek the young fool; the young fool seeks me. At the first oracle I inform him. A spring wells up at the foot of the mountain, the image of youth.",
+                "Waiting with sincerity brings light and success. Perseverance brings good fortune. It furthers one to cross the great water. Clouds rise up to heaven: the image of Waiting.",
+                "Conflict: You are sincere and are being obstructed. A cautious halt halfway brings good fortune. Heaven and water go their opposite ways: the image of Conflict.",
+                "The Army needs perseverance and a strong man. In the middle of the earth is water: the image of the Army. Thus the superior man increases his masses by generosity toward the people.",
+                "Holding Together brings good fortune. On the earth is water: the image of Holding Together. Thus the kings of antiquity bestowed the different states as fiefs."
             ]
         },
         {
@@ -348,17 +529,17 @@
             subtitle: "As above, so below; as within, so without",
             keyItem: "philosopher-stone",
             items: ["mercury", "sulfur", "salt"],
-            mechanic: "transmutation", // combine items to create key
+            mechanic: "transmutation",
             mechanicHint: "Three principles unite: sulfur (soul), mercury (spirit), salt (body). Gather all three.",
             corpus: [
-                "True, without falsehood, certain and most true: what is above is like what is below, and what is below is like what is above, to accomplish the miracle of the One Thing. And as all things were from One, by the mediation of One, so all things arose from this One Thing by adaptation.",
-                "The Sun is its father, the Moon its mother. The Wind carried it in its belly, the Earth is its nurse. The father of all perfection in the whole world is here. Its power is complete if it be turned into earth. Separate the earth from the fire, the subtle from the gross, gently and with great ingenuity.",
-                "It ascends from earth to heaven, and again it descends to earth, and receives the power of the superiors and the inferiors. Thus you will have the glory of the whole world. All obscurity will flee from you. This is the strong force of all forces, overcoming every subtle thing and penetrating every solid.",
-                "Thus the world was created. From this are wonderful adaptations, of which this is the manner. Therefore I am called Hermes Trismegistus, having three parts of the wisdom of the whole world. What I have to say about the operation of Sol is completed.",
-                "Know then the greatest secret of the universe: that which is above is from that which is below, and that which is below is from that which is above, working the miracles of one thing. Its father is the Sun and its mother the Moon; the Wind carries it in its belly and its nurse is the Earth.",
-                "This thing is the strong fortitude of all fortitude, because it overcomes every subtle thing and penetrates every solid. Thus was the world created. Hence proceed wonders, which are here established. Therefore am I called Thrice-Great, having the three parts of the philosophy of the whole universe.",
-                "Combine the volatile with the fixed. Unite the masculine with the feminine. Marry the king to the queen. Let the red man take the white woman. Through putrefaction comes generation. Through death comes life. Through separation comes conjunction.",
-                "The stone which the builders rejected has become the cornerstone. In stercore invenitur—in filth it shall be found. That which is most common is most precious. The philosophers' stone is found everywhere, in all things, yet recognized by none but the wise."
+                "True, without falsehood, certain and most true: what is above is like what is below, and what is below is like what is above, to accomplish the miracle of the One Thing.",
+                "The Sun is its father, the Moon its mother. The Wind carried it in its belly, the Earth is its nurse. The father of all perfection in the whole world is here.",
+                "It ascends from earth to heaven, and again it descends to earth, and receives the power of the superiors and the inferiors. Thus you will have the glory of the whole world.",
+                "Therefore I am called Hermes Trismegistus, having three parts of the wisdom of the whole world. What I have to say about the operation of Sol is completed.",
+                "Know then the greatest secret of the universe: that which is above is from that which is below, working the miracles of one thing.",
+                "This thing is the strong fortitude of all fortitude, because it overcomes every subtle thing and penetrates every solid. Thus was the world created.",
+                "Combine the volatile with the fixed. Unite the masculine with the feminine. Marry the king to the queen. Through putrefaction comes generation.",
+                "The stone which the builders rejected has become the cornerstone. In stercore invenitur—in filth it shall be found. That which is most common is most precious."
             ]
         },
         {
@@ -366,17 +547,17 @@
             subtitle: "The universe, which others call the Library",
             keyItem: "crimson-hexagon",
             items: ["book", "mirror", "lamp"],
-            mechanic: "infinite", // rooms wrap around, occasional shifts
+            mechanic: "infinite",
             mechanicHint: "The Library is infinite and periodic. Walking far enough returns you to the beginning.",
             corpus: [
-                "The universe, which others call the Library, is composed of an indefinite, perhaps infinite number of hexagonal galleries. In the center of each gallery is a ventilation shaft, bounded by a low railing. From any hexagon one can see the floors above and below—one after another, endlessly.",
-                "The arrangement of the galleries is always the same: Twenty bookshelves, five to each side, line four of the hexagon's six sides; the height of the bookshelves, floor to ceiling, is hardly greater than the height of a normal librarian. On each shelf rest thirty-two books of identical format.",
-                "Each book is four hundred ten pages; each page, forty lines, each line, approximately eighty black letters. There are also letters on the front cover of each book; those letters neither indicate nor prefigure what the pages inside will say. I know that such a lack of correspondence once struck men as mysterious.",
-                "The Library is total—perfect, complete, whole. Its bookshelves contain all possible combinations of the twenty-two orthographic symbols whose number, though vast, is not infinite—that is, all that is able to be expressed, in every language. All—the detailed history of the future, the autobiographies of the archangels.",
-                "When it was announced that the Library contained all books, the first reaction was unbounded joy. All men felt themselves the possessors of an intact and secret treasure. There was no personal problem, no world problem, whose eloquent solution did not exist—somewhere in some hexagon.",
-                "As was foreseeable, that unbounded hope was followed by a similarly unbounded despair. The certainty that some bookshelf in some hexagon contained precious books, yet that those precious books were forever out of reach, was almost unbearable.",
-                "I know of districts in which the young prostrate themselves before books and like savages kiss their pages, though they cannot read a single letter. Epidemics, heretical discords, pilgrimages that inevitably degenerate into banditry have decimated the population.",
-                "I suspect that the human species—the only one—teeters on the verge of extinction, yet the Library will endure: illuminated, solitary, infinite, perfectly still, armed with precious volumes, pointless, incorruptible, secret. I have just written the word 'infinite.' Infinite, I have not inserted that adjective out of mere rhetorical habit."
+                "The universe, which others call the Library, is composed of an indefinite, perhaps infinite number of hexagonal galleries.",
+                "The arrangement of the galleries is always the same: Twenty bookshelves, five to each side, line four of the hexagon's six sides.",
+                "Each book is four hundred ten pages; each page, forty lines, each line, approximately eighty black letters.",
+                "The Library is total—perfect, complete, whole. Its bookshelves contain all possible combinations of the twenty-two orthographic symbols.",
+                "When it was announced that the Library contained all books, the first reaction was unbounded joy.",
+                "As was foreseeable, that unbounded hope was followed by a similarly unbounded despair.",
+                "I know of districts in which the young prostrate themselves before books and like savages kiss their pages, though they cannot read a single letter.",
+                "The Library will endure: illuminated, solitary, infinite, perfectly still, armed with precious volumes, pointless, incorruptible, secret."
             ]
         },
         {
@@ -384,18 +565,17 @@
             subtitle: "What is the sound of one hand clapping?",
             keyItem: "mu",
             items: ["bowl", "staff", "bell"],
-            mechanic: "paradox", // key appears when you stop seeking
+            mechanic: "paradox",
             mechanicHint: "The key appears only to those who have stopped seeking it.",
             corpus: [
-                "A monk asked Zhaozhou, 'Does a dog have Buddha nature or not?' Zhaozhou replied, 'Mu.' This 'Mu' is the barrier of the ancestral teachers. If you can pass through it, you will not only see Zhaozhou face to face, but you will walk hand in hand with all the ancestral teachers.",
-                "What is the sound of one hand clapping? If you say something, you miss it entirely. If you remain silent, you miss it equally. What will you do? This very mind that does not understand is it. There is nothing to attain, nothing to realize. Yet this nothing is not emptiness—it is the fullness of all things.",
-                "Before your father and mother were born, what was your original face? Not the face of flesh, not a face of no-flesh. Speaking of it is already wrong; not speaking of it is equally wrong. Words cannot reach it, silence cannot reach it. Where will you find your original face?",
-                "If you meet the Buddha on the road, kill him. If you meet your master, kill him. As long as you seek Buddha outside yourself, Buddha will always be outside yourself. The treasure house is within you—everything you need is already there.",
-                "Sitting quietly, doing nothing, spring comes, and the grass grows by itself. This is not laziness. This is not inaction. This is the great action that has no actor. Who is it that sits? Who is it that does nothing? Look! Already the grass has grown.",
-                "The cypress tree in the garden—this is the answer to all your questions. But what does it mean? If you seek the meaning, you have already lost it. The cypress tree is just the cypress tree. The moon is just the moon. Your face is just your face.",
-                "When you can do nothing, what can you do? When you have nowhere to go, where will you go? When you have no one to be, who will you be? These are not puzzles to be solved—they are doors to be walked through.",
-                "To study the self is to forget the self. To forget the self is to be enlightened by all things. To be enlightened by all things is to remove the barrier between self and other. When the barrier is removed, there is no Buddha, no sentient beings—only this, just this, this present moment, complete.",
-                "The wild geese do not intend to cast their reflection; the water has no mind to receive their image. When you can understand this, you will understand everything. The reflection appears without intention; the water receives without grasping. This is the natural way."
+                "A monk asked Zhaozhou, 'Does a dog have Buddha nature or not?' Zhaozhou replied, 'Mu.'",
+                "What is the sound of one hand clapping? If you say something, you miss it entirely. If you remain silent, you miss it equally.",
+                "Before your father and mother were born, what was your original face?",
+                "If you meet the Buddha on the road, kill him. The treasure house is within you—everything you need is already there.",
+                "Sitting quietly, doing nothing, spring comes, and the grass grows by itself.",
+                "The cypress tree in the garden—this is the answer to all your questions. But what does it mean?",
+                "When you can do nothing, what can you do? When you have nowhere to go, where will you go?",
+                "To study the self is to forget the self. To forget the self is to be enlightened by all things."
             ]
         },
         {
@@ -403,20 +583,9 @@
             subtitle: "...",
             keyItem: null,
             items: [],
-            mechanic: "void", // everything fades
+            mechanic: "void",
             mechanicHint: "",
-            corpus: [
-                "                                                    ",
-                "         .                                          ",
-                "                    .           .                   ",
-                "        .                               .           ",
-                "                         .                          ",
-                "    .          .                   .                ",
-                "                                            .       ",
-                "                  .         .                       ",
-                "       .                           .                ",
-                "                       .                            "
-            ]
+            corpus: ["", "", "", "", "", "", "", ""]
         }
     ];
 
@@ -431,13 +600,18 @@
     let inventory = [];
     let rooms = {};
     let stairsPos = null;
-    let seekingKey = true; // For Koans mechanic
+    let seekingKey = true;
     let moveCount = 0;
+    let propositionIndex = 0; // For Tractatus progression
 
-    const SIZES = [17, 19, 21, 23, 19, 15]; // Size per level
+    const SIZES = [17, 19, 21, 23, 19, 15];
+    const CELL_SIZE = 20;
+
+    // Canvas elements
+    let canvas, ctx;
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // BIGRAM MARKOV CHAIN - More coherent than single-word
+    // BIGRAM MARKOV CHAIN
     // ═══════════════════════════════════════════════════════════════════════════
 
     function buildMarkov(texts) {
@@ -447,8 +621,6 @@
         for (const text of texts) {
             const words = text.split(/\s+/).filter(w => w);
             if (words.length < 3) continue;
-
-            // First two words can start a sequence
             starters.push(words[0] + ' ' + words[1]);
 
             for (let i = 0; i < words.length - 2; i++) {
@@ -461,11 +633,10 @@
         return { chain, starters };
     }
 
-    function generate(markov, minWords = 30, maxWords = 50) {
+    function generate(markov, minWords = 20, maxWords = 35) {
         const { chain, starters } = markov;
         if (starters.length === 0) return "...";
 
-        // Pick random starter
         let current = starters[Math.floor(Math.random() * starters.length)];
         let result = current.split(' ');
         let targetLength = minWords + Math.floor(Math.random() * (maxWords - minWords));
@@ -473,7 +644,6 @@
         for (let i = 0; i < targetLength; i++) {
             const next = chain[current];
             if (!next || next.length === 0) {
-                // Restart from a new starter
                 current = starters[Math.floor(Math.random() * starters.length)];
                 const words = current.split(' ');
                 result.push('—', words[0], words[1]);
@@ -485,33 +655,22 @@
             }
         }
 
-        // Find a good ending point (period, question mark, etc.)
         let text = result.join(' ');
-        const lastPeriod = Math.max(
-            text.lastIndexOf('.'),
-            text.lastIndexOf('?'),
-            text.lastIndexOf('!')
-        );
-
-        if (lastPeriod > text.length * 0.5) {
-            text = text.slice(0, lastPeriod + 1);
-        } else if (!text.endsWith('.')) {
-            text += '.';
-        }
+        const lastPeriod = Math.max(text.lastIndexOf('.'), text.lastIndexOf('?'), text.lastIndexOf('!'));
+        if (lastPeriod > text.length * 0.5) text = text.slice(0, lastPeriod + 1);
+        else if (!text.endsWith('.')) text += '.';
 
         return text;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // MAZE GENERATION - Better connected rooms using Kruskal's algorithm
+    // MAZE GENERATION - Kruskal's algorithm
     // ═══════════════════════════════════════════════════════════════════════════
 
     function generateMaze(W, H) {
-        // Initialize with walls
         const grid = Array(H).fill(null).map(() => Array(W).fill('#'));
-
-        // Create rooms at odd coordinates
         const cells = [];
+
         for (let y = 1; y < H - 1; y += 2) {
             for (let x = 1; x < W - 1; x += 2) {
                 grid[y][x] = '.';
@@ -519,7 +678,6 @@
             }
         }
 
-        // Create list of walls between adjacent cells
         const walls = [];
         for (let y = 1; y < H - 1; y += 2) {
             for (let x = 1; x < W - 1; x += 2) {
@@ -528,17 +686,12 @@
             }
         }
 
-        // Shuffle walls
         for (let i = walls.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [walls[i], walls[j]] = [walls[j], walls[i]];
         }
 
-        // Union-Find helpers
-        function findCell(x, y) {
-            return cells.find(c => c.x === x && c.y === y);
-        }
-
+        function findCell(x, y) { return cells.find(c => c.x === x && c.y === y); }
         function findSet(cell) {
             if (cell.set !== cells.indexOf(cell)) {
                 const parent = cells[cell.set];
@@ -546,30 +699,21 @@
             }
             return cell.set;
         }
-
         function union(cell1, cell2) {
-            const set1 = findSet(cell1);
-            const set2 = findSet(cell2);
-            if (set1 !== set2) {
-                cells[set1].set = set2;
-                return true;
-            }
+            const set1 = findSet(cell1), set2 = findSet(cell2);
+            if (set1 !== set2) { cells[set1].set = set2; return true; }
             return false;
         }
 
-        // Process walls (Kruskal's algorithm)
         for (const wall of walls) {
             const cell1 = findCell(wall.x1, wall.y1);
             const cell2 = findCell(wall.x2, wall.y2);
-
-            if (union(cell1, cell2)) {
-                grid[wall.wy][wall.wx] = '.';
-            }
+            if (union(cell1, cell2)) grid[wall.wy][wall.wx] = '.';
         }
 
-        // Add some extra passages for loops (makes it less linear)
+        // Add some loops
         const extraWalls = walls.filter(w => grid[w.wy][w.wx] === '#');
-        const extraCount = Math.floor(extraWalls.length * 0.15);
+        const extraCount = Math.floor(extraWalls.length * 0.12);
         for (let i = 0; i < extraCount && i < extraWalls.length; i++) {
             const w = extraWalls[Math.floor(Math.random() * extraWalls.length)];
             grid[w.wy][w.wx] = '.';
@@ -587,13 +731,11 @@
         const W = SIZES[level];
         const H = SIZES[level];
 
-        // Update theme
         document.body.className = `level-${level}`;
         document.getElementById('level-name').textContent = realm.name;
         document.getElementById('level-subtitle').textContent = realm.subtitle;
         document.getElementById('depth').textContent = `stratum ${['I', 'II', 'III', 'IV', 'V', 'VI'][level]}`;
 
-        // Show mechanic hint
         const hintEl = document.getElementById('mechanic-hint');
         if (realm.mechanicHint) {
             hintEl.textContent = realm.mechanicHint;
@@ -602,13 +744,17 @@
             hintEl.style.display = 'none';
         }
 
-        // Build markov chain
-        const markov = buildMarkov(realm.corpus);
+        // Build markov for non-Tractatus levels
+        const markov = realm.corpus ? buildMarkov(realm.corpus) : null;
 
-        // Generate maze
         maze = generateMaze(W, H);
 
-        // Find all floor tiles
+        // Setup canvas
+        canvas = document.getElementById('maze-canvas');
+        canvas.width = W * CELL_SIZE;
+        canvas.height = H * CELL_SIZE;
+        ctx = canvas.getContext('2d');
+
         const floors = [];
         for (let y = 1; y < H - 1; y++) {
             for (let x = 1; x < W - 1; x++) {
@@ -616,33 +762,26 @@
             }
         }
 
-        // Shuffle floors for random placement
         for (let i = floors.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [floors[i], floors[j]] = [floors[j], floors[i]];
         }
 
-        // Place player near top-left
         const startCandidates = floors.filter(f => f.x < W / 3 && f.y < H / 3);
         const start = startCandidates.length > 0 ? startCandidates[0] : floors[0];
         player = { x: start.x, y: start.y };
 
-        // Place items
         items = [];
         let floorIdx = 0;
-
         const allItems = [...realm.items];
         if (realm.keyItem) allItems.push(realm.keyItem);
 
         for (const itemName of allItems) {
-            // Find a floor tile not occupied by player
             while (floorIdx < floors.length) {
                 const f = floors[floorIdx++];
                 if (f.x !== player.x || f.y !== player.y) {
                     items.push({
-                        x: f.x,
-                        y: f.y,
-                        name: itemName,
+                        x: f.x, y: f.y, name: itemName,
                         isKey: itemName === realm.keyItem,
                         visible: realm.mechanic !== 'paradox' || itemName !== realm.keyItem
                     });
@@ -651,7 +790,6 @@
             }
         }
 
-        // Place stairs far from start
         if (level < REALMS.length - 1) {
             const farFloors = floors
                 .filter(f => f.x !== player.x || f.y !== player.y)
@@ -666,14 +804,20 @@
             stairsPos = null;
         }
 
-        // Generate room descriptions
         rooms = {};
-        for (const f of floors) {
-            rooms[`${f.x},${f.y}`] = generate(markov, 25, 45);
+        for (let i = 0; i < floors.length; i++) {
+            const f = floors[i];
+            if (level === 0) {
+                // Tractatus: assign propositions in order of room visitation
+                rooms[`${f.x},${f.y}`] = i;
+            } else {
+                rooms[`${f.x},${f.y}`] = markov ? generate(markov, 18, 30) : '...';
+            }
         }
 
         seekingKey = true;
         moveCount = 0;
+        propositionIndex = 0;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -682,33 +826,32 @@
 
     function applyMechanic(dir) {
         const realm = REALMS[level];
-
         switch (realm.mechanic) {
-            case 'divination':
-                return divinationMove(dir);
-            case 'infinite':
-                return infiniteMove(dir);
-            case 'paradox':
-                return paradoxMove(dir);
-            case 'void':
-                return voidMove(dir);
-            default:
-                return { dir, message: null };
+            case 'tractatus': return tractatusMove(dir);
+            case 'divination': return divinationMove(dir);
+            case 'infinite': return infiniteMove(dir);
+            case 'paradox': return paradoxMove(dir);
+            case 'void': return voidMove(dir);
+            default: return { dir, message: null };
         }
     }
 
+    function tractatusMove(dir) {
+        // In Tractatus, each move advances through propositions
+        if (propositionIndex < TRACTATUS.length - 1) {
+            propositionIndex++;
+        }
+        return { dir, message: null };
+    }
+
     function divinationMove(dir) {
-        // Cast coins to determine if movement is altered
         const coins = [Math.random() > 0.5, Math.random() > 0.5, Math.random() > 0.5];
         const value = coins.filter(c => c).length;
-
-        // Show divination briefly
         const divEl = document.getElementById('divination');
         const hexagram = coins.map(c => c ? '⚊' : '⚋').join(' ');
         const directions = ['n', 'e', 's', 'w'];
 
         if (value === 0 || value === 3) {
-            // Changing line - redirect
             const newDir = directions[(directions.indexOf(dir) + (value === 3 ? 1 : 3)) % 4];
             divEl.innerHTML = `<h3>The Oracle Speaks</h3><div class="hexagram">${hexagram}</div><p>The way shifts ${value === 3 ? 'rightward' : 'leftward'}.</p>`;
             divEl.style.display = 'block';
@@ -723,137 +866,208 @@
     }
 
     function infiniteMove(dir) {
-        // Library wraps around
-        const W = SIZES[level];
-        const H = SIZES[level];
+        const W = SIZES[level], H = SIZES[level];
         const dirs = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
         const [dx, dy] = dirs[dir];
+        let nx = player.x + dx, ny = player.y + dy;
 
-        let nx = player.x + dx;
-        let ny = player.y + dy;
-
-        // Wrap around
         if (nx < 1) nx = W - 2;
         if (nx > W - 2) nx = 1;
         if (ny < 1) ny = H - 2;
         if (ny > H - 2) ny = 1;
 
-        // If wrapped position is a wall, find nearest floor
         if (maze[ny][nx] === '#') {
             for (let r = 1; r < W; r++) {
                 for (const [ddx, ddy] of [[0,0], [1,0], [-1,0], [0,1], [0,-1]]) {
                     const tx = ((nx + ddx * r - 1 + W - 2) % (W - 2)) + 1;
                     const ty = ((ny + ddy * r - 1 + H - 2) % (H - 2)) + 1;
                     if (maze[ty][tx] === '.') {
-                        player.x = tx;
-                        player.y = ty;
-                        return { dir: null, message: "The corridors fold upon themselves. You emerge elsewhere." };
+                        player.x = tx; player.y = ty;
+                        return { dir: null, message: "The corridors fold upon themselves." };
                     }
                 }
             }
         }
-
-        player.x = nx;
-        player.y = ny;
+        player.x = nx; player.y = ny;
         return { dir: null, message: null };
     }
 
     function paradoxMove(dir) {
         moveCount++;
-
-        // The key only appears after many moves without seeking
         const keyItem = items.find(i => i.isKey);
         if (keyItem && !keyItem.visible) {
-            // Key becomes visible after 15+ moves if player hasn't been near it
             const dist = Math.abs(keyItem.x - player.x) + Math.abs(keyItem.y - player.y);
             if (moveCount > 15 && dist > 5) {
                 keyItem.visible = true;
-                return { dir, message: "You've stopped seeking. Something appears at the edge of perception." };
+                return { dir, message: "You've stopped seeking. Something appears." };
             }
         }
-
         return { dir, message: null };
     }
 
     function voidMove(dir) {
-        // In void, movement sometimes fails or goes wrong direction
         if (Math.random() < 0.3) {
             const directions = ['n', 'e', 's', 'w'];
             return { dir: directions[Math.floor(Math.random() * 4)], message: null };
         }
-
-        // Walls sometimes become permeable
         const dirs = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
         const [dx, dy] = dirs[dir];
-        const nx = player.x + dx;
-        const ny = player.y + dy;
-
+        const nx = player.x + dx, ny = player.y + dy;
         if (maze[ny] && maze[ny][nx] === '#' && Math.random() < 0.2) {
-            // Pass through wall
-            player.x = nx;
-            player.y = ny;
+            player.x = nx; player.y = ny;
             return { dir: null, message: null };
         }
-
         return { dir, message: null };
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // TRANSMUTATION (Hermetic level)
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function checkTransmutation() {
-        if (level !== 2) return; // Only Hermetic level
-
+        if (level !== 2) return null;
         const hasSulfur = inventory.includes('sulfur');
         const hasMercury = inventory.includes('mercury');
         const hasSalt = inventory.includes('salt');
 
         if (hasSulfur && hasMercury && hasSalt && !inventory.includes('philosopher-stone')) {
-            // Transmute!
             inventory = inventory.filter(i => i !== 'sulfur' && i !== 'mercury' && i !== 'salt');
             inventory.push('philosopher-stone');
-            return "The three principles unite! Sulfur, mercury, and salt dissolve into the philosopher's stone.";
+            return "The three principles unite! The philosopher's stone emerges.";
         }
         return null;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // RENDERING
+    // GRAPHICAL RENDERING
     // ═══════════════════════════════════════════════════════════════════════════
 
     function render() {
         const realm = REALMS[level];
-        const W = SIZES[level];
-        const H = SIZES[level];
+        const W = SIZES[level], H = SIZES[level];
         const hasKey = realm.keyItem ? inventory.includes(realm.keyItem) : false;
 
-        let out = '';
+        // Get computed colors
+        const style = getComputedStyle(document.body);
+        const wallColor = style.getPropertyValue('--wall').trim() || '#1a1a1e';
+        const floorColor = style.getPropertyValue('--floor').trim() || '#0d0d10';
+        const accentColor = style.getPropertyValue('--accent').trim() || '#10b981';
+        const accentBright = style.getPropertyValue('--accent-bright').trim() || '#34d399';
+
+        // Clear canvas
+        ctx.fillStyle = floorColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw maze with rounded walls
+        ctx.fillStyle = wallColor;
         for (let y = 0; y < H; y++) {
             for (let x = 0; x < W; x++) {
-                if (x === player.x && y === player.y) {
-                    out += '<span class="player">@</span>';
-                } else if (stairsPos && x === stairsPos.x && y === stairsPos.y && hasKey) {
-                    out += '<span class="stairs">▼</span>';
-                } else if (items.some(i => i.x === x && i.y === y && i.isKey && i.visible)) {
-                    out += '<span class="key-item">◆</span>';
-                } else if (items.some(i => i.x === x && i.y === y && !i.isKey)) {
-                    out += '<span class="item">∗</span>';
-                } else if (maze[y] && maze[y][x] === '#') {
-                    out += '<span class="wall">█</span>';
-                } else if (maze[y] && maze[y][x] === '.') {
-                    out += '<span class="floor">·</span>';
-                } else {
-                    out += ' ';
+                if (maze[y] && maze[y][x] === '#') {
+                    const px = x * CELL_SIZE;
+                    const py = y * CELL_SIZE;
+                    const r = 3; // corner radius
+
+                    // Check neighbors for rounded corners
+                    const top = y > 0 && maze[y-1][x] === '#';
+                    const bot = y < H-1 && maze[y+1][x] === '#';
+                    const left = x > 0 && maze[y][x-1] === '#';
+                    const right = x < W-1 && maze[y][x+1] === '#';
+
+                    ctx.beginPath();
+                    ctx.roundRect(px + 1, py + 1, CELL_SIZE - 2, CELL_SIZE - 2, [
+                        (!top && !left) ? r : 0,
+                        (!top && !right) ? r : 0,
+                        (!bot && !right) ? r : 0,
+                        (!bot && !left) ? r : 0
+                    ]);
+                    ctx.fill();
                 }
             }
-            out += '\n';
         }
-        document.getElementById('map').innerHTML = out;
+
+        // Draw subtle grid on floor
+        ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+        ctx.lineWidth = 1;
+        for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+                if (maze[y] && maze[y][x] === '.') {
+                    ctx.strokeRect(x * CELL_SIZE + 2, y * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+                }
+            }
+        }
+
+        // Draw stairs (if key found)
+        if (stairsPos && hasKey) {
+            const sx = stairsPos.x * CELL_SIZE + CELL_SIZE / 2;
+            const sy = stairsPos.y * CELL_SIZE + CELL_SIZE / 2;
+            ctx.fillStyle = '#eab308';
+            ctx.beginPath();
+            ctx.moveTo(sx, sy + 6);
+            ctx.lineTo(sx - 6, sy - 4);
+            ctx.lineTo(sx + 6, sy - 4);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Draw items
+        for (const item of items) {
+            if (!item.visible) continue;
+            const ix = item.x * CELL_SIZE + CELL_SIZE / 2;
+            const iy = item.y * CELL_SIZE + CELL_SIZE / 2;
+
+            if (item.isKey) {
+                ctx.fillStyle = accentColor;
+                ctx.beginPath();
+                // Diamond shape for key items
+                ctx.moveTo(ix, iy - 6);
+                ctx.lineTo(ix + 5, iy);
+                ctx.lineTo(ix, iy + 6);
+                ctx.lineTo(ix - 5, iy);
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.arc(ix, iy, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Draw player with glow
+        const px = player.x * CELL_SIZE + CELL_SIZE / 2;
+        const py = player.y * CELL_SIZE + CELL_SIZE / 2;
+
+        // Glow
+        const gradient = ctx.createRadialGradient(px, py, 0, px, py, 14);
+        gradient.addColorStop(0, accentBright + '40');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(px, py, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Player circle
+        ctx.fillStyle = accentBright;
+        ctx.beginPath();
+        ctx.arc(px, py, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Proposition display (Tractatus level)
+        const propEl = document.getElementById('proposition');
+        if (level === 0 && propositionIndex < TRACTATUS.length) {
+            const prop = TRACTATUS[propositionIndex];
+            propEl.innerHTML = `<span class="number">${prop.n}</span>${prop.t}`;
+            propEl.style.display = 'block';
+        } else {
+            propEl.style.display = 'none';
+        }
 
         // Description
         const roomKey = `${player.x},${player.y}`;
-        let desc = rooms[roomKey] || '...';
+        let desc;
+        if (level === 0) {
+            // For Tractatus, show the current proposition as main text
+            const prop = TRACTATUS[propositionIndex];
+            desc = prop ? prop.t : '...';
+        } else {
+            desc = typeof rooms[roomKey] === 'string' ? rooms[roomKey] : '...';
+        }
 
         const here = items.filter(i => i.x === player.x && i.y === player.y && (i.visible !== false));
         if (here.length) {
@@ -861,11 +1075,8 @@
         }
 
         if (stairsPos && player.x === stairsPos.x && player.y === stairsPos.y) {
-            if (hasKey) {
-                desc += '\n\nStairs spiral downward into deeper darkness.';
-            } else if (realm.keyItem) {
-                desc += `\n\nA sealed passage. It awaits the ${realm.keyItem}.`;
-            }
+            if (hasKey) desc += '\n\nStairs spiral downward into deeper darkness.';
+            else if (realm.keyItem) desc += `\n\nA sealed passage. It awaits the ${realm.keyItem}.`;
         }
 
         document.getElementById('description').textContent = desc;
@@ -873,8 +1084,9 @@
 
         // Hint
         const hint = document.getElementById('hint');
-        if (level === 2) {
-            // Hermetic level hint
+        if (level === 0) {
+            hint.textContent = `proposition ${propositionIndex + 1} of ${TRACTATUS.length}`;
+        } else if (level === 2) {
             const hasStone = inventory.includes('philosopher-stone');
             if (!hasStone) {
                 const has = [
@@ -882,11 +1094,7 @@
                     inventory.includes('mercury') ? 'mercury' : null,
                     inventory.includes('salt') ? 'salt' : null
                 ].filter(Boolean);
-                if (has.length === 0) {
-                    hint.textContent = 'gather the three principles';
-                } else if (has.length < 3) {
-                    hint.textContent = `${has.join(' + ')} — seek the rest`;
-                }
+                hint.textContent = has.length === 0 ? 'gather the three principles' : has.length < 3 ? `${has.join(' + ')} — seek the rest` : '';
             } else {
                 hint.textContent = 'the stone is yours — find the way down';
             }
@@ -894,8 +1102,6 @@
             hint.textContent = `seek the ${realm.keyItem}`;
         } else if (hasKey && stairsPos) {
             hint.textContent = 'descend ▼';
-        } else if (level === REALMS.length - 1) {
-            hint.textContent = '';
         } else {
             hint.textContent = '';
         }
@@ -907,21 +1113,16 @@
         document.getElementById('btn-e').disabled = !canMove(1, 0);
 
         const btnDescend = document.getElementById('btn-descend');
-        const canDescend = stairsPos && player.x === stairsPos.x && player.y === stairsPos.y && hasKey;
-        btnDescend.style.display = canDescend ? 'inline-block' : 'none';
+        const canDescendNow = stairsPos && player.x === stairsPos.x && player.y === stairsPos.y && hasKey;
+        btnDescend.style.display = canDescendNow ? 'inline-block' : 'none';
     }
 
     function canMove(dx, dy) {
         const realm = REALMS[level];
-        const W = SIZES[level];
-        const H = SIZES[level];
-        const nx = player.x + dx;
-        const ny = player.y + dy;
+        const W = SIZES[level], H = SIZES[level];
+        const nx = player.x + dx, ny = player.y + dy;
 
-        // Infinite library wraps
         if (realm.mechanic === 'infinite') return true;
-
-        // Void level is more permeable
         if (realm.mechanic === 'void') return true;
 
         return nx >= 0 && nx < W && ny >= 0 && ny < H && maze[ny] && maze[ny][nx] !== '#';
@@ -929,20 +1130,14 @@
 
     function move(dir) {
         const result = applyMechanic(dir);
-        let message = result.message;
 
         if (result.dir !== null) {
             const dirs = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
             const [dx, dy] = dirs[result.dir];
-
             if (canMove(dx, dy)) {
                 player.x += dx;
                 player.y += dy;
             }
-        }
-
-        if (message) {
-            // Could show message in description
         }
 
         render();
@@ -956,13 +1151,8 @@
                 const idx = items.indexOf(item);
                 if (idx >= 0) items.splice(idx, 1);
             }
-
-            // Check for transmutation
             const transMsg = checkTransmutation();
-            if (transMsg) {
-                alert(transMsg);
-            }
-
+            if (transMsg) alert(transMsg);
             render();
         }
     }
@@ -992,18 +1182,9 @@
             k: 'n', j: 's', h: 'w', l: 'e'
         };
 
-        if (map[e.key]) {
-            e.preventDefault();
-            move(map[e.key]);
-        }
-        if (e.key === ' ' || e.key === 'Enter' || e.key === 'g') {
-            e.preventDefault();
-            take();
-        }
-        if (e.key === '>' || e.key === '.') {
-            e.preventDefault();
-            descend();
-        }
+        if (map[e.key]) { e.preventDefault(); move(map[e.key]); }
+        if (e.key === ' ' || e.key === 'Enter' || e.key === 'g') { e.preventDefault(); take(); }
+        if (e.key === '>' || e.key === '.') { e.preventDefault(); descend(); }
     });
 
     // ═══════════════════════════════════════════════════════════════════════════
