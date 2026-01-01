@@ -3,28 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>dodeca - generative polyhedron</title>
-    <meta name="hyle-sketch" content="spiky dodecahedron with perturbed surface using landscape generation algos. layered rotoscoped rendering floating over starry void">
+    <title>Dodeca — hyle</title>
+    <meta name="description" content="Spiky dodecahedron with noise-perturbed vertices and rotoscoped rendering">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #000; overflow: hidden; }
-        canvas { display: block; }
-        #info {
-            position: fixed;
-            bottom: 1rem;
-            left: 1rem;
-            color: #666;
-            font: 12px system-ui;
-            pointer-events: none;
+        :root {
+            --bg: #000;
+            --text: #f0f0f3;
+            --text-secondary: #a0a0ab;
+            --text-muted: #606068;
+            --accent: #10b981;
+            --accent-bright: #34d399;
+            --border: #1a1a20;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
         }
-        #info a { color: #6b9fff; pointer-events: auto; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            overflow: hidden;
+        }
+
+        canvas { display: block; }
+
+        /* Nav */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .brand .lambda { color: var(--accent); font-size: 1.25rem; }
+        .brand:hover .lambda { color: var(--accent-bright); }
+
+        .back-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover { color: var(--accent); }
     </style>
 </head>
 <body>
+    <nav>
+        <a href="/" class="brand">
+            <span class="lambda">λ</span>
+            <span>hyle</span>
+        </a>
+        <a href="/projects/" class="back-link">← Projects</a>
+    </nav>
     <canvas id="c"></canvas>
-    <div id="info">
-        <a href="https://uprootiny.github.io/hyle/">hyle</a> · dodeca · <a href="https://uprootiny.github.io/hyle/#sketch=spiky%20dodecahedron%20with%20perturbed%20surface%20using%20landscape%20generation%20algos.%20layered%20rotoscoped%20rendering%20floating%20over%20starry%20void">remix →</a>
-    </div>
     <script type="module">
         // Minimal three.js-like WebGL renderer
         const canvas = document.getElementById('c');

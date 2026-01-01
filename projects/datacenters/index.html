@@ -3,17 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Datacenter Impact Visualization</title>
+    <title>Datacenters Globe — hyle</title>
+    <meta name="description" content="Interactive 3D visualization of global cloud infrastructure and environmental impact">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #0a0a0f;
-            --text: #e0e0e0;
-            --accent: #00d4ff;
-            --warning: #ff6b35;
-            --danger: #ff3366;
-            --water: #3498db;
-            --power: #f1c40f;
-            --fire: #e74c3c;
+            --bg: #050506;
+            --bg-elevated: #0a0a0f;
+            --text: #f0f0f3;
+            --text-secondary: #a0a0ab;
+            --text-muted: #606068;
+            --accent: #10b981;
+            --accent-bright: #34d399;
+            --border: #1a1a20;
+            --water: #3b82f6;
+            --power: #eab308;
+            --fire: #ef4444;
+            --warning: #f97316;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -21,10 +32,48 @@
         body {
             background: var(--bg);
             color: var(--text);
-            font-family: 'SF Mono', 'Consolas', monospace;
+            font-family: var(--font-sans);
             min-height: 100vh;
             overflow: hidden;
         }
+
+        /* Nav */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            background: linear-gradient(to bottom, rgba(5,5,6,0.9), transparent);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .brand .lambda { color: var(--accent); font-size: 1.25rem; }
+        .brand:hover .lambda { color: var(--accent-bright); }
+
+        .back-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover { color: var(--accent); }
 
         #canvas {
             position: fixed;
@@ -46,22 +95,22 @@
 
         .panel {
             position: fixed;
-            background: rgba(10, 10, 15, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+            background: rgba(10, 10, 15, 0.85);
+            border: 1px solid var(--border);
+            border-radius: 12px;
             padding: 16px;
             pointer-events: auto;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(16px);
         }
 
         .stats-panel {
-            top: 20px;
+            top: 70px;
             left: 20px;
             min-width: 240px;
         }
 
         .token-panel {
-            top: 20px;
+            top: 70px;
             right: 20px;
             text-align: right;
         }
@@ -83,12 +132,13 @@
         .detail-panel.visible { display: block; }
 
         h2 {
-            font-size: 11px;
+            font-family: var(--font-mono);
+            font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 2px;
             color: var(--accent);
             margin-bottom: 12px;
-            font-weight: 400;
+            font-weight: 500;
         }
 
         .stat-row {
@@ -98,55 +148,70 @@
             font-size: 12px;
         }
 
-        .stat-label { color: #888; }
-        .stat-value { color: var(--text); font-weight: 600; }
+        .stat-label { color: var(--text-muted); font-size: 0.85rem; }
+        .stat-value { color: var(--text); font-weight: 600; font-family: var(--font-mono); }
         .stat-value.water { color: var(--water); }
         .stat-value.power { color: var(--power); }
         .stat-value.fire { color: var(--fire); }
 
         .token-counter {
-            font-size: 32px;
-            font-weight: 200;
+            font-size: 2.5rem;
+            font-weight: 300;
             color: var(--accent);
-            letter-spacing: -1px;
+            letter-spacing: -2px;
+            font-family: var(--font-mono);
         }
 
         .token-label {
             font-size: 10px;
-            color: #666;
+            color: var(--text-muted);
             margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .legend-item {
             display: flex;
             align-items: center;
             gap: 8px;
-            margin: 4px 0;
-            font-size: 11px;
+            margin: 6px 0;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
         }
 
         .legend-dot {
             width: 10px;
             height: 10px;
             border-radius: 50%;
+            flex-shrink: 0;
         }
 
         .close-btn {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 12px;
+            right: 12px;
             background: none;
             border: none;
-            color: #666;
-            font-size: 18px;
+            color: var(--text-muted);
+            font-size: 20px;
             cursor: pointer;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s;
         }
 
-        .close-btn:hover { color: var(--text); }
+        .close-btn:hover {
+            color: var(--text);
+            background: rgba(255,255,255,0.1);
+        }
 
         .impact-meter {
             height: 4px;
-            background: #222;
+            background: rgba(255,255,255,0.1);
             border-radius: 2px;
             margin: 8px 0;
             overflow: hidden;
@@ -162,9 +227,10 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            font-size: 11px;
-            color: #444;
+            font-size: 0.75rem;
+            color: var(--text-muted);
             pointer-events: none;
+            font-family: var(--font-mono);
         }
 
         @keyframes pulse {
@@ -174,6 +240,14 @@
     </style>
 </head>
 <body>
+    <nav>
+        <a href="/" class="brand">
+            <span class="lambda">λ</span>
+            <span>hyle</span>
+        </a>
+        <a href="/projects/" class="back-link">← Projects</a>
+    </nav>
+
     <canvas id="canvas"></canvas>
     <div id="overlay">
         <div class="panel stats-panel">
@@ -316,26 +390,32 @@
         { lat: 64.15, lon: -21.94, provider: 'Meta', name: 'eu-north-iceland', capacity: 200, water: 0.2, fire: 0.01 },
     ];
 
-    // Dymaxion/Fuller projection approximation
+    // Dymaxion/Fuller-inspired projection
+    // Uses icosahedral gnomonic projection with continuous rotation
     function project(lat, lon) {
-        // Simplified icosahedral projection
         const phi = (90 - lat) * Math.PI / 180;
         const theta = (lon + rotation) * Math.PI / 180;
 
-        // Convert to 3D
+        // Convert to 3D sphere
         const x3 = Math.sin(phi) * Math.cos(theta);
-        const y3 = Math.sin(phi) * Math.sin(theta);
-        const z3 = Math.cos(phi);
+        const y3 = Math.cos(phi);  // Y is up
+        const z3 = Math.sin(phi) * Math.sin(theta);
 
-        // Orthographic with slight perspective
-        const perspective = 1 / (1 - z3 * 0.3);
-        const x = x3 * perspective;
-        const y = y3 * perspective;
+        // Fuller/Dymaxion-style: tilt the globe to show more landmass
+        const tilt = 0.4;  // 23 degrees tilt
+        const y3t = y3 * Math.cos(tilt) - z3 * Math.sin(tilt);
+        const z3t = y3 * Math.sin(tilt) + z3 * Math.cos(tilt);
+
+        // Stereographic projection (better for Dymaxion feel)
+        const k = 2 / (1 + Math.max(0.01, 1 - z3t * 0.8));
+        const x = x3 * k;
+        const y = y3t * k;
 
         return {
-            x: centerX + x * scale * zoom,
-            y: centerY - y * scale * zoom * 0.6, // Flatten slightly
-            visible: z3 > -0.2 // Allow some backface visibility
+            x: centerX + x * scale * zoom * 0.5,
+            y: centerY - y * scale * zoom * 0.5,
+            visible: z3t > -0.3,
+            depth: z3t
         };
     }
 
@@ -348,14 +428,23 @@
     }
 
     function drawGlobe() {
-        // Draw latitude lines
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        // Draw globe edge glow
+        const edgeGlow = ctx.createRadialGradient(centerX, centerY, scale * zoom * 0.3, centerX, centerY, scale * zoom * 0.6);
+        edgeGlow.addColorStop(0, 'transparent');
+        edgeGlow.addColorStop(0.8, 'rgba(16, 185, 129, 0.03)');
+        edgeGlow.addColorStop(1, 'transparent');
+        ctx.fillStyle = edgeGlow;
+        ctx.fillRect(0, 0, width, height);
+
+        // Draw graticule (lat/lon lines)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
         ctx.lineWidth = 1;
 
-        for (let lat = -60; lat <= 60; lat += 30) {
+        // Latitude lines
+        for (let lat = -60; lat <= 60; lat += 20) {
             ctx.beginPath();
             let first = true;
-            for (let lon = -180; lon <= 180; lon += 5) {
+            for (let lon = -180; lon <= 180; lon += 3) {
                 const p = project(lat, lon);
                 if (p.visible) {
                     if (first) {
@@ -371,11 +460,11 @@
             ctx.stroke();
         }
 
-        // Draw longitude lines
-        for (let lon = -180; lon < 180; lon += 30) {
+        // Longitude lines
+        for (let lon = -180; lon < 180; lon += 20) {
             ctx.beginPath();
             let first = true;
-            for (let lat = -90; lat <= 90; lat += 5) {
+            for (let lat = -85; lat <= 85; lat += 3) {
                 const p = project(lat, lon);
                 if (p.visible) {
                     if (first) {
@@ -391,45 +480,85 @@
             ctx.stroke();
         }
 
-        // Draw simplified continents
+        // Draw detailed continents
         drawContinentOutlines();
+
+        // Draw equator highlight
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        let first = true;
+        for (let lon = -180; lon <= 180; lon += 3) {
+            const p = project(0, lon);
+            if (p.visible) {
+                if (first) {
+                    ctx.moveTo(p.x, p.y);
+                    first = false;
+                } else {
+                    ctx.lineTo(p.x, p.y);
+                }
+            } else {
+                first = true;
+            }
+        }
+        ctx.stroke();
     }
 
     function drawContinentOutlines() {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = 1;
-
-        // Simplified continent polygons (just key coastline points)
+        // Draw filled continents with gradient
         const continents = [
-            // North America
-            [[70, -170], [60, -140], [55, -130], [40, -125], [25, -110], [20, -100], [30, -85], [25, -80], [45, -65], [50, -55], [60, -75], [70, -100]],
-            // South America
-            [[10, -75], [5, -80], [-5, -80], [-15, -75], [-25, -70], [-35, -65], [-55, -70], [-55, -65], [-45, -65], [-35, -55], [-25, -45], [-5, -35], [5, -55]],
-            // Europe
-            [[70, 30], [60, 10], [45, -10], [35, -10], [35, 5], [45, 15], [50, 20], [55, 25], [60, 40]],
-            // Africa
-            [[35, -5], [30, 30], [10, 45], [-5, 40], [-25, 35], [-35, 20], [-35, 15], [-20, 10], [5, -5], [10, -15], [35, -5]],
-            // Asia
-            [[70, 180], [60, 160], [55, 140], [35, 140], [20, 120], [10, 100], [25, 90], [40, 75], [45, 50], [55, 60], [70, 80], [75, 100], [70, 140]],
-            // Australia
-            [[-10, 140], [-20, 150], [-35, 150], [-40, 145], [-35, 115], [-20, 115], [-10, 130]]
+            // North America (detailed)
+            [[71,-168],[66,-169],[64,-166],[60,-165],[58,-162],[56,-158],[55,-155],[57,-153],[59,-150],[60,-147],[60,-142],[59,-138],[57,-135],[55,-131],[53,-128],[49,-126],[46,-124],[42,-124],[39,-123],[36,-122],[33,-120],[31,-117],[29,-114],[27,-111],[25,-109],[24,-106],[26,-104],[28,-100],[29,-97],[30,-94],[29,-91],[28,-88],[26,-85],[25,-81],[27,-80],[29,-82],[30,-85],[32,-87],[35,-89],[38,-88],[40,-86],[43,-83],[45,-79],[47,-75],[49,-70],[50,-66],[52,-64],[54,-61],[56,-60],[59,-62],[61,-65],[63,-68],[65,-70],[68,-72],[70,-75],[71,-80],[72,-85],[73,-90],[74,-95],[75,-100],[76,-110],[77,-120],[76,-130],[74,-140],[73,-150],[72,-160],[71,-168]],
+            // South America (detailed)
+            [[12,-72],[10,-75],[8,-77],[5,-78],[2,-79],[-1,-80],[-4,-81],[-8,-80],[-12,-77],[-16,-75],[-20,-70],[-24,-66],[-28,-65],[-32,-64],[-36,-63],[-40,-64],[-44,-66],[-48,-68],[-52,-70],[-54,-69],[-55,-66],[-54,-64],[-52,-62],[-48,-58],[-44,-55],[-40,-52],[-36,-50],[-32,-48],[-28,-46],[-24,-43],[-20,-40],[-16,-38],[-12,-36],[-8,-35],[-4,-35],[0,-38],[4,-42],[8,-50],[10,-55],[11,-60],[12,-65],[12,-72]],
+            // Europe (detailed)
+            [[71,28],[70,30],[68,25],[65,20],[62,12],[60,8],[58,5],[55,0],[52,-4],[50,-6],[48,-5],[45,-2],[43,0],[40,-5],[36,-6],[35,-3],[37,0],[39,3],[42,6],[44,8],[46,10],[48,12],[49,15],[50,18],[52,20],[54,22],[56,25],[58,28],[60,30],[62,32],[64,35],[66,32],[68,30],[71,28]],
+            // Africa (detailed)
+            [[37,-10],[35,-6],[33,-2],[31,2],[30,8],[31,12],[33,16],[35,20],[36,25],[35,30],[32,32],[28,34],[24,36],[20,38],[16,40],[12,42],[8,44],[4,45],[0,43],[-4,40],[-8,38],[-12,36],[-16,34],[-20,32],[-24,28],[-28,24],[-32,20],[-34,18],[-35,16],[-34,14],[-32,12],[-28,10],[-24,12],[-20,14],[-16,12],[-12,8],[-8,4],[-4,2],[0,0],[4,-4],[8,-6],[12,-8],[16,-12],[20,-16],[24,-16],[28,-14],[32,-12],[37,-10]],
+            // Asia (detailed)
+            [[77,100],[75,110],[73,120],[70,130],[67,140],[64,145],[61,148],[58,152],[55,158],[52,160],[48,155],[44,148],[40,142],[36,138],[32,132],[28,122],[24,115],[20,108],[16,100],[12,95],[8,98],[6,100],[8,104],[12,108],[16,112],[18,116],[15,120],[10,118],[5,115],[2,112],[0,108],[-4,105],[-8,100],[-4,95],[0,90],[4,88],[8,82],[12,78],[16,75],[20,72],[24,70],[28,68],[32,66],[36,62],[40,58],[44,52],[48,46],[52,42],[56,38],[60,36],[64,38],[68,42],[70,50],[72,58],[74,70],[76,82],[78,95],[77,100]],
+            // Australia (detailed)
+            [[-11,143],[-13,147],[-17,150],[-21,152],[-25,153],[-29,153],[-33,151],[-36,148],[-38,146],[-39,144],[-38,140],[-37,137],[-35,134],[-32,130],[-28,126],[-24,122],[-20,118],[-16,116],[-13,118],[-12,122],[-11,127],[-10,132],[-11,138],[-11,143]],
+            // Greenland
+            [[84,-40],[82,-30],[80,-22],[77,-18],[74,-20],[72,-25],[70,-30],[68,-35],[66,-42],[65,-48],[66,-52],[68,-55],[70,-58],[72,-60],[74,-58],[76,-54],[78,-48],[80,-42],[82,-38],[84,-40]],
+            // UK/Ireland
+            [[59,-6],[58,-3],[56,0],[54,-3],[52,-5],[51,-8],[52,-10],[54,-10],[56,-8],[58,-7],[59,-6]],
+            // Japan
+            [[45,145],[43,146],[40,142],[36,140],[34,136],[33,132],[34,130],[36,132],[38,136],[40,140],[42,143],[45,145]],
+            // Indonesia/SE Asia
+            [[6,95],[4,100],[2,105],[0,110],[-2,115],[-5,118],[-8,120],[-6,125],[-4,128],[-2,130],[0,128],[2,125],[4,120],[5,115],[6,110],[6,105],[6,95]],
+            // New Zealand
+            [[-34,172],[-37,175],[-40,177],[-44,172],[-46,168],[-45,166],[-42,170],[-38,174],[-34,172]]
         ];
+
+        // Draw filled continents
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.25)';
+        ctx.lineWidth = 1.5;
 
         continents.forEach(points => {
             ctx.beginPath();
             let first = true;
+            let hasVisible = false;
             points.forEach(([lat, lon]) => {
                 const p = project(lat, lon);
                 if (p.visible) {
+                    hasVisible = true;
                     if (first) {
                         ctx.moveTo(p.x, p.y);
                         first = false;
                     } else {
                         ctx.lineTo(p.x, p.y);
                     }
+                } else if (!first) {
+                    first = true;
                 }
             });
-            ctx.stroke();
+            if (hasVisible) {
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
         });
     }
 

@@ -3,75 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>labyrinth - procedural text crawler</title>
-    <meta name="hyle-sketch" content="procedural labyrinth crawler. text-based with ASCII map. rooms from markov chains on borges. inventory. time moves when you move. state in URL hash">
+    <title>Labyrinth — hyle</title>
+    <meta name="description" content="Procedural text crawler with ASCII dungeons and Borges-inspired room descriptions">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #050506;
+            --bg-elevated: #0a0a0c;
+            --bg-surface: #0f0f12;
+            --text: #f0f0f3;
+            --text-secondary: #a0a0ab;
+            --text-muted: #606068;
+            --accent: #10b981;
+            --accent-bright: #34d399;
+            --border: #1a1a20;
+            --blue: #3b82f6;
+            --orange: #f97316;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            background: #0a0a0a;
-            color: #e8e8e8;
-            font-family: 'SF Mono', 'Fira Code', monospace;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
             font-size: 14px;
             line-height: 1.6;
-            padding: 1rem;
             min-height: 100vh;
         }
+
+        /* Nav */
+        nav {
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            background: rgba(5,5,6,0.8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .brand .lambda { color: var(--accent); font-size: 1.25rem; }
+        .brand:hover .lambda { color: var(--accent-bright); }
+
+        .back-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover { color: var(--accent); }
+
         #game {
             max-width: 800px;
             margin: 0 auto;
+            padding: 2rem 1.5rem;
         }
+
         #map {
-            background: #111;
-            padding: 1rem;
-            border-radius: 4px;
+            background: var(--bg-elevated);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
             white-space: pre;
-            font-size: 16px;
-            line-height: 1.2;
-            margin-bottom: 1rem;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.3;
+            margin-bottom: 1.5rem;
             overflow-x: auto;
         }
+
         #description {
-            padding: 1rem;
-            background: #141414;
-            border-left: 2px solid #333;
-            margin-bottom: 1rem;
+            padding: 1.25rem 1.5rem;
+            background: var(--bg-surface);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 12px 12px 0;
+            margin-bottom: 1.5rem;
             min-height: 100px;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
         }
+
         #inventory {
-            color: #666;
-            font-size: 12px;
-            margin-bottom: 1rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+            font-family: var(--font-mono);
         }
-        #inventory span { color: #6b9fff; }
+
+        #inventory span { color: var(--accent); }
+
         #controls {
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
         }
+
         button {
-            background: #1a1a1a;
-            color: #e8e8e8;
-            border: 1px solid #333;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
+            background: var(--bg-elevated);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 0.6rem 1.25rem;
+            border-radius: 8px;
             cursor: pointer;
-            font-family: inherit;
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
         }
-        button:hover { border-color: #6b9fff; }
-        button:disabled { opacity: 0.3; cursor: not-allowed; }
-        #footer {
-            margin-top: 2rem;
-            color: #444;
-            font-size: 12px;
+
+        button:hover {
+            border-color: var(--accent);
+            background: rgba(16, 185, 129, 0.1);
         }
-        #footer a { color: #6b9fff; }
-        .player { color: #6b9fff; }
-        .wall { color: #444; }
-        .door { color: #f80; }
-        .item { color: #4a9; }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        button:disabled:hover {
+            border-color: var(--border);
+            background: var(--bg-elevated);
+        }
+
+        .player { color: var(--accent-bright); }
+        .wall { color: var(--text-muted); }
+        .door { color: var(--orange); }
+        .item { color: var(--blue); }
     </style>
 </head>
 <body>
+    <nav>
+        <a href="/" class="brand">
+            <span class="lambda">λ</span>
+            <span>hyle</span>
+        </a>
+        <a href="/projects/" class="back-link">← Projects</a>
+    </nav>
     <div id="game">
         <div id="map"></div>
         <div id="description"></div>
@@ -83,9 +171,6 @@
             <button onclick="move('e')" id="btn-e">→ east</button>
             <button onclick="take()">take</button>
             <button onclick="look()">look</button>
-        </div>
-        <div id="footer">
-            <a href="https://uprootiny.github.io/hyle/">hyle</a> · labyrinth · <a href="https://uprootiny.github.io/hyle/#sketch=procedural%20labyrinth%20crawler.%20text-based%20with%20ASCII%20map.%20rooms%20from%20markov%20chains%20on%20borges.%20inventory.%20time%20moves%20when%20you%20move.%20state%20in%20URL%20hash">remix →</a>
         </div>
     </div>
 

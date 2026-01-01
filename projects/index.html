@@ -3,203 +3,412 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Projects - hyle.lol</title>
+    <title>Projects — hyle</title>
+    <meta name="description" content="Interactive demos and artpieces built with hyle">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
 :root {
-    --bg: #0a0a0b;
-    --surface: #111114;
-    --border: #2a2a32;
-    --text: #e8e8ec;
-    --text-dim: #888890;
-    --text-muted: #555560;
-    --accent: #6b9fff;
+    --bg-deep: #050506;
+    --bg: #09090b;
+    --bg-elevated: #0f0f12;
+    --bg-hover: #151519;
+    --border: #1a1a20;
+    --border-bright: #2a2a35;
+    --text: #f0f0f3;
+    --text-secondary: #a0a0ab;
+    --text-muted: #606068;
+    --accent: #10b981;
+    --accent-bright: #34d399;
+    --accent-glow: rgba(16, 185, 129, 0.15);
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --orange: #f97316;
+    --pink: #ec4899;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
     line-height: 1.6;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
 }
 
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a { color: var(--accent); text-decoration: none; transition: all 0.2s; }
+a:hover { color: var(--accent-bright); }
 
-.container {
-    max-width: 800px;
+.bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(16, 185, 129, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(16, 185, 129, 0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Header */
+header {
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--border);
+    background: rgba(9, 9, 11, 0.8);
+    backdrop-filter: blur(20px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-content {
+    max-width: 1000px;
     margin: 0 auto;
-    padding: 3rem 1.5rem;
-}
-
-h1 {
-    font-size: 2rem;
-    font-weight: 300;
-    margin-bottom: 0.5rem;
-}
-
-.subtitle {
-    color: var(--text-dim);
-    margin-bottom: 2.5rem;
-}
-
-.project-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.project {
+    padding: 0 2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.25rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    transition: border-color 0.15s, transform 0.15s;
 }
 
-.project:hover {
-    border-color: var(--accent);
-    transform: translateX(4px);
-    text-decoration: none;
-}
-
-.project-info {
+.brand {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 1.1rem;
 }
 
-.project-name {
+.brand .lambda {
+    font-size: 1.5rem;
+    color: var(--accent);
+}
+
+.nav-links {
+    display: flex;
+    gap: 1.5rem;
+    list-style: none;
+}
+
+.nav-links a {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
     font-weight: 500;
+}
+
+.nav-links a:hover {
     color: var(--text);
 }
 
-.project-desc {
-    font-size: 0.85rem;
-    color: var(--text-dim);
+/* Main */
+main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+}
+
+.page-header {
+    margin-bottom: 3rem;
+}
+
+.page-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.75rem;
+}
+
+.page-header p {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+}
+
+/* Projects Grid */
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.project-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-card:hover {
+    border-color: var(--border-bright);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.project-preview {
+    height: 160px;
+    background: var(--bg-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.project-preview::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 0%, rgba(16, 185, 129, 0.05) 100%);
+}
+
+.project-preview.globe::before {
+    background: radial-gradient(circle at 30% 30%, rgba(0, 212, 255, 0.1) 0%, transparent 60%);
+}
+
+.project-preview.seismic::before {
+    background: radial-gradient(circle at 50% 50%, rgba(239, 68, 68, 0.1) 0%, transparent 60%);
+}
+
+.project-preview.labyrinth::before {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, transparent 60%);
+}
+
+.project-preview.jsonl::before {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, transparent 60%);
+}
+
+.project-content {
+    padding: 1.5rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-content h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+}
+
+.project-content p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    flex: 1;
 }
 
 .project-tags {
     display: flex;
     gap: 0.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
 }
 
 .tag {
     font-size: 0.7rem;
-    padding: 0.2rem 0.5rem;
-    background: var(--bg);
-    border-radius: 4px;
-    color: var(--text-muted);
+    font-weight: 600;
+    padding: 0.25rem 0.6rem;
+    border-radius: 100px;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.05em;
 }
 
-.tag.webgl { color: var(--accent); }
-.tag.data { color: #b56bff; }
-.tag.audio { color: #ff9f6b; }
-.tag.tool { color: #4ade80; }
+.tag.webgl {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--blue);
+}
 
+.tag.data {
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--purple);
+}
+
+.tag.audio {
+    background: rgba(249, 115, 22, 0.15);
+    color: var(--orange);
+}
+
+.tag.tool {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--accent);
+}
+
+.tag.generative {
+    background: rgba(236, 72, 153, 0.15);
+    color: var(--pink);
+}
+
+.tag.gallery {
+    background: rgba(160, 160, 171, 0.15);
+    color: var(--text-secondary);
+}
+
+.project-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--accent);
+    margin-top: 1rem;
+    transition: gap 0.2s;
+}
+
+.project-card:hover .project-arrow {
+    gap: 0.75rem;
+}
+
+/* Footer */
 footer {
-    margin-top: 3rem;
-    padding-top: 1.5rem;
     border-top: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: 0.9rem;
+    padding: 2rem;
+    text-align: center;
+}
+
+.footer-content {
+    max-width: 1000px;
+    margin: 0 auto;
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+footer span, footer a {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+footer a:hover {
+    color: var(--accent);
 }
 
 @media (max-width: 640px) {
-    .project {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.75rem;
-    }
-    footer {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
+    .header-content { padding: 0 1rem; }
+    main { padding: 2rem 1rem; }
+    .page-header h1 { font-size: 2rem; }
+    .projects-grid { grid-template-columns: 1fr; }
+    .footer-content { flex-direction: column; }
 }
     </style>
 </head>
 <body>
-    <div class="container">
+
+<div class="bg-grid"></div>
+
+<header>
+    <div class="header-content">
+        <a href="/" class="brand">
+            <span class="lambda">λ</span>
+            <span>hyle</span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="/">Home</a></li>
+            <li><a href="https://github.com/uprootiny/hyle">GitHub</a></li>
+        </ul>
+    </div>
+</header>
+
+<main>
+    <div class="page-header">
         <h1>Projects</h1>
-        <p class="subtitle">Artpieces and tools built from <a href="/">hyle</a> sketches</p>
+        <p>Interactive demos and artpieces — experiments in code, data, and generative systems.</p>
+    </div>
 
-        <div class="project-list">
-            <a href="/projects/vitrine/" class="project">
-                <div class="project-info">
-                    <span class="project-name">Vitrine</span>
-                    <span class="project-desc">Curated showcase gallery of all artpieces</span>
-                </div>
-                <div class="project-tags">
-                    <span class="tag">gallery</span>
-                </div>
-            </a>
-
-            <a href="/projects/datacenters/" class="project">
-                <div class="project-info">
-                    <span class="project-name">Datacenters Globe</span>
-                    <span class="project-desc">Interactive visualization of global cloud infrastructure and environmental impact</span>
-                </div>
+    <div class="projects-grid">
+        <a href="/projects/datacenters/" class="project-card">
+            <div class="project-preview globe">🌍</div>
+            <div class="project-content">
+                <h2>Datacenters Globe</h2>
+                <p>Interactive 3D visualization of global cloud infrastructure, water usage, and environmental impact metrics.</p>
                 <div class="project-tags">
                     <span class="tag webgl">WebGL</span>
                     <span class="tag data">Data</span>
                 </div>
-            </a>
+                <span class="project-arrow">Explore →</span>
+            </div>
+        </a>
 
-            <a href="/projects/seismic/" class="project">
-                <div class="project-info">
-                    <span class="project-name">Seismic Activity</span>
-                    <span class="project-desc">Real-time earthquake visualization and sonification from USGS data</span>
-                </div>
+        <a href="/projects/seismic/" class="project-card">
+            <div class="project-preview seismic">🌋</div>
+            <div class="project-content">
+                <h2>Seismic Activity</h2>
+                <p>Real-time earthquake visualization and sonification using live USGS data feeds.</p>
                 <div class="project-tags">
                     <span class="tag data">Data</span>
                     <span class="tag audio">Audio</span>
                 </div>
-            </a>
+                <span class="project-arrow">Explore →</span>
+            </div>
+        </a>
 
-            <a href="/projects/labyrinth/" class="project">
-                <div class="project-info">
-                    <span class="project-name">Labyrinth</span>
-                    <span class="project-desc">Procedural text crawler with Borges-inspired Markov generation</span>
-                </div>
+        <a href="/projects/labyrinth/" class="project-card">
+            <div class="project-preview labyrinth">📜</div>
+            <div class="project-content">
+                <h2>Labyrinth</h2>
+                <p>Procedural text crawler with ASCII dungeons and Borges-inspired Markov chain room descriptions.</p>
                 <div class="project-tags">
-                    <span class="tag">Generative</span>
+                    <span class="tag generative">Generative</span>
                 </div>
-            </a>
+                <span class="project-arrow">Explore →</span>
+            </div>
+        </a>
 
-            <a href="/projects/dodeca/" class="project">
-                <div class="project-info">
-                    <span class="project-name">Dodeca</span>
-                    <span class="project-desc">Spiky dodecahedron with noise-perturbed surface and rotoscoped rendering</span>
-                </div>
+        <a href="/projects/dodeca/" class="project-card">
+            <div class="project-preview">🔮</div>
+            <div class="project-content">
+                <h2>Dodeca</h2>
+                <p>Spiky dodecahedron with noise-perturbed vertices and rotoscoped edge rendering.</p>
                 <div class="project-tags">
                     <span class="tag webgl">WebGL</span>
                 </div>
-            </a>
+                <span class="project-arrow">Explore →</span>
+            </div>
+        </a>
 
-            <a href="/projects/jsonl/" class="project">
-                <div class="project-info">
-                    <span class="project-name">JSONL Viewer</span>
-                    <span class="project-desc">Stream-friendly JSON Lines viewer with syntax highlighting and queries</span>
-                </div>
+        <a href="/projects/jsonl/" class="project-card">
+            <div class="project-preview jsonl">{ }</div>
+            <div class="project-content">
+                <h2>JSONL Viewer</h2>
+                <p>Stream-friendly JSON Lines viewer with syntax highlighting, filtering, and inline queries.</p>
                 <div class="project-tags">
                     <span class="tag tool">Tool</span>
                 </div>
-            </a>
-        </div>
+                <span class="project-arrow">Explore →</span>
+            </div>
+        </a>
 
-        <footer>
-            <span>Built with <a href="/">hyle</a></span>
-            <a href="/">Back to hyle.lol</a>
-        </footer>
+        <a href="/projects/vitrine/" class="project-card">
+            <div class="project-preview">🖼️</div>
+            <div class="project-content">
+                <h2>Vitrine</h2>
+                <p>Curated showcase gallery of all artpieces and experiments.</p>
+                <div class="project-tags">
+                    <span class="tag gallery">Gallery</span>
+                </div>
+                <span class="project-arrow">Explore →</span>
+            </div>
+        </a>
     </div>
+</main>
+
+<footer>
+    <div class="footer-content">
+        <span>Built with <a href="/">hyle</a></span>
+        <a href="/">← Back to hyle.lol</a>
+    </div>
+</footer>
+
 </body>
 </html>

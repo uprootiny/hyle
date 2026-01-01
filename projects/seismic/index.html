@@ -3,56 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>seismic - earthquake sonification</title>
-    <meta name="hyle-sketch" content="real-time seismic data sonification. fetch USGS earthquake feed, map magnitude to pitch, depth to reverb, location to stereo pan. visualize as expanding rings on mercator">
+    <title>Seismic Activity — hyle</title>
+    <meta name="description" content="Real-time earthquake visualization and sonification using USGS data">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #050506;
+            --text: #f0f0f3;
+            --text-secondary: #a0a0ab;
+            --text-muted: #606068;
+            --accent: #10b981;
+            --accent-bright: #34d399;
+            --border: #1a1a20;
+            --blue: #3b82f6;
+            --orange: #f97316;
+            --red: #ef4444;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a0a; color: #e8e8e8; font-family: system-ui; overflow: hidden; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            overflow: hidden;
+        }
+
+        /* Nav */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            background: linear-gradient(to bottom, rgba(5,5,6,0.9), transparent);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .brand .lambda { color: var(--accent); font-size: 1.25rem; }
+        .brand:hover .lambda { color: var(--accent-bright); }
+
+        .back-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover { color: var(--accent); }
+
         #map { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+
         #ui {
             position: fixed;
-            bottom: 1rem;
-            left: 1rem;
-            right: 1rem;
+            bottom: 1.5rem;
+            left: 1.5rem;
+            right: 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
             pointer-events: none;
             z-index: 10;
         }
-        #info { font-size: 12px; color: #666; }
-        #info a { color: #6b9fff; pointer-events: auto; }
-        #controls { display: flex; gap: 1rem; align-items: center; }
+
+        #info {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        #info a {
+            color: var(--accent);
+            pointer-events: auto;
+            text-decoration: none;
+        }
+
+        #info a:hover { color: var(--accent-bright); }
+
+        #controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
         button {
-            background: #222;
-            color: #e8e8e8;
-            border: 1px solid #333;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
+            background: rgba(10, 10, 15, 0.8);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 0.6rem 1.25rem;
+            border-radius: 8px;
             cursor: pointer;
             pointer-events: auto;
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            font-weight: 500;
+            backdrop-filter: blur(12px);
+            transition: all 0.2s;
         }
-        button:hover { border-color: #6b9fff; }
-        button.active { background: #6b9fff; color: #000; }
-        #status { font-size: 12px; color: #666; }
+
+        button:hover {
+            border-color: var(--accent);
+            background: rgba(16, 185, 129, 0.15);
+        }
+
+        button.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg);
+        }
+
+        #status {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            pointer-events: auto;
+        }
+
         #legend {
             position: fixed;
-            top: 1rem;
-            right: 1rem;
-            background: rgba(0,0,0,0.7);
-            padding: 1rem;
-            border-radius: 4px;
-            font-size: 12px;
+            top: 70px;
+            right: 1.5rem;
+            background: rgba(10, 10, 15, 0.85);
+            border: 1px solid var(--border);
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            backdrop-filter: blur(12px);
         }
-        .legend-item { display: flex; align-items: center; gap: 0.5rem; margin: 0.25rem 0; }
-        .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        #legend strong {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin: 0.4rem 0;
+            color: var(--text-secondary);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
+    <nav>
+        <a href="/" class="brand">
+            <span class="lambda">λ</span>
+            <span>hyle</span>
+        </a>
+        <a href="/projects/" class="back-link">← Projects</a>
+    </nav>
     <canvas id="map"></canvas>
     <div id="ui">
         <div id="info">
-            <a href="https://uprootiny.github.io/hyle/">hyle</a> · seismic · <a href="https://uprootiny.github.io/hyle/#sketch=real-time%20seismic%20data%20sonification.%20fetch%20USGS%20earthquake%20feed%2C%20map%20magnitude%20to%20pitch%2C%20depth%20to%20reverb%2C%20location%20to%20stereo%20pan.%20visualize%20as%20expanding%20rings%20on%20mercator">remix →</a><br>
             data: <a href="https://earthquake.usgs.gov">USGS</a>
         </div>
         <div id="controls">
@@ -62,10 +193,10 @@
     </div>
     <div id="legend">
         <div><strong>magnitude → pitch</strong></div>
-        <div class="legend-item"><span class="legend-dot" style="background:#4a9"></span> M &lt; 3</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#6b9fff"></span> M 3-5</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#f80"></span> M 5-7</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#f00"></span> M &gt; 7</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#10b981"></span> M &lt; 3</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span> M 3-5</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#f97316"></span> M 5-7</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> M &gt; 7</div>
     </div>
 
     <script>
@@ -92,12 +223,12 @@
             return { x, y };
         }
 
-        // Magnitude to color
+        // Magnitude to color (matching CSS variables)
         function magColor(mag) {
-            if (mag < 3) return '#4a9';
-            if (mag < 5) return '#6b9fff';
-            if (mag < 7) return '#f80';
-            return '#f00';
+            if (mag < 3) return '#10b981';  // accent green
+            if (mag < 5) return '#3b82f6';  // blue
+            if (mag < 7) return '#f97316';  // orange
+            return '#ef4444';  // red
         }
 
         // Magnitude to frequency (Hz)

@@ -3,34 +3,76 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vitrine - hyle.lol</title>
+  <title>Vitrine — hyle</title>
   <meta name="description" content="A curated showcase of internet artpieces">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
 :root {
-  --bg: #0a0a0b;
-  --surface: #121214;
-  --surface-2: #1a1a1e;
-  --border: #2a2a30;
-  --text: #e8e8ec;
-  --text-dim: #888890;
-  --text-muted: #555560;
-  --accent: #6b9fff;
-  --accent-2: #b56bff;
-  --warm: #ff9f6b;
+  --bg: #050506;
+  --surface: #0a0a0c;
+  --surface-2: #0f0f12;
+  --border: #1a1a20;
+  --text: #f0f0f3;
+  --text-dim: #a0a0ab;
+  --text-muted: #606068;
+  --accent: #10b981;
+  --accent-bright: #34d399;
+  --blue: #3b82f6;
+  --purple: #8b5cf6;
+  --warm: #f97316;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
 }
 
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+a:hover { color: var(--accent-bright); }
+
+/* Nav */
+nav {
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  background: rgba(5,5,6,0.8);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.brand .lambda { color: var(--accent); font-size: 1.25rem; }
+.brand:hover .lambda { color: var(--accent-bright); }
+
+.back-link {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.back-link:hover { color: var(--accent); }
 
 .container {
   max-width: 1200px;
@@ -44,10 +86,10 @@ header {
 }
 
 h1 {
-  font-size: clamp(2.5rem, 8vw, 4rem);
-  font-weight: 300;
+  font-size: clamp(2.5rem, 8vw, 3.5rem);
+  font-weight: 700;
   letter-spacing: -0.03em;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
   background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -58,6 +100,9 @@ h1 {
   color: var(--text-dim);
   font-size: 1.1rem;
 }
+
+.subtitle a { color: var(--accent); }
+.subtitle a:hover { color: var(--accent-bright); }
 
 /* Gallery Grid */
 .gallery {
@@ -70,15 +115,15 @@ h1 {
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
 }
 
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
-  border-color: var(--accent);
+  transform: translateY(-6px);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  border-color: rgba(16, 185, 129, 0.4);
 }
 
 .card-preview {
@@ -119,18 +164,19 @@ h1 {
 }
 
 .card-tag {
-  padding: 0.2rem 0.5rem;
+  padding: 0.2rem 0.6rem;
   background: var(--surface-2);
-  border-radius: 4px;
+  border-radius: 100px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  font-weight: 600;
 }
 
-.card-tag.live { color: #4ade80; background: rgba(74, 222, 128, 0.1); }
-.card-tag.webgl { color: var(--accent); background: rgba(107, 159, 255, 0.1); }
-.card-tag.audio { color: var(--warm); background: rgba(255, 159, 107, 0.1); }
-.card-tag.data { color: var(--accent-2); background: rgba(181, 107, 255, 0.1); }
+.card-tag.live { color: var(--accent); background: rgba(16, 185, 129, 0.15); }
+.card-tag.webgl { color: var(--blue); background: rgba(59, 130, 246, 0.15); }
+.card-tag.audio { color: var(--warm); background: rgba(249, 115, 22, 0.15); }
+.card-tag.data { color: var(--purple); background: rgba(139, 92, 246, 0.15); }
 
 .card-title {
   font-size: 1.1rem;
@@ -170,11 +216,12 @@ h1 {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--bg);
+  font-weight: 500;
 }
 
 .card-link.primary:hover {
-  background: #8bb3ff;
-  border-color: #8bb3ff;
+  background: var(--accent-bright);
+  border-color: var(--accent-bright);
 }
 
 /* Footer */
@@ -200,6 +247,14 @@ footer a { color: var(--text-dim); }
   </style>
 </head>
 <body>
+  <nav>
+    <a href="/" class="brand">
+      <span class="lambda">λ</span>
+      <span>hyle</span>
+    </a>
+    <a href="/projects/" class="back-link">← Projects</a>
+  </nav>
+
   <div class="container">
     <header>
       <h1>Vitrine</h1>
@@ -364,8 +419,7 @@ footer a { color: var(--text-dim); }
     </div>
 
     <footer>
-      <p>Built with <a href="/">hyle</a> &mdash; Rust-native code assistant</p>
-      <p style="margin-top: 0.5rem;"><a href="/">Back to hyle.lol</a></p>
+      <p>Built with <a href="/">hyle</a></p>
     </footer>
   </div>
 </body>

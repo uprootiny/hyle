@@ -3,27 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSONL Viewer - hyle.lol</title>
+    <title>JSONL Viewer — hyle</title>
     <meta name="description" content="Stream-friendly JSON Lines viewer with syntax highlighting, queries, and export">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>λ</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
 :root {
-    --bg: #0a0a0b;
-    --surface: #111114;
-    --surface-2: #18181c;
-    --surface-3: #202026;
-    --border: #2a2a32;
-    --border-dim: #1e1e24;
-    --text: #e8e8ec;
-    --text-dim: #888890;
-    --text-muted: #555560;
-    --accent: #6b9fff;
-    --accent-dim: rgba(107, 159, 255, 0.15);
-    --green: #4ade80;
-    --yellow: #fbbf24;
-    --orange: #fb923c;
-    --red: #f87171;
-    --purple: #a78bfa;
-    --mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    --bg: #050506;
+    --surface: #0a0a0c;
+    --surface-2: #0f0f12;
+    --surface-3: #151519;
+    --border: #1a1a20;
+    --border-dim: #141418;
+    --text: #f0f0f3;
+    --text-dim: #a0a0ab;
+    --text-muted: #606068;
+    --accent: #10b981;
+    --accent-bright: #34d399;
+    --accent-dim: rgba(16, 185, 129, 0.15);
+    --green: #10b981;
+    --yellow: #eab308;
+    --orange: #f97316;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', 'Monaco', monospace;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -34,7 +41,7 @@ html, body {
 }
 
 body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
     font-size: 14px;
@@ -42,8 +49,39 @@ body {
     flex-direction: column;
 }
 
-/* Header */
-header {
+/* Nav */
+nav {
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.brand .lambda { color: var(--accent); font-size: 1.25rem; }
+.brand:hover .lambda { color: var(--accent-bright); }
+
+.back-link {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: color 0.2s;
+}
+
+.back-link:hover { color: var(--accent); }
+
+/* Toolbar */
+.toolbar {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
@@ -53,14 +91,6 @@ header {
     flex-wrap: wrap;
     z-index: 100;
 }
-
-.logo {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-.logo a { color: var(--accent); text-decoration: none; }
-.logo a:hover { text-decoration: underline; }
 
 /* Drop zone */
 .drop-zone {
@@ -133,10 +163,11 @@ header {
     background: var(--accent);
     border-color: var(--accent);
     color: var(--bg);
+    font-weight: 500;
 }
 .btn-primary:hover {
-    background: #8bb3ff;
-    border-color: #8bb3ff;
+    background: var(--accent-bright);
+    border-color: var(--accent-bright);
 }
 
 .stats {
@@ -274,7 +305,7 @@ main {
 .v-num { color: var(--yellow); }
 .v-str { color: var(--green); }
 .v-obj { color: var(--purple); }
-.v-arr { color: var(--accent); }
+.v-arr { color: var(--blue); }
 
 /* Expanded row */
 .expand-row {
@@ -456,8 +487,15 @@ footer a:hover { color: var(--accent); }
     </style>
 </head>
 <body>
-    <header>
-        <div class="logo"><a href="/">hyle</a> / jsonl</div>
+    <nav>
+        <a href="/" class="brand">
+            <span class="lambda">λ</span>
+            <span>hyle</span>
+        </a>
+        <a href="/projects/" class="back-link">← Projects</a>
+    </nav>
+
+    <div class="toolbar">
         <div class="drop-zone" id="dropZone">
             <input type="file" id="fileInput" accept=".jsonl,.json,.ndjson,.txt">
             Drop .jsonl file or click to browse
@@ -470,7 +508,7 @@ footer a:hover { color: var(--accent); }
             <button class="btn" onclick="exportData()">Export</button>
         </div>
         <div class="stats" id="stats"></div>
-    </header>
+    </div>
 
     <main>
         <div class="table-container" id="tableContainer">
@@ -504,9 +542,6 @@ footer a:hover { color: var(--accent); }
             <span><kbd>Enter</kbd> Expand</span>
             <span><kbd>Esc</kbd> Collapse</span>
             <span><kbd>?</kbd> Help</span>
-        </div>
-        <div>
-            <a href="/">Back to hyle.lol</a>
         </div>
     </footer>
 
