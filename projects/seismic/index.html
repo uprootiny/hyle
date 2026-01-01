@@ -320,16 +320,33 @@
             }
         }
 
+        // Continent outlines (simplified)
+        const continents = [
+            // North America
+            [[71,-168],[66,-169],[60,-165],[55,-155],[60,-147],[55,-131],[49,-126],[42,-124],[36,-122],[31,-117],[25,-109],[26,-104],[29,-97],[28,-88],[25,-81],[29,-82],[35,-89],[40,-86],[47,-75],[52,-64],[59,-62],[65,-70],[71,-80],[76,-110],[76,-130],[73,-150],[71,-168]],
+            // South America
+            [[12,-72],[5,-78],[-4,-81],[-12,-77],[-20,-70],[-32,-64],[-44,-66],[-55,-66],[-52,-62],[-44,-55],[-36,-50],[-24,-43],[-12,-36],[0,-38],[8,-50],[12,-65],[12,-72]],
+            // Europe
+            [[71,28],[65,20],[58,5],[50,-6],[45,-2],[36,-6],[37,0],[46,10],[50,18],[56,25],[62,32],[68,30],[71,28]],
+            // Africa
+            [[37,-10],[31,2],[33,16],[36,25],[28,34],[16,40],[4,45],[-8,38],[-20,32],[-34,18],[-32,12],[-20,14],[-8,4],[4,-4],[16,-12],[28,-14],[37,-10]],
+            // Asia
+            [[77,100],[70,130],[61,148],[52,160],[44,148],[32,132],[20,108],[8,98],[8,104],[18,116],[10,118],[2,112],[-4,105],[0,90],[8,82],[20,72],[32,66],[44,52],[56,38],[64,38],[72,58],[78,95],[77,100]],
+            // Australia
+            [[-11,143],[-17,150],[-25,153],[-36,148],[-38,140],[-32,130],[-20,118],[-12,122],[-10,132],[-11,143]],
+            // Antarctica
+            [[-65,-60],[-70,-30],[-68,0],[-70,30],[-72,60],[-68,90],[-70,120],[-75,150],[-78,180],[-75,-150],[-70,-120],[-68,-90],[-65,-60]]
+        ];
+
         // Draw frame
         function draw() {
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw simple world outline (just continents approximation)
-            ctx.strokeStyle = '#222';
+            // Draw graticule (light grid)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            // Simplified coastlines - just grid lines for now
             for (let lat = -60; lat <= 80; lat += 30) {
                 const { y } = project(lat, -180);
                 ctx.moveTo(0, y);
@@ -341,6 +358,23 @@
                 ctx.lineTo(x, canvas.height);
             }
             ctx.stroke();
+
+            // Draw filled continents
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.06)';
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.2)';
+            ctx.lineWidth = 1;
+            for (const points of continents) {
+                ctx.beginPath();
+                let first = true;
+                for (const [lat, lon] of points) {
+                    const { x, y } = project(lat, lon);
+                    if (first) { ctx.moveTo(x, y); first = false; }
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
 
             // Draw earthquakes as dots
             for (const eq of earthquakes) {

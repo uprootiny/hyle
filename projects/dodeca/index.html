@@ -67,6 +67,141 @@
         }
 
         .back-link:hover { color: var(--accent); }
+
+        /* Controls Panel */
+        .controls {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 1.5rem;
+            background: rgba(10, 10, 15, 0.85);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            min-width: 220px;
+        }
+
+        .controls h3 {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent);
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .control-label {
+            color: var(--text-muted);
+        }
+
+        .control-value {
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin-top: 0.5rem;
+            accent-color: var(--accent);
+            background: transparent;
+        }
+
+        .control-group {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .color-btn {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .color-btn:hover {
+            border-color: var(--text-muted);
+        }
+
+        .color-btn.active {
+            border-color: var(--accent);
+        }
+
+        .color-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Info Panel */
+        .info-panel {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            background: rgba(10, 10, 15, 0.85);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            max-width: 280px;
+        }
+
+        .info-panel h2 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .info-panel p {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .stat-label { color: var(--text-muted); }
+        .stat-value { font-family: var(--font-mono); color: var(--accent); }
+
+        /* Hint */
+        .hint {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .hint.visible { opacity: 1; }
     </style>
 </head>
 <body>
@@ -77,6 +212,51 @@
         </a>
         <a href="/projects/" class="back-link">← Projects</a>
     </nav>
+
+    <div class="controls">
+        <h3>Parameters</h3>
+        <div class="control-group">
+            <div class="control-row">
+                <span class="control-label">Noise Amplitude</span>
+                <span class="control-value" id="noiseVal">0.30</span>
+            </div>
+            <input type="range" id="noiseAmp" min="0" max="100" value="30">
+        </div>
+        <div class="control-group">
+            <div class="control-row">
+                <span class="control-label">Noise Frequency</span>
+                <span class="control-value" id="freqVal">2.0</span>
+            </div>
+            <input type="range" id="noiseFreq" min="5" max="80" value="20">
+        </div>
+        <div class="control-group">
+            <div class="control-row">
+                <span class="control-label">Rotation Speed</span>
+                <span class="control-value" id="speedVal">1.0</span>
+            </div>
+            <input type="range" id="rotSpeed" min="0" max="100" value="50">
+        </div>
+    </div>
+
+    <div class="info-panel">
+        <h2>Perturbed Icosahedron</h2>
+        <p>Simplex noise displaces vertices along surface normals, creating organic deformation.</p>
+        <div class="stat-row">
+            <span class="stat-label">Vertices</span>
+            <span class="stat-value" id="vertCount">2562</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Triangles</span>
+            <span class="stat-value" id="triCount">1280</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Frame Rate</span>
+            <span class="stat-value" id="fpsCount">60</span>
+        </div>
+    </div>
+
+    <div class="hint" id="hint">drag to rotate</div>
+
     <canvas id="c"></canvas>
     <script type="module">
         // Minimal three.js-like WebGL renderer
@@ -351,6 +531,77 @@
         gl.enable(gl.DEPTH_TEST);
         gl.clearColor(0, 0, 0, 1);
 
+        // Control state
+        let rotSpeed = 1.0;
+        let dragX = 0, dragY = 0;
+        let isDragging = false;
+        let lastX = 0, lastY = 0;
+        let autoRotateX = 0, autoRotateY = 0;
+
+        // FPS tracking
+        let frameCount = 0;
+        let lastFpsTime = performance.now();
+
+        // Wire up controls
+        document.getElementById('noiseAmp').addEventListener('input', (e) => {
+            const val = e.target.value / 100;
+            document.getElementById('noiseVal').textContent = val.toFixed(2);
+        });
+
+        document.getElementById('noiseFreq').addEventListener('input', (e) => {
+            const val = e.target.value / 10;
+            document.getElementById('freqVal').textContent = val.toFixed(1);
+        });
+
+        document.getElementById('rotSpeed').addEventListener('input', (e) => {
+            rotSpeed = e.target.value / 50;
+            document.getElementById('speedVal').textContent = rotSpeed.toFixed(1);
+        });
+
+        // Mouse drag for rotation
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            document.getElementById('hint').classList.remove('visible');
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            dragX += (e.clientX - lastX) * 0.01;
+            dragY += (e.clientY - lastY) * 0.01;
+            lastX = e.clientX;
+            lastY = e.clientY;
+        });
+
+        canvas.addEventListener('mouseup', () => isDragging = false);
+        canvas.addEventListener('mouseleave', () => isDragging = false);
+
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            lastX = e.touches[0].clientX;
+            lastY = e.touches[0].clientY;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            dragX += (e.touches[0].clientX - lastX) * 0.01;
+            dragY += (e.touches[0].clientY - lastY) * 0.01;
+            lastX = e.touches[0].clientX;
+            lastY = e.touches[0].clientY;
+        });
+
+        canvas.addEventListener('touchend', () => isDragging = false);
+
+        // Show hint initially
+        setTimeout(() => document.getElementById('hint').classList.add('visible'), 1000);
+        setTimeout(() => document.getElementById('hint').classList.remove('visible'), 4000);
+
+        // Update stats display
+        document.getElementById('vertCount').textContent = verts.length;
+        document.getElementById('triCount').textContent = faces.length;
+
         function render(t) {
             const time = t * 0.001;
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -359,11 +610,30 @@
             gl.uniformMatrix4fv(projLoc, false, perspective(Math.PI/4, aspect, 0.1, 100));
             gl.uniformMatrix4fv(viewLoc, false, lookAt([0, 0, 4], [0, 0, 0], [0, 1, 0]));
 
-            const model = mulMat(rotateY(time * 0.3), rotateX(time * 0.2));
+            // Auto-rotate when not dragging
+            if (!isDragging) {
+                autoRotateX += 0.003 * rotSpeed;
+                autoRotateY += 0.002 * rotSpeed;
+            }
+
+            const model = mulMat(
+                mulMat(rotateY(autoRotateX + dragX), rotateX(autoRotateY + dragY)),
+                rotateY(time * 0.1 * rotSpeed)
+            );
             gl.uniformMatrix4fv(modelLoc, false, model);
             gl.uniform1f(timeLoc, time);
 
             gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3);
+
+            // Update FPS counter
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsTime >= 1000) {
+                document.getElementById('fpsCount').textContent = frameCount;
+                frameCount = 0;
+                lastFpsTime = now;
+            }
+
             requestAnimationFrame(render);
         }
 
