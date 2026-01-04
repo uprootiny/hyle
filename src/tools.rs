@@ -544,6 +544,46 @@ impl ToolExecutor {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("bash: missing 'command' argument"))?;
 
+        // ═══════════════════════════════════════════════════════════════
+        // SAFETY GUARD: Block destructive commands
+        // Added after a free model ran `rm -rf` and destroyed the repo
+        // ═══════════════════════════════════════════════════════════════
+        const BLOCKED_PATTERNS: &[&str] = &[
+            "rm -rf",
+            "rm -fr",
+            "rm -r ",
+            "rm -R ",
+            "rm --recursive",
+            "rmdir",
+            "> /dev/sd",      // Overwrite disk
+            "mkfs",           // Format filesystem
+            "dd if=",         // Raw disk write
+            ":(){:|:&};:",    // Fork bomb
+            "chmod -R 777",   // Insecure permissions
+            "chmod 777 /",    // Root permissions
+            "wget|sh",        // Remote code execution
+            "curl|sh",        // Remote code execution
+            "wget|bash",      // Remote code execution
+            "curl|bash",      // Remote code execution
+            "; rm ",          // Chained rm
+            "&& rm ",         // Chained rm
+            "|| rm ",         // Chained rm
+            "$(rm ",          // Subshell rm
+            "`rm ",           // Backtick rm
+        ];
+
+        let cmd_lower = command.to_lowercase();
+        for pattern in BLOCKED_PATTERNS {
+            if cmd_lower.contains(&pattern.to_lowercase()) {
+                return Err(anyhow::anyhow!(
+                    "BLOCKED: Command contains dangerous pattern '{}'. \
+                     This safety guard exists because a model previously destroyed the repository with rm -rf. \
+                     If you really need this command, use a terminal directly.",
+                    pattern
+                ));
+            }
+        }
+
         let timeout_ms = call.args.get("timeout")
             .and_then(|v| v.as_u64())
             .unwrap_or(60000);
@@ -1099,6 +1139,71 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(call.status, ToolCallStatus::Failed);
         assert!(call.error.as_ref().unwrap().contains("Timeout"));
+    }
+
+    #[test]
+    fn test_executor_bash_blocks_rm_rf() {
+        // This test exists because a free model ran `rm -rf` and destroyed the repo
+        let mut executor = ToolExecutor::new();
+
+        let dangerous_commands = [
+            "rm -rf /",
+            "rm -rf .",
+            "rm -rf ~",
+            "rm -fr /home/user",
+            "rm -r /tmp/foo",
+            "rm -R /tmp/foo",
+            "rm --recursive /tmp",
+            "echo foo && rm -rf bar",
+            "echo foo; rm -rf bar",
+            "echo foo || rm -rf bar",
+            "$(rm -rf foo)",
+            "`rm -rf foo`",
+        ];
+
+        for cmd in &dangerous_commands {
+            let mut call = ToolCall::new("bash", serde_json::json!({
+                "command": cmd
+            }));
+
+            let result = executor.execute(&mut call);
+            assert!(result.is_err(), "Command should be blocked: {}", cmd);
+            assert_eq!(call.status, ToolCallStatus::Failed);
+            assert!(call.error.as_ref().unwrap().contains("BLOCKED"),
+                "Error should mention BLOCKED for: {}", cmd);
+        }
+    }
+
+    #[test]
+    fn test_executor_bash_allows_safe_commands() {
+        // Make sure we don't block safe commands
+        let mut executor = ToolExecutor::new();
+
+        let safe_commands = [
+            "ls -la",
+            "cat file.txt",
+            "grep -r pattern .",
+            "find . -name '*.rs'",
+            "cargo build",
+            "git status",
+            "echo hello world",
+            "rm file.txt",  // Single file rm is allowed
+        ];
+
+        for cmd in &safe_commands {
+            let mut call = ToolCall::new("bash", serde_json::json!({
+                "command": cmd,
+                "timeout": 100  // Short timeout since we just want to check blocking
+            }));
+
+            let result = executor.execute(&mut call);
+            // Command might fail for other reasons (file not found, etc.)
+            // but it should NOT be blocked
+            if result.is_err() {
+                assert!(!call.error.as_ref().unwrap().contains("BLOCKED"),
+                    "Safe command should not be blocked: {}", cmd);
+            }
+        }
     }
 
     #[test]
