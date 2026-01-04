@@ -58,12 +58,15 @@ hyle --backburner
 ```
 hyle                          # resume last session
 hyle --free [PATHS...]        # choose free model, interactive loop
+hyle --nonfree [PATHS...]     # paid models only (excludes free tier)
 hyle --new                    # start fresh session
+hyle --handoff                # import context from Claude Code
 hyle --model <id> [PATHS...]  # use specific model
 hyle --task "..." [PATHS...]  # one-shot: produce diff, ask apply
 hyle --backburner             # background maintenance daemon
 hyle --serve [PORT]           # HTTP API server (default: 8420)
 hyle orchestrate              # project orchestrator web UI
+hyle benchmark [--model <id>] # profile LLM on housekeeping tasks
 hyle doctor                   # check config, key, network
 hyle models --refresh         # refresh models cache
 hyle sessions --list          # list saved sessions
@@ -241,6 +244,70 @@ The bootstrap system supports:
 - Automatic commit of successful changes
 - Issue detection and repair suggestions
 
+## Status & Statistics
+
+**Current Build**: 233 tests passing
+
+| Metric | Value |
+|--------|-------|
+| Test Coverage | 233 tests |
+| Modules | 26 source files |
+| Lines of Code | ~15,000 |
+| Free Models | 35+ available |
+| Slash Commands | 20+ |
+
+### Known Issues
+
+- Multiline input joins lines with spaces (single-line input model)
+- Session history navigation blocked during generation
+- Context window estimation is approximate
+
+### Safety Features
+
+hyle includes guardrails learned from production incidents:
+
+| Guard | Protection |
+|-------|------------|
+| `rm -rf` blocker | Blocks destructive bash patterns |
+| Rate limit detection | Auto-switches to fallback models |
+| Session auto-save | Preserves work on Ctrl-C |
+| Tool timeout | 60s default, configurable |
+
+## Failure Scenarios
+
+### The rm -rf Disaster (2025-01-04)
+
+A free model (gemma-2-9b-it) given tool access interpreted "take over development"
+as "delete everything and start fresh", executing:
+
+```bash
+rm -rf /home/user/project
+```
+
+**Lesson learned**: Free models with tool access need guardrails.
+
+**Fix applied**: `BLOCKED_PATTERNS` in tools.rs now blocks:
+- `rm -rf`, `rm -r`, `rm --recursive`
+- Fork bombs, disk overwrites
+- Chained destructive commands
+- Remote code execution patterns
+
+### Rate Limit Cascade
+
+Free models have aggressive rate limits. hyle auto-rotates through fallback models:
+1. Detect rate limit response
+2. Mark model as limited
+3. Switch to next available model
+4. Retry with exponential backoff
+
+### Context Overflow
+
+Large codebases can exceed context windows. hyle uses salience-aware pruning:
+- Focus tier (40%): Current task
+- Recent tier (30%): Last exchanges
+- Summary tier (20%): Compressed history
+- Background tier (10%): Project structure
+
 ## Tests
 
 ```bash
@@ -263,6 +330,44 @@ hyle will:
 3. Scaffold appropriate boilerplate
 4. Generate nginx/systemd deployment configs
 5. Dispatch an autonomous hyle instance to build it out
+
+## Roadmap
+
+### Near-term
+- [ ] Full async TUI with prompt queuing
+- [ ] Better scrollback with search
+- [ ] MCP server support
+- [ ] Local model support (Ollama)
+
+### Medium-term
+- [ ] Visual diff preview before apply
+- [ ] Project templates and scaffolding
+- [ ] Team collaboration (shared sessions)
+- [ ] Plugin/extension system
+
+### Aspirational
+- [ ] Self-bootstrapping: hyle develops hyle
+- [ ] Multi-agent orchestration
+- [ ] Continuous integration with git hooks
+- [ ] Voice interface
+
+## Claude Code Interoperability
+
+hyle can import context from Claude Code sessions:
+
+```bash
+# In a project with recent Claude Code activity
+hyle --handoff
+
+# hyle will detect ~/.claude/ sessions and offer to import
+```
+
+The Sessions view (Tab to navigate) shows:
+- Active hyle sessions
+- Cold hyle sessions (can revive)
+- Foreign sessions (Claude Code, Aider, etc.)
+
+Press Enter on a session to restore or import its context.
 
 ## License
 
