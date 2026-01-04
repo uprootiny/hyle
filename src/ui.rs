@@ -1505,6 +1505,75 @@ async fn run_tui_loop(
                         } else {
                             // No tool calls - reset loop counter
                             state.loop_iteration = 0;
+
+                            // Process queued prompts if any
+                            if let Some(queued) = state.pending_prompts.pop_front() {
+                                state.output.push(format!("> {} [from queue]", queued));
+                                state.mark_dirty();
+                                state.log(format!(
+                                    "Processing queued prompt ({} remaining)",
+                                    state.pending_prompts.len()
+                                ));
+
+                                // Start generation for queued prompt
+                                let api_key = state.api_key.clone();
+                                let model = state.current_model.clone();
+                                let project_clone = state.project.clone();
+
+                                // Save to session
+                                if let Err(e) = session.add_user_message(&queued) {
+                                    state.log(format!("Session save error: {}", e));
+                                }
+
+                                // Build history for context
+                                let history: Vec<serde_json::Value> = session
+                                    .messages
+                                    .iter()
+                                    .take(session.messages.len().saturating_sub(1))
+                                    .map(|m| {
+                                        serde_json::json!({
+                                            "role": m.role,
+                                            "content": m.content
+                                        })
+                                    })
+                                    .collect();
+
+                                state.last_prompt = queued.clone();
+                                state.is_generating = true;
+                                state.request_start = std::time::Instant::now();
+
+                                let tx = tx.clone();
+                                tokio::spawn(async move {
+                                    match client::stream_completion_full(
+                                        &api_key,
+                                        &model,
+                                        &queued,
+                                        project_clone.as_ref(),
+                                        &history,
+                                    )
+                                    .await
+                                    {
+                                        Ok(mut stream) => {
+                                            while let Some(event) = stream.recv().await {
+                                                match event {
+                                                    StreamEvent::Token(t) => {
+                                                        let _ = tx.send(TuiMsg::Token(t)).await;
+                                                    }
+                                                    StreamEvent::Done(u) => {
+                                                        let _ = tx.send(TuiMsg::Done(u)).await;
+                                                    }
+                                                    StreamEvent::Error(e) => {
+                                                        let _ = tx.send(TuiMsg::Error(e)).await;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            let _ = tx.send(TuiMsg::Error(e.to_string())).await;
+                                        }
+                                    }
+                                });
+                            }
                         }
 
                         state.current_response.clear();
@@ -1963,9 +2032,21 @@ async fn run_tui_loop(
                             KeyCode::Down if !state.is_generating => {
                                 state.history_down();
                             }
-                            // Enter - only when not generating
-                            KeyCode::Enter if !state.is_generating => {
-                                if !state.input.is_empty() {
+                            // Enter - queue if generating, process if not
+                            KeyCode::Enter => {
+                                if !state.input.is_empty() && state.is_generating {
+                                    // Queue the prompt for later
+                                    let prompt = state.input.clone();
+                                    state.pending_prompts.push_back(prompt.clone());
+                                    state.input.clear();
+                                    state.cursor_pos = 0;
+                                    state.output.push(format!("⏳ [queued] {}", prompt));
+                                    state.mark_dirty();
+                                    state.log(format!(
+                                        "Queued prompt ({} in queue)",
+                                        state.pending_prompts.len()
+                                    ));
+                                } else if !state.input.is_empty() {
                                     let prompt = state.input.clone();
                                     state.add_to_history(&prompt);
                                     state.input.clear();
