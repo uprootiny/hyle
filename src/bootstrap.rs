@@ -11,12 +11,12 @@
 
 #![allow(dead_code)] // Forward-looking module for self-bootstrapping
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::project::{Project, self_project, is_self_development};
 use crate::git;
+use crate::project::{is_self_development, self_project, Project};
 
 // ═══════════════════════════════════════════════════════════════
 // DEVELOPMENT TASK
@@ -65,8 +65,7 @@ pub struct Bootstrap {
 impl Bootstrap {
     /// Create bootstrap for hyle's own development
     pub fn new() -> Result<Self> {
-        let project = self_project()
-            .context("Could not detect hyle project")?;
+        let project = self_project().context("Could not detect hyle project")?;
 
         if !is_self_development() {
             bail!("Not running in hyle project - self-development disabled");
@@ -80,8 +79,7 @@ impl Bootstrap {
 
     /// Create bootstrap for any project
     pub fn for_project(path: &Path) -> Result<Self> {
-        let project = Project::detect(path)
-            .context("Could not detect project")?;
+        let project = Project::detect(path).context("Could not detect project")?;
 
         Ok(Self {
             project,
@@ -175,7 +173,10 @@ impl Bootstrap {
                 tests_after: None,
             });
         }
-        self.log(&format!("Pre-flight: {} tests passed", pre_tests.test_count));
+        self.log(&format!(
+            "Pre-flight: {} tests passed",
+            pre_tests.test_count
+        ));
 
         // Make changes
         self.log("Making changes...");
@@ -197,7 +198,10 @@ impl Bootstrap {
             });
         }
 
-        self.log(&format!("Post-flight: {} tests passed", post_tests.test_count));
+        self.log(&format!(
+            "Post-flight: {} tests passed",
+            post_tests.test_count
+        ));
 
         // Success!
         Ok(TaskResult {
@@ -218,7 +222,9 @@ impl Bootstrap {
             bail!("Cannot commit failed task");
         }
 
-        let message = task.commit_message.clone()
+        let message = task
+            .commit_message
+            .clone()
             .unwrap_or_else(|| format!("feat: {}", task.description));
 
         // Stage changed files
@@ -297,12 +303,11 @@ fn extract_test_count(output: &str) -> usize {
             // Parse "test result: ok. 42 passed; 0 failed"
             let parts: Vec<&str> = line.split_whitespace().collect();
             for (i, part) in parts.iter().enumerate() {
-                if (*part == "passed" || part.starts_with("passed"))
-                    && i > 0 {
-                        if let Ok(n) = parts[i - 1].parse::<usize>() {
-                            return n;
-                        }
+                if (*part == "passed" || part.starts_with("passed")) && i > 0 {
+                    if let Ok(n) = parts[i - 1].parse::<usize>() {
+                        return n;
                     }
+                }
             }
         }
     }
@@ -321,7 +326,7 @@ pub struct CodebaseAnalysis {
     pub test_count: usize,
     pub dead_code_warnings: usize,
     pub todos: Vec<TodoItem>,
-    pub health_score: f32,  // 0.0 to 1.0
+    pub health_score: f32, // 0.0 to 1.0
 }
 
 /// Info about a module
@@ -332,7 +337,7 @@ pub struct ModuleInfo {
     pub lines: usize,
     pub functions: usize,
     pub tests: usize,
-    pub doc_coverage: f32,  // 0.0 to 1.0
+    pub doc_coverage: f32, // 0.0 to 1.0
     pub dependencies: Vec<String>,
 }
 
@@ -347,9 +352,9 @@ pub struct TodoItem {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TodoPriority {
-    High,    // FIXME, HACK, XXX
-    Medium,  // TODO
-    Low,     // NOTE, IDEA
+    High,   // FIXME, HACK, XXX
+    Medium, // TODO
+    Low,    // NOTE, IDEA
 }
 
 /// Self-analyzer for hyle codebase
@@ -359,8 +364,7 @@ pub struct SelfAnalyzer {
 
 impl SelfAnalyzer {
     pub fn new() -> Result<Self> {
-        let project = self_project()
-            .context("Could not detect hyle project")?;
+        let project = self_project().context("Could not detect hyle project")?;
         Ok(Self { project })
     }
 
@@ -375,12 +379,15 @@ impl SelfAnalyzer {
         // Calculate health score
         let test_ratio = (test_count as f32 / modules.len() as f32).min(10.0) / 10.0;
         let dead_code_penalty = (dead_code_warnings as f32 / 100.0).min(0.3);
-        let todo_penalty = (todos.iter()
+        let todo_penalty = (todos
+            .iter()
             .filter(|t| t.priority == TodoPriority::High)
-            .count() as f32 / 10.0).min(0.2);
+            .count() as f32
+            / 10.0)
+            .min(0.2);
 
-        let health_score = (0.5 + test_ratio * 0.3 - dead_code_penalty - todo_penalty)
-            .clamp(0.0, 1.0);
+        let health_score =
+            (0.5 + test_ratio * 0.3 - dead_code_penalty - todo_penalty).clamp(0.0, 1.0);
 
         Ok(CodebaseAnalysis {
             modules,
@@ -402,7 +409,8 @@ impl SelfAnalyzer {
                 let path = entry.path();
                 if path.extension().map(|e| e == "rs").unwrap_or(false) {
                     if let Ok(content) = std::fs::read_to_string(&path) {
-                        let name = path.file_stem()
+                        let name = path
+                            .file_stem()
                             .and_then(|s| s.to_str())
                             .unwrap_or("unknown")
                             .to_string();
@@ -412,13 +420,15 @@ impl SelfAnalyzer {
                         let tests = content.matches("#[test]").count();
 
                         // Count doc comments
-                        let doc_lines = content.lines()
+                        let doc_lines = content
+                            .lines()
                             .filter(|l| l.trim().starts_with("///") || l.trim().starts_with("//!"))
                             .count();
                         let doc_coverage = (doc_lines as f32 / lines.max(1) as f32).min(1.0);
 
                         // Extract dependencies (use statements)
-                        let dependencies: Vec<String> = content.lines()
+                        let dependencies: Vec<String> = content
+                            .lines()
                             .filter(|l| l.starts_with("use crate::"))
                             .filter_map(|l| {
                                 l.strip_prefix("use crate::")
@@ -467,8 +477,7 @@ impl SelfAnalyzer {
             .context("Failed to run cargo check")?;
 
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Ok(stderr.matches("never used").count() +
-           stderr.matches("never constructed").count())
+        Ok(stderr.matches("never used").count() + stderr.matches("never constructed").count())
     }
 
     /// Find TODO/FIXME items
@@ -483,7 +492,10 @@ impl SelfAnalyzer {
                     if let Ok(content) = std::fs::read_to_string(&path) {
                         for (i, line) in content.lines().enumerate() {
                             let upper = line.to_uppercase();
-                            let priority = if upper.contains("FIXME") || upper.contains("XXX") || upper.contains("HACK") {
+                            let priority = if upper.contains("FIXME")
+                                || upper.contains("XXX")
+                                || upper.contains("HACK")
+                            {
                                 Some(TodoPriority::High)
                             } else if upper.contains("TODO") {
                                 Some(TodoPriority::Medium)
@@ -532,23 +544,39 @@ impl SelfAnalyzer {
         let mut prompt = String::from("Analyze this Rust codebase and suggest improvements:\n\n");
 
         prompt.push_str("## Health Score\n");
-        prompt.push_str(&format!("{:.0}% (tests: {}, dead code warnings: {}, high-priority TODOs: {})\n\n",
+        prompt.push_str(&format!(
+            "{:.0}% (tests: {}, dead code warnings: {}, high-priority TODOs: {})\n\n",
             analysis.health_score * 100.0,
             analysis.test_count,
             analysis.dead_code_warnings,
-            analysis.todos.iter().filter(|t| t.priority == TodoPriority::High).count()
+            analysis
+                .todos
+                .iter()
+                .filter(|t| t.priority == TodoPriority::High)
+                .count()
         ));
 
         prompt.push_str("## Modules by Size\n");
         for m in analysis.modules.iter().take(10) {
-            prompt.push_str(&format!("- {} ({} lines, {} fns, {} tests, {:.0}% doc)\n",
-                m.name, m.lines, m.functions, m.tests, m.doc_coverage * 100.0
+            prompt.push_str(&format!(
+                "- {} ({} lines, {} fns, {} tests, {:.0}% doc)\n",
+                m.name,
+                m.lines,
+                m.functions,
+                m.tests,
+                m.doc_coverage * 100.0
             ));
         }
 
         prompt.push_str("\n## High Priority TODOs\n");
-        for todo in analysis.todos.iter().filter(|t| t.priority == TodoPriority::High).take(5) {
-            prompt.push_str(&format!("- {}:{}: {}\n",
+        for todo in analysis
+            .todos
+            .iter()
+            .filter(|t| t.priority == TodoPriority::High)
+            .take(5)
+        {
+            prompt.push_str(&format!(
+                "- {}:{}: {}\n",
                 todo.file.file_name().unwrap_or_default().to_string_lossy(),
                 todo.line,
                 todo.text
@@ -575,9 +603,14 @@ impl std::fmt::Display for CodebaseAnalysis {
         writeln!(f, "Total Lines: {}", self.total_lines)?;
         writeln!(f, "Tests: {}", self.test_count)?;
         writeln!(f, "Dead Code Warnings: {}", self.dead_code_warnings)?;
-        writeln!(f, "TODOs: {} ({} high priority)",
+        writeln!(
+            f,
+            "TODOs: {} ({} high priority)",
             self.todos.len(),
-            self.todos.iter().filter(|t| t.priority == TodoPriority::High).count()
+            self.todos
+                .iter()
+                .filter(|t| t.priority == TodoPriority::High)
+                .count()
         )?;
         Ok(())
     }
@@ -610,10 +643,10 @@ pub enum IssueKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Severity {
-    Critical,  // Blocks execution
-    High,      // Should fix soon
-    Medium,    // Should fix eventually
-    Low,       // Nice to have
+    Critical, // Blocks execution
+    High,     // Should fix soon
+    Medium,   // Should fix eventually
+    Low,      // Nice to have
 }
 
 /// Self-repair suggestions
@@ -623,8 +656,7 @@ pub struct SelfRepair {
 
 impl SelfRepair {
     pub fn new() -> Result<Self> {
-        let project = self_project()
-            .context("Could not detect hyle project")?;
+        let project = self_project().context("Could not detect hyle project")?;
         Ok(Self { project })
     }
 
@@ -678,21 +710,21 @@ impl SelfRepair {
 
     /// Generate fix suggestions
     pub fn suggest_fixes(&self, issues: &[Issue]) -> Vec<String> {
-        issues.iter().filter_map(|i| {
-            match i.kind {
-                IssueKind::CompileError => Some(format!(
-                    "Fix compile error: {}", i.message
-                )),
-                IssueKind::TestFailure => Some(
-                    "Review and fix failing tests".to_string()
-                ),
+        issues
+            .iter()
+            .filter_map(|i| match i.kind {
+                IssueKind::CompileError => Some(format!("Fix compile error: {}", i.message)),
+                IssueKind::TestFailure => Some("Review and fix failing tests".to_string()),
                 IssueKind::DeadCode => Some(format!(
                     "Remove or wire up dead code: {}",
-                    i.file.as_ref().map(|p| p.display().to_string()).unwrap_or_default()
+                    i.file
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default()
                 )),
                 _ => None,
-            }
-        }).collect()
+            })
+            .collect()
     }
 }
 
@@ -733,7 +765,10 @@ mod tests {
                 println!("Bootstrap created for: {}", bs.project().name);
             }
             Err(e) => {
-                println!("Bootstrap not available: {} (expected outside hyle project)", e);
+                println!(
+                    "Bootstrap not available: {} (expected outside hyle project)",
+                    e
+                );
             }
         }
     }
@@ -742,7 +777,10 @@ mod tests {
     fn test_run_tests() {
         if let Ok(bs) = Bootstrap::new() {
             let result = bs.run_tests().expect("Failed to run tests");
-            println!("Tests passed: {}, count: {}", result.passed, result.test_count);
+            println!(
+                "Tests passed: {}, count: {}",
+                result.passed, result.test_count
+            );
             // Don't assert on pass/fail as we might be testing mid-development
             assert!(result.test_count > 0);
         }

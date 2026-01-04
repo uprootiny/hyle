@@ -9,7 +9,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::tools::{ToolCall, ToolCallStatus, ToolExecutor, ToolCallTracker};
+use crate::tools::{ToolCall, ToolCallStatus, ToolCallTracker, ToolExecutor};
 
 // ═══════════════════════════════════════════════════════════════
 // TOOL CALL PARSING
@@ -114,7 +114,10 @@ fn parse_function_calls(text: &str) -> Vec<ParsedToolCall> {
         for arg_cap in arg_re.captures_iter(args_str) {
             let key = arg_cap.get(1).map(|m| m.as_str()).unwrap_or("");
             let value = arg_cap.get(2).map(|m| m.as_str()).unwrap_or("");
-            args.insert(key.to_string(), serde_json::Value::String(value.to_string()));
+            args.insert(
+                key.to_string(),
+                serde_json::Value::String(value.to_string()),
+            );
         }
 
         if !args.is_empty() {
@@ -165,7 +168,10 @@ fn value_to_tool_call(value: &serde_json::Value) -> Option<ParsedToolCall> {
 
 /// Check if a name is a known tool
 fn is_known_tool(name: &str) -> bool {
-    matches!(name, "read" | "write" | "glob" | "grep" | "bash" | "edit" | "search" | "patch" | "diff")
+    matches!(
+        name,
+        "read" | "write" | "glob" | "grep" | "bash" | "edit" | "search" | "patch" | "diff"
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -246,10 +252,10 @@ pub fn is_task_complete(response: &str) -> bool {
 pub fn is_fatal_error(response: &str) -> bool {
     let lower = response.to_lowercase();
 
-    lower.contains("cannot proceed") ||
-    lower.contains("unable to continue") ||
-    lower.contains("fatal error") ||
-    lower.contains("aborting")
+    lower.contains("cannot proceed")
+        || lower.contains("unable to continue")
+        || lower.contains("fatal error")
+        || lower.contains("aborting")
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -321,7 +327,10 @@ pub fn format_tool_results(tracker: &ToolCallTracker, indices: &[usize]) -> Stri
                     }
                 }
                 ToolCallStatus::Failed => {
-                    output.push_str(&format!("ERROR: {}\n", call.error.as_deref().unwrap_or("unknown")));
+                    output.push_str(&format!(
+                        "ERROR: {}\n",
+                        call.error.as_deref().unwrap_or("unknown")
+                    ));
                 }
                 ToolCallStatus::Killed => {
                     output.push_str("(killed by user)\n");
@@ -342,7 +351,8 @@ pub fn format_tool_results(tracker: &ToolCallTracker, indices: &[usize]) -> Stri
 
 /// Generate system prompt for code assistant mode
 pub fn code_assistant_prompt(work_dir: &Path) -> String {
-    format!(r#"You are hyle, a Rust-native code assistant. You help users with software engineering tasks.
+    format!(
+        r#"You are hyle, a Rust-native code assistant. You help users with software engineering tasks.
 
 Working directory: {}
 
@@ -377,15 +387,17 @@ Guidelines:
 - Make atomic, focused changes
 - Run tests after modifications
 - Commit changes with clear messages
-"#, work_dir.display())
+"#,
+        work_dir.display()
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════
 // AUTONOMOUS AGENT LOOP
 // ═══════════════════════════════════════════════════════════════
 
-use tokio::sync::mpsc;
 use crate::client::{self, StreamEvent};
+use tokio::sync::mpsc;
 
 /// Events emitted by the agent loop
 #[derive(Debug, Clone)]
@@ -397,7 +409,11 @@ pub enum AgentEvent {
     /// Executing a tool
     ToolExecuting { name: String, args: String },
     /// Tool finished with result
-    ToolResult { name: String, success: bool, output: String },
+    ToolResult {
+        name: String,
+        success: bool,
+        output: String,
+    },
     /// Iteration complete, continuing
     IterationComplete { iteration: usize, tool_count: usize },
     /// Agent finished
@@ -450,28 +466,30 @@ pub async fn run_agent_loop(
     }));
 
     for iteration in 0..config.max_iterations {
-        let _ = event_tx.send(AgentEvent::Status(format!(
-            "Iteration {} of {}", iteration + 1, config.max_iterations
-        ))).await;
+        let _ = event_tx
+            .send(AgentEvent::Status(format!(
+                "Iteration {} of {}",
+                iteration + 1,
+                config.max_iterations
+            )))
+            .await;
 
         // Stream LLM response - pass full conversation history
         let mut response = String::new();
-        let last_user_msg = conversation.iter().rev()
+        let last_user_msg = conversation
+            .iter()
+            .rev()
             .find(|m| m["role"] == "user")
             .and_then(|m| m["content"].as_str())
             .unwrap_or("");
-        let history: Vec<_> = conversation.iter()
+        let history: Vec<_> = conversation
+            .iter()
             .filter(|m| m["role"] != "system") // System handled separately
             .take(conversation.len().saturating_sub(1))
             .cloned()
             .collect();
-        let stream_result = client::stream_completion_full(
-            api_key,
-            model,
-            last_user_msg,
-            None,
-            &history,
-        ).await;
+        let stream_result =
+            client::stream_completion_full(api_key, model, last_user_msg, None, &history).await;
 
         let mut rx = match stream_result {
             Ok(rx) => rx,
@@ -522,7 +540,9 @@ pub async fn run_agent_loop(
 
         // Check for fatal error
         if is_fatal_error(&response) {
-            let _ = event_tx.send(AgentEvent::Error("Agent reported fatal error".into())).await;
+            let _ = event_tx
+                .send(AgentEvent::Error("Agent reported fatal error".into()))
+                .await;
             return AgentResult {
                 iterations: iteration + 1,
                 tool_calls_executed: total_tool_calls,
@@ -535,14 +555,18 @@ pub async fn run_agent_loop(
 
         // Parse tool calls
         let tool_calls = parse_tool_calls(&response);
-        let _ = event_tx.send(AgentEvent::ToolCallsParsed(tool_calls.clone())).await;
+        let _ = event_tx
+            .send(AgentEvent::ToolCallsParsed(tool_calls.clone()))
+            .await;
 
         // Check if task is complete (no tool calls or explicit completion)
         if tool_calls.is_empty() || is_task_complete(&response) {
-            let _ = event_tx.send(AgentEvent::Complete {
-                iterations: iteration + 1,
-                success: true,
-            }).await;
+            let _ = event_tx
+                .send(AgentEvent::Complete {
+                    iterations: iteration + 1,
+                    success: true,
+                })
+                .await;
             return AgentResult {
                 iterations: iteration + 1,
                 tool_calls_executed: total_tool_calls,
@@ -556,7 +580,8 @@ pub async fn run_agent_loop(
         // Execute tool calls (up to limit)
         let mut tool_results = String::new();
         let mut iteration_failures = 0;
-        let calls_to_execute = tool_calls.into_iter()
+        let calls_to_execute = tool_calls
+            .into_iter()
             .take(config.max_tool_calls_per_iteration)
             .collect::<Vec<_>>();
 
@@ -568,10 +593,12 @@ pub async fn run_agent_loop(
                 recent_actions.remove(0);
             }
 
-            let _ = event_tx.send(AgentEvent::ToolExecuting {
-                name: parsed.name.clone(),
-                args: parsed.args.to_string(),
-            }).await;
+            let _ = event_tx
+                .send(AgentEvent::ToolExecuting {
+                    name: parsed.name.clone(),
+                    args: parsed.args.to_string(),
+                })
+                .await;
 
             let call = ToolCall::new(&parsed.name, parsed.args.clone());
             let idx = tracker.add(call);
@@ -585,11 +612,13 @@ pub async fn run_agent_loop(
             }
             let output = format_tool_results(&tracker, &[idx]);
 
-            let _ = event_tx.send(AgentEvent::ToolResult {
-                name: parsed.name.clone(),
-                success,
-                output: output.clone(),
-            }).await;
+            let _ = event_tx
+                .send(AgentEvent::ToolResult {
+                    name: parsed.name.clone(),
+                    success,
+                    output: output.clone(),
+                })
+                .await;
 
             tool_results.push_str(&output);
         }
@@ -611,9 +640,11 @@ pub async fn run_agent_loop(
         };
 
         if is_stuck {
-            let _ = event_tx.send(AgentEvent::Error(
-                "Agent appears stuck (repeated failures or actions)".into()
-            )).await;
+            let _ = event_tx
+                .send(AgentEvent::Error(
+                    "Agent appears stuck (repeated failures or actions)".into(),
+                ))
+                .await;
             return AgentResult {
                 iterations: iteration + 1,
                 tool_calls_executed: total_tool_calls,
@@ -630,14 +661,18 @@ pub async fn run_agent_loop(
             "content": format!("Tool execution results:\n{}", tool_results)
         }));
 
-        let _ = event_tx.send(AgentEvent::IterationComplete {
-            iteration: iteration + 1,
-            tool_count: calls_to_execute.len(),
-        }).await;
+        let _ = event_tx
+            .send(AgentEvent::IterationComplete {
+                iteration: iteration + 1,
+                tool_count: calls_to_execute.len(),
+            })
+            .await;
     }
 
     // Max iterations reached
-    let _ = event_tx.send(AgentEvent::Error("Max iterations reached".into())).await;
+    let _ = event_tx
+        .send(AgentEvent::Error("Max iterations reached".into()))
+        .await;
     AgentResult {
         iterations: config.max_iterations,
         tool_calls_executed: total_tool_calls,
@@ -682,7 +717,13 @@ impl AgentCore {
     ///
     /// Spawns the agent loop in background, returns channel to receive events.
     /// Caller should poll the receiver and handle events appropriately.
-    pub fn run(&self, prompt: &str) -> (mpsc::Receiver<AgentEvent>, tokio::task::JoinHandle<AgentResult>) {
+    pub fn run(
+        &self,
+        prompt: &str,
+    ) -> (
+        mpsc::Receiver<AgentEvent>,
+        tokio::task::JoinHandle<AgentResult>,
+    ) {
         let (tx, rx) = mpsc::channel(256);
 
         let api_key = self.api_key.clone();
@@ -907,8 +948,12 @@ Then read one:
 
     #[test]
     fn test_is_task_complete_positive() {
-        assert!(is_task_complete("I have finished the implementation. Task complete."));
-        assert!(is_task_complete("All changes have been successfully applied."));
+        assert!(is_task_complete(
+            "I have finished the implementation. Task complete."
+        ));
+        assert!(is_task_complete(
+            "All changes have been successfully applied."
+        ));
         assert!(is_task_complete("Done! The tests are now passing."));
     }
 
@@ -1017,9 +1062,12 @@ Then read one:
         let mut tracker = ToolCallTracker::new();
         let mut executor = ToolExecutor::new();
 
-        let mut call = ToolCall::new("bash", serde_json::json!({
-            "command": "echo test"
-        }));
+        let mut call = ToolCall::new(
+            "bash",
+            serde_json::json!({
+                "command": "echo test"
+            }),
+        );
         let idx = tracker.add(call.clone());
         executor.execute(tracker.get_mut(idx).unwrap()).ok();
 
@@ -1070,12 +1118,10 @@ Then read one:
 
     #[test]
     fn test_execute_tool_calls() {
-        let parsed = vec![
-            ParsedToolCall {
-                name: "bash".to_string(),
-                args: serde_json::json!({"command": "echo hello"}),
-            }
-        ];
+        let parsed = vec![ParsedToolCall {
+            name: "bash".to_string(),
+            args: serde_json::json!({"command": "echo hello"}),
+        }];
 
         let mut executor = ToolExecutor::new();
         let mut tracker = ToolCallTracker::new();

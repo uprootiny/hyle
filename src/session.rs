@@ -105,15 +105,17 @@ impl Session {
         // Load metadata
         let meta_path = session_dir.join("meta.json");
         let meta: SessionMeta = serde_json::from_str(
-            &fs::read_to_string(&meta_path).context("Failed to read meta.json")?
-        ).context("Failed to parse meta.json")?;
+            &fs::read_to_string(&meta_path).context("Failed to read meta.json")?,
+        )
+        .context("Failed to parse meta.json")?;
 
         // Load messages
         let messages_path = session_dir.join("messages.jsonl");
         let messages = if messages_path.exists() {
             let file = File::open(&messages_path)?;
             let reader = BufReader::new(file);
-            reader.lines()
+            reader
+                .lines()
                 .map_while(|line| line.ok())
                 .filter_map(|line| serde_json::from_str(&line).ok())
                 .collect()
@@ -239,20 +241,21 @@ impl Session {
 
     /// Get messages for API request (excluding tokens field)
     pub fn messages_for_api(&self) -> Vec<serde_json::Value> {
-        self.messages.iter().map(|m| {
-            serde_json::json!({
-                "role": m.role,
-                "content": m.content
+        self.messages
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "role": m.role,
+                    "content": m.content
+                })
             })
-        }).collect()
+            .collect()
     }
 
     /// Get conversation summary for display (used in session list)
     #[allow(dead_code)]
     pub fn summary(&self) -> String {
-        let user_msgs: Vec<_> = self.messages.iter()
-            .filter(|m| m.role == "user")
-            .collect();
+        let user_msgs: Vec<_> = self.messages.iter().filter(|m| m.role == "user").collect();
 
         if user_msgs.is_empty() {
             return "(empty session)".to_string();
@@ -365,12 +368,11 @@ pub fn import_claude_context(project_dir: &str, limit: usize) -> Result<Vec<Mess
     let reader = BufReader::new(file);
 
     // Parse all entries for this project
-    let mut entries: Vec<ClaudeHistoryEntry> = reader.lines()
+    let mut entries: Vec<ClaudeHistoryEntry> = reader
+        .lines()
         .map_while(|line| line.ok())
         .filter_map(|line| serde_json::from_str(&line).ok())
-        .filter(|e: &ClaudeHistoryEntry| {
-            e.project.as_deref() == Some(project_dir)
-        })
+        .filter(|e: &ClaudeHistoryEntry| e.project.as_deref() == Some(project_dir))
         .collect();
 
     // Sort by timestamp (newest first) and take recent ones
@@ -378,16 +380,19 @@ pub fn import_claude_context(project_dir: &str, limit: usize) -> Result<Vec<Mess
     entries.truncate(limit);
 
     // Convert to hyle messages (reverse to get chronological order)
-    let messages: Vec<Message> = entries.into_iter().rev().map(|e| {
-        let ts = DateTime::from_timestamp_millis(e.timestamp)
-            .unwrap_or_else(Utc::now);
-        Message {
-            role: "user".into(),
-            content: e.display,
-            timestamp: ts,
-            tokens: None,
-        }
-    }).collect();
+    let messages: Vec<Message> = entries
+        .into_iter()
+        .rev()
+        .map(|e| {
+            let ts = DateTime::from_timestamp_millis(e.timestamp).unwrap_or_else(Utc::now);
+            Message {
+                role: "user".into(),
+                content: e.display,
+                timestamp: ts,
+                tokens: None,
+            }
+        })
+        .collect();
 
     Ok(messages)
 }
@@ -409,13 +414,11 @@ pub fn has_recent_claude_session(project_dir: &str, max_age_hours: i64) -> Resul
     let max_age_ms = max_age_hours * 3600 * 1000;
 
     // Look for recent entries in this project
-    let has_recent = reader.lines()
+    let has_recent = reader
+        .lines()
         .map_while(|line| line.ok())
         .filter_map(|line| serde_json::from_str::<ClaudeHistoryEntry>(&line).ok())
-        .any(|e| {
-            e.project.as_deref() == Some(project_dir) &&
-            (now - e.timestamp) < max_age_ms
-        });
+        .any(|e| e.project.as_deref() == Some(project_dir) && (now - e.timestamp) < max_age_ms);
 
     Ok(has_recent)
 }
@@ -436,7 +439,8 @@ pub fn get_claude_session_id(project_dir: &str) -> Result<Option<String>> {
     let reader = BufReader::new(file);
 
     // Find most recent entry with a session ID
-    let session_id = reader.lines()
+    let session_id = reader
+        .lines()
         .map_while(|line| line.ok())
         .filter_map(|line| serde_json::from_str::<ClaudeHistoryEntry>(&line).ok())
         .filter(|e| e.project.as_deref() == Some(project_dir))

@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::agent::{AgentCore, AgentEvent, AgentConfig};
+use crate::agent::{AgentConfig, AgentCore, AgentEvent};
 use crate::config;
 
 // ═══════════════════════════════════════════════════════════════
@@ -142,7 +142,8 @@ impl ServerState {
     fn record_request(&mut self) {
         let now = std::time::Instant::now();
         // Clean up old requests (older than 1 minute)
-        self.request_times.retain(|t| now.duration_since(*t).as_secs() < 60);
+        self.request_times
+            .retain(|t| now.duration_since(*t).as_secs() < 60);
         self.request_times.push(now);
         self.rate_limits.requests_used = self.request_times.len() as u32;
     }
@@ -163,7 +164,9 @@ pub async fn run_server(port: u16) -> Result<()> {
 
     let api_key = config::get_api_key()?;
     let cfg = config::Config::load()?;
-    let model = cfg.default_model.unwrap_or_else(|| "meta-llama/llama-3.2-3b-instruct:free".into());
+    let model = cfg
+        .default_model
+        .unwrap_or_else(|| "meta-llama/llama-3.2-3b-instruct:free".into());
     let work_dir = std::env::current_dir()?;
 
     let state = Arc::new(RwLock::new(ServerState::new(api_key, model, work_dir)));
@@ -212,7 +215,9 @@ pub async fn run_server(port: u16) -> Result<()> {
                         content_length = len.trim().parse().unwrap_or(0);
                         // Cap to prevent memory exhaustion DoS
                         if content_length > MAX_BODY_SIZE {
-                            let _ = writer.write_all(b"HTTP/1.1 413 Payload Too Large\r\n\r\n").await;
+                            let _ = writer
+                                .write_all(b"HTTP/1.1 413 Payload Too Large\r\n\r\n")
+                                .await;
                             return;
                         }
                     }
@@ -250,22 +255,34 @@ pub async fn run_server(port: u16) -> Result<()> {
                 ("POST", "/complete") => handle_complete(&state, &body).await,
                 ("OPTIONS", _) => Ok(cors_preflight()),
                 ("GET", "/") => Ok(html_response(WEB_UI_HTML)),
-                ("GET", "/api") => Ok(json_response(200, &serde_json::json!({
-                    "name": "hyle",
-                    "version": env!("CARGO_PKG_VERSION"),
-                    "endpoints": ["/status", "/sessions", "/prompt", "/complete"],
-                    "docs": "POST /prompt with {\"prompt\": \"...\", \"files\": [...]} for agent mode"
-                }))),
+                ("GET", "/api") => Ok(json_response(
+                    200,
+                    &serde_json::json!({
+                        "name": "hyle",
+                        "version": env!("CARGO_PKG_VERSION"),
+                        "endpoints": ["/status", "/sessions", "/prompt", "/complete"],
+                        "docs": "POST /prompt with {\"prompt\": \"...\", \"files\": [...]} for agent mode"
+                    }),
+                )),
                 (_, p) if p.starts_with("/session/") => {
                     let id = p.trim_start_matches("/session/");
                     // Validate session ID format to prevent path traversal
-                    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
-                        Ok(json_response(400, &serde_json::json!({"error": "Invalid session ID format"})))
+                    if !id
+                        .chars()
+                        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+                    {
+                        Ok(json_response(
+                            400,
+                            &serde_json::json!({"error": "Invalid session ID format"}),
+                        ))
                     } else {
                         handle_session(id).await
                     }
                 }
-                _ => Ok(json_response(404, &serde_json::json!({"error": "Not found"}))),
+                _ => Ok(json_response(
+                    404,
+                    &serde_json::json!({"error": "Not found"}),
+                )),
             };
 
             let response = response.unwrap_or_else(|e| {
@@ -296,7 +313,8 @@ fn json_response(status: u16, body: &serde_json::Value) -> String {
 fn html_response(html: &str) -> String {
     format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
-        html.len(), html
+        html.len(),
+        html
     )
 }
 
@@ -559,50 +577,63 @@ fn cors_preflight() -> String {
      Access-Control-Allow-Origin: *\r\n\
      Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\
      Access-Control-Allow-Headers: Content-Type\r\n\
-     Access-Control-Max-Age: 86400\r\n\r\n".to_string()
+     Access-Control-Max-Age: 86400\r\n\r\n"
+        .to_string()
 }
 
 async fn handle_sessions() -> Result<String> {
     let sessions = crate::session::list_sessions().unwrap_or_default();
-    let session_infos: Vec<SessionInfo> = sessions.iter().map(|s| SessionInfo {
-        id: s.id.clone(),
-        model: s.model.clone(),
-        messages: s.message_count,
-        tokens: s.total_tokens,
-        created: s.created_at.to_rfc3339(),
-        updated: s.updated_at.to_rfc3339(),
-    }).collect();
+    let session_infos: Vec<SessionInfo> = sessions
+        .iter()
+        .map(|s| SessionInfo {
+            id: s.id.clone(),
+            model: s.model.clone(),
+            messages: s.message_count,
+            tokens: s.total_tokens,
+            created: s.created_at.to_rfc3339(),
+            updated: s.updated_at.to_rfc3339(),
+        })
+        .collect();
 
-    let response = SessionsResponse { sessions: session_infos };
+    let response = SessionsResponse {
+        sessions: session_infos,
+    };
     Ok(json_response(200, &serde_json::to_value(response)?))
 }
 
 async fn handle_session(id: &str) -> Result<String> {
     match crate::session::Session::load(id) {
         Ok(session) => {
-            let messages: Vec<ConversationMessage> = session.messages.iter().map(|m| {
-                ConversationMessage {
+            let messages: Vec<ConversationMessage> = session
+                .messages
+                .iter()
+                .map(|m| ConversationMessage {
                     role: m.role.clone(),
                     content: m.content.clone(),
                     tool: None,
                     timestamp: None,
-                }
-            }).collect();
+                })
+                .collect();
 
             let conv = Conversation {
                 id: session.meta.id.clone(),
-                title: session.meta.description.clone().unwrap_or_else(|| {
-                    format!("Session {}", &session.meta.id[..8])
-                }),
+                title: session
+                    .meta
+                    .description
+                    .clone()
+                    .unwrap_or_else(|| format!("Session {}", &session.meta.id[..8])),
                 messages,
                 created: session.meta.created_at.to_rfc3339(),
                 tokens: session.meta.total_tokens,
             };
             Ok(json_response(200, &serde_json::to_value(conv)?))
         }
-        Err(e) => Ok(json_response(404, &serde_json::json!({
-            "error": format!("Session not found: {}", e)
-        }))),
+        Err(e) => Ok(json_response(
+            404,
+            &serde_json::json!({
+                "error": format!("Session not found: {}", e)
+            }),
+        )),
     }
 }
 
@@ -613,9 +644,12 @@ async fn handle_prompt(state: &Arc<RwLock<ServerState>>, body: &str) -> Result<S
     {
         let mut state = state.write().await;
         if state.busy {
-            return Ok(json_response(503, &serde_json::json!({
-                "error": "Server is busy processing another request"
-            })));
+            return Ok(json_response(
+                503,
+                &serde_json::json!({
+                    "error": "Server is busy processing another request"
+                }),
+            ));
         }
         state.busy = true;
         state.record_request();
@@ -624,7 +658,11 @@ async fn handle_prompt(state: &Arc<RwLock<ServerState>>, body: &str) -> Result<S
     // Get state info
     let (api_key, model, work_dir) = {
         let state = state.read().await;
-        (state.api_key.clone(), state.model.clone(), state.work_dir.clone())
+        (
+            state.api_key.clone(),
+            state.model.clone(),
+            state.work_dir.clone(),
+        )
     };
 
     // Build prompt with file context
@@ -636,19 +674,20 @@ async fn handle_prompt(state: &Arc<RwLock<ServerState>>, body: &str) -> Result<S
     }
 
     // Run agent
-    let agent = AgentCore::new(&api_key, &model, &work_dir)
-        .with_config(AgentConfig {
-            max_iterations: 10,
-            max_tool_calls_per_iteration: 5,
-            timeout_per_tool_ms: 30000,
-        });
+    let agent = AgentCore::new(&api_key, &model, &work_dir).with_config(AgentConfig {
+        max_iterations: 10,
+        max_tool_calls_per_iteration: 5,
+        timeout_per_tool_ms: 30000,
+    });
 
     let mut last_response = String::new();
-    let result = agent.run_with_callback(&full_prompt, |event| {
-        if let AgentEvent::Token(t) = event {
-            last_response.push_str(t);
-        }
-    }).await;
+    let result = agent
+        .run_with_callback(&full_prompt, |event| {
+            if let AgentEvent::Token(t) = event {
+                last_response.push_str(t);
+            }
+        })
+        .await;
 
     // Mark not busy and record token usage
     {
@@ -690,10 +729,13 @@ async fn handle_complete(state: &Arc<RwLock<ServerState>>, body: &str) -> Result
         }
     }
 
-    Ok(json_response(200, &serde_json::json!({
-        "success": true,
-        "response": response
-    })))
+    Ok(json_response(
+        200,
+        &serde_json::json!({
+            "success": true,
+            "response": response
+        }),
+    ))
 }
 
 // ═══════════════════════════════════════════════════════════════

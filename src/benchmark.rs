@@ -5,9 +5,9 @@
 // Evaluates LLMs on repository hygiene and maintenance tasks.
 // Scores models based on accuracy, efficiency, and code quality.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════
 // PROMPT CATEGORIES
@@ -63,8 +63,8 @@ impl TaskCategory {
 
     pub fn weight(&self) -> f64 {
         match self {
-            TaskCategory::Security => 1.5,      // Security is critical
-            TaskCategory::Testing => 1.3,       // Tests are important
+            TaskCategory::Security => 1.5, // Security is critical
+            TaskCategory::Testing => 1.3,  // Tests are important
             TaskCategory::CodeCleanup => 1.0,
             TaskCategory::Documentation => 0.8,
             TaskCategory::Dependencies => 1.2,
@@ -122,7 +122,10 @@ impl PromptSet {
     }
 
     pub fn by_category(&self, category: TaskCategory) -> Vec<&BenchmarkPrompt> {
-        self.prompts.iter().filter(|p| p.category == category).collect()
+        self.prompts
+            .iter()
+            .filter(|p| p.category == category)
+            .collect()
     }
 
     pub fn all(&self) -> &[BenchmarkPrompt] {
@@ -312,10 +315,10 @@ impl Default for PromptSet {
 pub struct ResponseScore {
     pub prompt_id: String,
     pub model: String,
-    pub relevance: f64,       // 0-1: contains expected elements
-    pub precision: f64,       // 0-1: avoids negative elements
-    pub completeness: f64,    // 0-1: covers all aspects
-    pub efficiency: f64,      // 0-1: token efficiency
+    pub relevance: f64,    // 0-1: contains expected elements
+    pub precision: f64,    // 0-1: avoids negative elements
+    pub completeness: f64, // 0-1: covers all aspects
+    pub efficiency: f64,   // 0-1: token efficiency
     pub latency_ms: u64,
     pub tokens_used: u32,
     pub raw_score: f64,
@@ -333,7 +336,9 @@ impl ResponseScore {
         let response_lower = response.to_lowercase();
 
         // Relevance: how many expected elements are present
-        let expected_hits = prompt.expected_elements.iter()
+        let expected_hits = prompt
+            .expected_elements
+            .iter()
             .filter(|e| response_lower.contains(&e.to_lowercase()))
             .count();
         let relevance = if prompt.expected_elements.is_empty() {
@@ -343,7 +348,9 @@ impl ResponseScore {
         };
 
         // Precision: avoids negative elements
-        let negative_hits = prompt.negative_elements.iter()
+        let negative_hits = prompt
+            .negative_elements
+            .iter()
             .filter(|e| response_lower.contains(&e.to_lowercase()))
             .count();
         let precision = if prompt.negative_elements.is_empty() {
@@ -355,9 +362,9 @@ impl ResponseScore {
         // Completeness: response length relative to max_tokens
         let length_ratio = tokens as f64 / prompt.max_tokens as f64;
         let completeness = if length_ratio < 0.3 {
-            length_ratio / 0.3  // Penalize very short responses
+            length_ratio / 0.3 // Penalize very short responses
         } else if length_ratio > 0.9 {
-            0.9 + 0.1 * (1.0 - (length_ratio - 0.9) / 0.1).max(0.0)  // Slight penalty for hitting limit
+            0.9 + 0.1 * (1.0 - (length_ratio - 0.9) / 0.1).max(0.0) // Slight penalty for hitting limit
         } else {
             1.0
         };
@@ -373,9 +380,7 @@ impl ResponseScore {
         let raw_score = relevance * 0.4 + precision * 0.3 + completeness * 0.2 + efficiency * 0.1;
 
         // Apply difficulty and category weights
-        let weighted_score = raw_score
-            * prompt.difficulty.multiplier()
-            * prompt.category.weight();
+        let weighted_score = raw_score * prompt.difficulty.multiplier() * prompt.category.weight();
 
         Self {
             prompt_id: prompt.id.clone(),
@@ -419,7 +424,10 @@ impl ModelProfile {
         for score in &scores {
             // Find category from prompt_id (this is a simplification)
             for cat in TaskCategory::all() {
-                if score.prompt_id.starts_with(&cat.name().to_lowercase().replace(' ', "-")[..4]) {
+                if score
+                    .prompt_id
+                    .starts_with(&cat.name().to_lowercase().replace(' ', "-")[..4])
+                {
                     let entry = category_totals.entry(*cat).or_insert((0.0, 0));
                     entry.0 += score.weighted_score;
                     entry.1 += 1;
@@ -464,9 +472,15 @@ impl ModelProfile {
     pub fn render_report(&self) -> String {
         let mut report = String::new();
         report.push_str(&format!("═══ {} ═══\n", self.model));
-        report.push_str(&format!("Grade: {} (score: {:.2})\n", self.grade(), self.total_score));
-        report.push_str(&format!("Avg latency: {}ms | Tokens: {} | Est. cost: ${:.4}\n\n",
-            self.avg_latency_ms, self.total_tokens, self.cost_estimate));
+        report.push_str(&format!(
+            "Grade: {} (score: {:.2})\n",
+            self.grade(),
+            self.total_score
+        ));
+        report.push_str(&format!(
+            "Avg latency: {}ms | Tokens: {} | Est. cost: ${:.4}\n\n",
+            self.avg_latency_ms, self.total_tokens, self.cost_estimate
+        ));
 
         report.push_str("Category Scores:\n");
         for cat in TaskCategory::all() {
@@ -480,8 +494,12 @@ impl ModelProfile {
         for score in &self.scores {
             report.push_str(&format!(
                 "  {} | rel:{:.2} prec:{:.2} comp:{:.2} eff:{:.2} → {:.2}\n",
-                score.prompt_id, score.relevance, score.precision,
-                score.completeness, score.efficiency, score.weighted_score
+                score.prompt_id,
+                score.relevance,
+                score.precision,
+                score.completeness,
+                score.efficiency,
+                score.weighted_score
             ));
         }
 
@@ -524,7 +542,8 @@ pub struct BenchmarkResult {
 
 impl BenchmarkResult {
     pub fn new(profiles: Vec<ModelProfile>) -> Self {
-        let winner = profiles.iter()
+        let winner = profiles
+            .iter()
             .max_by(|a, b| a.total_score.partial_cmp(&b.total_score).unwrap())
             .map(|p| p.model.clone())
             .unwrap_or_default();
@@ -546,10 +565,17 @@ impl BenchmarkResult {
         s.push_str("╠══════════════════════════════════════════════════════════════╣\n");
 
         for profile in profiles {
-            let crown = if profile.model == winner { "👑" } else { "  " };
+            let crown = if profile.model == winner {
+                "👑"
+            } else {
+                "  "
+            };
             s.push_str(&format!(
                 "║ {} {:30} {:4} score:{:6.2} ║\n",
-                crown, profile.model, profile.grade(), profile.total_score
+                crown,
+                profile.model,
+                profile.grade(),
+                profile.total_score
             ));
         }
 
@@ -840,8 +866,11 @@ impl<'a> BenchmarkRunner<'a> {
         let prompts = PromptSet::default();
         let mut scores = Vec::new();
 
-        println!("Running {} prompts across {} categories...",
-            prompts.prompts.len(), self.config.categories.len());
+        println!(
+            "Running {} prompts across {} categories...",
+            prompts.prompts.len(),
+            self.config.categories.len()
+        );
 
         for prompt in &prompts.prompts {
             if !self.config.categories.contains(&prompt.category) {
@@ -855,13 +884,8 @@ impl<'a> BenchmarkRunner<'a> {
                 Ok(response) => {
                     let elapsed = start.elapsed();
                     let tokens = estimate_tokens(&response);
-                    let score = ResponseScore::compute(
-                        prompt,
-                        self.model,
-                        &response,
-                        elapsed,
-                        tokens,
-                    );
+                    let score =
+                        ResponseScore::compute(prompt, self.model, &response, elapsed, tokens);
                     println!("score: {:.2}", score.weighted_score);
                     scores.push(score);
                 }
@@ -890,11 +914,17 @@ impl<'a> BenchmarkRunner<'a> {
         use crate::client;
 
         let full_prompt = if let Some(ctx) = &prompt.context {
-            format!("You are a code assistant helping with housekeeping tasks. \
-                     Be concise and specific.\n\n{}\n\nContext:\n{}", prompt.prompt, ctx)
+            format!(
+                "You are a code assistant helping with housekeeping tasks. \
+                     Be concise and specific.\n\n{}\n\nContext:\n{}",
+                prompt.prompt, ctx
+            )
         } else {
-            format!("You are a code assistant helping with housekeeping tasks. \
-                     Be concise and specific.\n\n{}", prompt.prompt)
+            format!(
+                "You are a code assistant helping with housekeeping tasks. \
+                     Be concise and specific.\n\n{}",
+                prompt.prompt
+            )
         };
 
         let response = client::chat_completion_simple(
@@ -902,7 +932,8 @@ impl<'a> BenchmarkRunner<'a> {
             self.model,
             &full_prompt,
             prompt.max_tokens,
-        ).await?;
+        )
+        .await?;
 
         Ok(response)
     }
@@ -952,7 +983,11 @@ mod tests {
     fn test_prompt_set_has_all_categories() {
         let set = PromptSet::new();
         for cat in TaskCategory::all() {
-            assert!(!set.by_category(*cat).is_empty(), "Missing prompts for {:?}", cat);
+            assert!(
+                !set.by_category(*cat).is_empty(),
+                "Missing prompts for {:?}",
+                cat
+            );
         }
     }
 
@@ -975,8 +1010,17 @@ mod tests {
             difficulty: Difficulty::Easy,
         };
 
-        let score = ResponseScore::compute(&prompt, "test-model", "foo bar", Duration::from_millis(100), 10);
-        assert!((score.relevance - 0.666).abs() < 0.01, "Expected ~0.67 relevance");
+        let score = ResponseScore::compute(
+            &prompt,
+            "test-model",
+            "foo bar",
+            Duration::from_millis(100),
+            10,
+        );
+        assert!(
+            (score.relevance - 0.666).abs() < 0.01,
+            "Expected ~0.67 relevance"
+        );
     }
 
     #[test]
@@ -992,8 +1036,17 @@ mod tests {
             difficulty: Difficulty::Easy,
         };
 
-        let score = ResponseScore::compute(&prompt, "test-model", "this is bad", Duration::from_millis(100), 10);
-        assert!((score.precision - 0.5).abs() < 0.01, "Expected 0.5 precision");
+        let score = ResponseScore::compute(
+            &prompt,
+            "test-model",
+            "this is bad",
+            Duration::from_millis(100),
+            10,
+        );
+        assert!(
+            (score.precision - 0.5).abs() < 0.01,
+            "Expected 0.5 precision"
+        );
     }
 
     #[test]
@@ -1011,20 +1064,18 @@ mod tests {
 
     #[test]
     fn test_model_profile_grade() {
-        let scores = vec![
-            ResponseScore {
-                prompt_id: "test".into(),
-                model: "model".into(),
-                relevance: 1.0,
-                precision: 1.0,
-                completeness: 1.0,
-                efficiency: 1.0,
-                latency_ms: 100,
-                tokens_used: 50,
-                raw_score: 1.0,
-                weighted_score: 2.5,
-            },
-        ];
+        let scores = vec![ResponseScore {
+            prompt_id: "test".into(),
+            model: "model".into(),
+            relevance: 1.0,
+            precision: 1.0,
+            completeness: 1.0,
+            efficiency: 1.0,
+            latency_ms: 100,
+            tokens_used: 50,
+            raw_score: 1.0,
+            weighted_score: 2.5,
+        }];
         let profile = ModelProfile::from_scores("model", scores);
         assert_eq!(profile.grade(), "A+");
     }
@@ -1032,16 +1083,36 @@ mod tests {
     #[test]
     fn test_benchmark_result_winner() {
         let profiles = vec![
-            ModelProfile::from_scores("model-a", vec![ResponseScore {
-                prompt_id: "t1".into(), model: "model-a".into(),
-                relevance: 0.5, precision: 0.5, completeness: 0.5, efficiency: 0.5,
-                latency_ms: 100, tokens_used: 50, raw_score: 0.5, weighted_score: 1.0,
-            }]),
-            ModelProfile::from_scores("model-b", vec![ResponseScore {
-                prompt_id: "t1".into(), model: "model-b".into(),
-                relevance: 0.9, precision: 0.9, completeness: 0.9, efficiency: 0.9,
-                latency_ms: 100, tokens_used: 50, raw_score: 0.9, weighted_score: 2.0,
-            }]),
+            ModelProfile::from_scores(
+                "model-a",
+                vec![ResponseScore {
+                    prompt_id: "t1".into(),
+                    model: "model-a".into(),
+                    relevance: 0.5,
+                    precision: 0.5,
+                    completeness: 0.5,
+                    efficiency: 0.5,
+                    latency_ms: 100,
+                    tokens_used: 50,
+                    raw_score: 0.5,
+                    weighted_score: 1.0,
+                }],
+            ),
+            ModelProfile::from_scores(
+                "model-b",
+                vec![ResponseScore {
+                    prompt_id: "t1".into(),
+                    model: "model-b".into(),
+                    relevance: 0.9,
+                    precision: 0.9,
+                    completeness: 0.9,
+                    efficiency: 0.9,
+                    latency_ms: 100,
+                    tokens_used: 50,
+                    raw_score: 0.9,
+                    weighted_score: 2.0,
+                }],
+            ),
         ];
         let result = BenchmarkResult::new(profiles);
         assert_eq!(result.winner, "model-b");

@@ -15,34 +15,34 @@
 //!   hyle models --refresh         # refresh models cache
 //!   hyle config set key <value>   # non-interactive config
 
-mod config;
-mod models;
-mod client;
-mod telemetry;
-mod traces;
-mod skills;
-mod session;
-mod ui;
-mod tools;
-mod backburner;
 mod agent;
-mod git;
-mod eval;
-mod project;
+mod backburner;
+mod benchmark;
 mod bootstrap;
-mod intent;
-mod prompt;
-mod prompts;
-mod tmux;
+mod client;
 mod cognitive;
+mod config;
 mod docs;
 mod environ;
+mod eval;
+mod git;
 mod github;
-mod server;
+mod intake;
+mod intent;
+mod models;
 mod orchestrator;
 mod orchestrator_server;
-mod intake;
-mod benchmark;
+mod project;
+mod prompt;
+mod prompts;
+mod server;
+mod session;
+mod skills;
+mod telemetry;
+mod tmux;
+mod tools;
+mod traces;
+mod ui;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -132,7 +132,8 @@ fn parse_args() -> Command {
 
     // Check for benchmark command
     if args.first().map(|s| s.as_str()) == Some("benchmark") {
-        let model = args.iter()
+        let model = args
+            .iter()
             .position(|a| a == "--model" || a == "-m")
             .and_then(|i| args.get(i + 1))
             .cloned();
@@ -140,17 +141,19 @@ fn parse_args() -> Command {
     }
 
     if args.first().map(|s| s.as_str()) == Some("config")
-        && args.get(1).map(|s| s.as_str()) == Some("set") {
-            return Command::ConfigSet {
-                key: args.get(2).cloned().unwrap_or_default(),
-                value: args.get(3).cloned().unwrap_or_default(),
-            };
-        }
+        && args.get(1).map(|s| s.as_str()) == Some("set")
+    {
+        return Command::ConfigSet {
+            key: args.get(2).cloned().unwrap_or_default(),
+            value: args.get(3).cloned().unwrap_or_default(),
+        };
+    }
 
     // Check for --backburner flag
     if args.iter().any(|a| a == "--backburner" || a == "-b") {
         let watch_docs = args.iter().any(|a| a == "--watch-docs");
-        let paths: Vec<PathBuf> = args.iter()
+        let paths: Vec<PathBuf> = args
+            .iter()
             .filter(|a| !a.starts_with('-'))
             .map(PathBuf::from)
             .collect();
@@ -159,7 +162,8 @@ fn parse_args() -> Command {
 
     // Check for --serve flag
     if args.iter().any(|a| a == "--serve" || a == "-s") {
-        let port = args.iter()
+        let port = args
+            .iter()
             .position(|a| a == "--serve" || a == "-s")
             .and_then(|i| args.get(i + 1))
             .and_then(|p| p.parse().ok())
@@ -169,13 +173,15 @@ fn parse_args() -> Command {
 
     // Check for orchestrate command
     if args.first().map(|s| s.as_str()) == Some("orchestrate") {
-        let port = args.iter()
+        let port = args
+            .iter()
             .position(|a| a == "--port" || a == "-p")
             .and_then(|i| args.get(i + 1))
             .and_then(|p| p.parse().ok())
             .unwrap_or(8421);
 
-        let projects_root = args.iter()
+        let projects_root = args
+            .iter()
             .position(|a| a == "--root" || a == "-r")
             .and_then(|i| args.get(i + 1))
             .map(PathBuf::from)
@@ -185,13 +191,18 @@ fn parse_args() -> Command {
                     .unwrap_or_else(|| PathBuf::from("/tmp/hyle-projects"))
             });
 
-        let domain = args.iter()
+        let domain = args
+            .iter()
             .position(|a| a == "--domain" || a == "-d")
             .and_then(|i| args.get(i + 1))
             .cloned()
             .unwrap_or_else(|| "hyperstitious.org".into());
 
-        return Command::Orchestrate { port, projects_root, domain };
+        return Command::Orchestrate {
+            port,
+            projects_root,
+            domain,
+        };
     }
 
     // Parse flags and paths
@@ -245,14 +256,25 @@ fn parse_args() -> Command {
     }
 
     if let Some(task_str) = task {
-        Command::Task { task: task_str, paths }
+        Command::Task {
+            task: task_str,
+            paths,
+        }
     } else {
-        Command::Interactive { free_only, nonfree_only, model, paths, resume, handoff }
+        Command::Interactive {
+            free_only,
+            nonfree_only,
+            model,
+            paths,
+            resume,
+            handoff,
+        }
     }
 }
 
 fn print_help() {
-    println!(r#"hyle - Rust-native code assistant (OpenRouter powered)
+    println!(
+        r#"hyle - Rust-native code assistant (OpenRouter powered)
 
 USAGE:
     hyle                          # resume last session (or start new)
@@ -317,7 +339,8 @@ BACKBURNER MODE:
     - Dependency audit suggestions
     - Code quality hints
     Send SIGINT/SIGTERM to stop gracefully.
-"#);
+"#
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -345,18 +368,10 @@ async fn run_command() -> Result<()> {
             print_help();
             Ok(())
         }
-        Command::Doctor => {
-            run_doctor().await
-        }
-        Command::Models { refresh } => {
-            run_models(refresh).await
-        }
-        Command::Sessions { list, clean } => {
-            run_sessions(list, clean)
-        }
-        Command::ConfigSet { key, value } => {
-            run_config_set(&key, &value)
-        }
+        Command::Doctor => run_doctor().await,
+        Command::Models { refresh } => run_models(refresh).await,
+        Command::Sessions { list, clean } => run_sessions(list, clean),
+        Command::ConfigSet { key, value } => run_config_set(&key, &value),
         Command::Task { task, paths } => {
             tmux::set_status("task");
             let result = run_task(&task, &paths).await;
@@ -371,7 +386,11 @@ async fn run_command() -> Result<()> {
             tmux::set_status("serve");
             server::run_server(port).await
         }
-        Command::Orchestrate { port, projects_root, domain } => {
+        Command::Orchestrate {
+            port,
+            projects_root,
+            domain,
+        } => {
             tmux::set_status("orch");
             orchestrator_server::run_orchestrator(port, projects_root, domain).await
         }
@@ -379,9 +398,14 @@ async fn run_command() -> Result<()> {
             tmux::set_status("bench");
             run_benchmark(model.as_deref()).await
         }
-        Command::Interactive { free_only, nonfree_only, model, paths, resume, handoff } => {
-            run_interactive(free_only, nonfree_only, model, paths, resume, handoff).await
-        }
+        Command::Interactive {
+            free_only,
+            nonfree_only,
+            model,
+            paths,
+            resume,
+            handoff,
+        } => run_interactive(free_only, nonfree_only, model, paths, resume, handoff).await,
     }
 }
 
@@ -394,14 +418,16 @@ async fn run_doctor() -> Result<()> {
 
     // Check config
     let cfg = config::Config::load()?;
-    println!("[{}] Config: {}",
+    println!(
+        "[{}] Config: {}",
         if cfg.api_key.is_some() { "✓" } else { "✗" },
         config::config_path()?.display()
     );
 
     // Check API key
     let has_key = cfg.api_key.is_some() || std::env::var("OPENROUTER_API_KEY").is_ok();
-    println!("[{}] API key: {}",
+    println!(
+        "[{}] API key: {}",
         if has_key { "✓" } else { "✗" },
         if has_key { "configured" } else { "missing" }
     );
@@ -409,7 +435,8 @@ async fn run_doctor() -> Result<()> {
     // Check models cache
     let models_path = config::cache_dir()?.join("models.json");
     let models_ok = models_path.exists();
-    println!("[{}] Models cache: {}",
+    println!(
+        "[{}] Models cache: {}",
         if models_ok { "✓" } else { "✗" },
         models_path.display()
     );
@@ -418,18 +445,28 @@ async fn run_doctor() -> Result<()> {
     let in_tmux = tmux::is_tmux();
     let width = tmux::term_width();
     let wide = tmux::is_wide();
-    println!("[{}] Tmux: {} ({}cols, {})",
+    println!(
+        "[{}] Tmux: {} ({}cols, {})",
         if in_tmux { "✓" } else { "○" },
         if in_tmux { "detected" } else { "not in tmux" },
         width,
-        if wide { "wide layout available" } else { "narrow" }
+        if wide {
+            "wide layout available"
+        } else {
+            "narrow"
+        }
     );
 
     // Check project
     let cwd = std::env::current_dir()?;
     if let Some(p) = project::Project::detect(&cwd) {
-        println!("[✓] Project: {} ({:?}, {} files, {} lines)",
-            p.name, p.project_type, p.files.len(), p.total_lines());
+        println!(
+            "[✓] Project: {} ({:?}, {} files, {} lines)",
+            p.name,
+            p.project_type,
+            p.files.len(),
+            p.total_lines()
+        );
     } else {
         println!("[○] Project: not detected");
     }
@@ -493,7 +530,8 @@ fn run_sessions(_list: bool, clean: bool) -> Result<()> {
             format!("{}d ago", age.num_days())
         };
 
-        println!("  {} | {} | {} msgs | {} tokens | {}",
+        println!(
+            "  {} | {} | {} msgs | {} tokens | {}",
             s.id,
             s.model.split('/').next_back().unwrap_or(&s.model),
             s.message_count,
@@ -573,42 +611,54 @@ async fn run_task(task: &str, paths: &[PathBuf]) -> Result<()> {
     // Run agent with event printing
     let agent = AgentCore::new(&api_key, &model, &work_dir);
 
-    let result = agent.run_with_callback(&prompt, |event| {
-        match event {
-            AgentEvent::Token(t) => {
-                print!("{}", t);
-                let _ = std::io::stdout().flush();
-            }
-            AgentEvent::Status(s) => {
-                println!("\n[{}]", s);
-            }
-            AgentEvent::ToolExecuting { name, args: _ } => {
-                println!("\n  → {}", name);
-            }
-            AgentEvent::ToolResult { name, success, output } => {
-                let icon = if *success { "✓" } else { "✗" };
-                println!("  {} {}", icon, name);
-                // Show first few lines of output
-                for line in output.lines().take(3) {
-                    println!("    {}", line);
+    let result = agent
+        .run_with_callback(&prompt, |event| {
+            match event {
+                AgentEvent::Token(t) => {
+                    print!("{}", t);
+                    let _ = std::io::stdout().flush();
                 }
-                if output.lines().count() > 3 {
-                    println!("    ...");
+                AgentEvent::Status(s) => {
+                    println!("\n[{}]", s);
                 }
+                AgentEvent::ToolExecuting { name, args: _ } => {
+                    println!("\n  → {}", name);
+                }
+                AgentEvent::ToolResult {
+                    name,
+                    success,
+                    output,
+                } => {
+                    let icon = if *success { "✓" } else { "✗" };
+                    println!("  {} {}", icon, name);
+                    // Show first few lines of output
+                    for line in output.lines().take(3) {
+                        println!("    {}", line);
+                    }
+                    if output.lines().count() > 3 {
+                        println!("    ...");
+                    }
+                }
+                AgentEvent::IterationComplete {
+                    iteration,
+                    tool_count,
+                } => {
+                    println!("\n─── Iteration {} ({} tools) ───\n", iteration, tool_count);
+                }
+                AgentEvent::Complete {
+                    iterations,
+                    success,
+                } => {
+                    let status = if *success { "completed" } else { "stopped" };
+                    println!("\n\n[Agent {} after {} iterations]", status, iterations);
+                }
+                AgentEvent::Error(e) => {
+                    eprintln!("\n[Error: {}]", e);
+                }
+                AgentEvent::ToolCallsParsed(_) => {}
             }
-            AgentEvent::IterationComplete { iteration, tool_count } => {
-                println!("\n─── Iteration {} ({} tools) ───\n", iteration, tool_count);
-            }
-            AgentEvent::Complete { iterations, success } => {
-                let status = if *success { "completed" } else { "stopped" };
-                println!("\n\n[Agent {} after {} iterations]", status, iterations);
-            }
-            AgentEvent::Error(e) => {
-                eprintln!("\n[Error: {}]", e);
-            }
-            AgentEvent::ToolCallsParsed(_) => {}
-        }
-    }).await;
+        })
+        .await;
 
     if result.success {
         println!("\nTask completed successfully.");
@@ -616,7 +666,10 @@ async fn run_task(task: &str, paths: &[PathBuf]) -> Result<()> {
         println!("\nTask failed: {}", err);
     }
 
-    println!("[{} iterations, {} tool calls]", result.iterations, result.tool_calls_executed);
+    println!(
+        "[{} iterations, {} tool calls]",
+        result.iterations, result.tool_calls_executed
+    );
 
     Ok(())
 }
@@ -649,7 +702,12 @@ async fn run_interactive(
     let cwd_str = cwd.display().to_string();
     let project = project::Project::detect(&cwd);
     if let Some(ref p) = project {
-        println!("Project: {} ({:?}, {} files)", p.name, p.project_type, p.files.len());
+        println!(
+            "Project: {} ({:?}, {} files)",
+            p.name,
+            p.project_type,
+            p.files.len()
+        );
     }
 
     // Check for Claude Code session context
@@ -694,7 +752,7 @@ async fn run_interactive(
                 println!("  → Importing {} recent prompts as context", msgs.len());
                 Some(msgs)
             }
-            _ => None
+            _ => None,
         }
     } else {
         None
@@ -731,7 +789,15 @@ async fn run_interactive(
     println!("Using model: {}", selected_model);
 
     // Run TUI with session, project context, and optional Claude import
-    ui::run_tui(&api_key, &selected_model, paths, resume, project, claude_context).await
+    ui::run_tui(
+        &api_key,
+        &selected_model,
+        paths,
+        resume,
+        project,
+        claude_context,
+    )
+    .await
 }
 
 async fn run_benchmark(model: Option<&str>) -> Result<()> {
@@ -754,11 +820,16 @@ async fn run_benchmark(model: Option<&str>) -> Result<()> {
     println!("BENCHMARK RESULTS: {}", model_id);
     println!("{}", "═".repeat(60));
     println!();
-    println!("Overall Score: {:.1} (Grade: {})", profile.total_score, profile.grade());
+    println!(
+        "Overall Score: {:.1} (Grade: {})",
+        profile.total_score,
+        profile.grade()
+    );
     println!();
     println!("Detailed Scores:");
     for score in &profile.scores {
-        println!("  {:30} {:.2}  (rel:{:.0}% prec:{:.0}% comp:{:.0}% eff:{:.0}%)",
+        println!(
+            "  {:30} {:.2}  (rel:{:.0}% prec:{:.0}% comp:{:.0}% eff:{:.0}%)",
             score.prompt_id,
             score.weighted_score,
             score.relevance * 100.0,

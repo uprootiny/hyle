@@ -73,21 +73,37 @@ impl EnvironmentMap {
 
         // Resources
         out.push_str("\n▸ Resources\n");
-        out.push_str(&format!("  memory: {}% used\n", self.resources.memory_percent));
+        out.push_str(&format!(
+            "  memory: {}% used\n",
+            self.resources.memory_percent
+        ));
         out.push_str(&format!("  disk: {}% used\n", self.resources.disk_percent));
         out.push_str(&format!("  load: {:.1}\n", self.resources.load_avg));
 
         // Access
         out.push_str("\n▸ Access\n");
         out.push_str(&format!("  ssh keys: {}\n", self.access.ssh_keys.len()));
-        out.push_str(&format!("  gh auth: {}\n", if self.access.gh_authenticated { "yes" } else { "no" }));
+        out.push_str(&format!(
+            "  gh auth: {}\n",
+            if self.access.gh_authenticated {
+                "yes"
+            } else {
+                "no"
+            }
+        ));
         if !self.access.known_hosts.is_empty() {
-            out.push_str(&format!("  known hosts: {}\n", self.access.known_hosts.len()));
+            out.push_str(&format!(
+                "  known hosts: {}\n",
+                self.access.known_hosts.len()
+            ));
         }
 
         // Activity
         out.push_str("\n▸ Recent Activity\n");
-        out.push_str(&format!("  hyle sessions: {}\n", self.activity.session_count));
+        out.push_str(&format!(
+            "  hyle sessions: {}\n",
+            self.activity.session_count
+        ));
         if !self.activity.recent_files.is_empty() {
             out.push_str("  recent files:\n");
             for f in self.activity.recent_files.iter().take(5) {
@@ -334,7 +350,8 @@ impl SystemResources {
             .ok()
             .and_then(|o| {
                 let output = String::from_utf8_lossy(&o.stdout);
-                output.lines()
+                output
+                    .lines()
                     .nth(1)?
                     .trim()
                     .trim_end_matches('%')
@@ -399,7 +416,8 @@ impl AccessMap {
         std::fs::read_to_string(known_hosts)
             .ok()
             .map(|content| {
-                content.lines()
+                content
+                    .lines()
                     .filter_map(|line| {
                         // Format: hostname,ip key-type key comment
                         line.split_whitespace()
@@ -439,7 +457,9 @@ impl RecentActivity {
     fn get_recent_files() -> Vec<String> {
         // Get recently modified files in current directory
         Command::new("find")
-            .args([".", "-type", "f", "-mmin", "-60", "-not", "-path", "./.git/*"])
+            .args([
+                ".", "-type", "f", "-mmin", "-60", "-not", "-path", "./.git/*",
+            ])
             .output()
             .ok()
             .map(|o| {

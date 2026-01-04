@@ -4,8 +4,8 @@
 
 #![allow(dead_code)] // Forward-looking module for LLM integration
 
-use crate::project::Project;
 use crate::intent::IntentStack;
+use crate::project::Project;
 
 // ═══════════════════════════════════════════════════════════════
 // SYSTEM PROMPT BUILDER
@@ -116,7 +116,8 @@ You communicate concisely and act decisively. When asked to do something, do it 
 
         section.push_str(&format!("Name: {}\n", project.name));
         section.push_str(&format!("Type: {:?}\n", project.project_type));
-        section.push_str(&format!("Files: {} ({} lines)\n",
+        section.push_str(&format!(
+            "Files: {} ({} lines)\n",
             project.files.len(),
             project.total_lines()
         ));
@@ -127,7 +128,10 @@ You communicate concisely and act decisively. When asked to do something, do it 
             section.push_str(&format!("  {} ({} lines)\n", file.relative, file.lines));
         }
         if project.files.len() > 20 {
-            section.push_str(&format!("  ... and {} more files\n", project.files.len() - 20));
+            section.push_str(&format!(
+                "  ... and {} more files\n",
+                project.files.len() - 20
+            ));
         }
 
         section.push_str("</project>\n\n");
@@ -173,7 +177,8 @@ Quality:
 - Add tests for new functionality
 - Follow existing project conventions
 </guidelines>
-"#.to_string()
+"#
+        .to_string()
     }
 }
 
@@ -224,9 +229,7 @@ pub fn minimal_prompt() -> String {
 
 /// Build a project-aware system prompt
 pub fn project_prompt(project: &Project) -> String {
-    SystemPrompt::new()
-        .with_project(project.clone())
-        .build()
+    SystemPrompt::new().with_project(project.clone()).build()
 }
 
 /// Build a full context-aware prompt
@@ -278,9 +281,7 @@ mod tests {
         intents.set_primary("Build feature X");
         intents.push_subtask("Add tests");
 
-        let prompt = SystemPrompt::new()
-            .with_intents(intents)
-            .build();
+        let prompt = SystemPrompt::new().with_intents(intents).build();
 
         assert!(prompt.contains("<intent>"));
         assert!(prompt.contains("Build feature X"));

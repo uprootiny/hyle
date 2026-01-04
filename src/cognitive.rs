@@ -37,9 +37,9 @@ pub struct CognitiveConfig {
     pub executor_model: String,
     pub summarizer_model: String,
     pub sanity_model: String,
-    pub sanity_interval: u8,         // Check every N iterations
-    pub context_budget: usize,       // Max tokens for context
-    pub summary_trigger: usize,      // Compress after N messages
+    pub sanity_interval: u8,    // Check every N iterations
+    pub context_budget: usize,  // Max tokens for context
+    pub summary_trigger: usize, // Compress after N messages
 }
 
 impl Default for CognitiveConfig {
@@ -103,17 +103,17 @@ pub struct Fact {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FactCategory {
-    UserIntent,      // What user wants
-    FileState,       // State of a file
-    Error,           // An error that occurred
-    Decision,        // A decision that was made
-    Constraint,      // A constraint or requirement
+    UserIntent, // What user wants
+    FileState,  // State of a file
+    Error,      // An error that occurred
+    Decision,   // A decision that was made
+    Constraint, // A constraint or requirement
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Progress {
     pub iteration: u32,
-    pub estimated_completion: f32,  // 0.0 to 1.0
+    pub estimated_completion: f32, // 0.0 to 1.0
     pub momentum: Momentum,
     pub stuck_detector: StuckDetector,
 }
@@ -141,7 +141,7 @@ impl Default for Momentum {
 pub struct ToolOutcome {
     pub tool_name: String,
     pub success: bool,
-    pub was_useful: bool,  // Did it provide useful information?
+    pub was_useful: bool, // Did it provide useful information?
 }
 
 impl Momentum {
@@ -179,7 +179,7 @@ impl Momentum {
 
 #[derive(Debug, Clone, Default)]
 pub struct StuckDetector {
-    recent_actions: VecDeque<u64>,  // Hashes of recent actions
+    recent_actions: VecDeque<u64>, // Hashes of recent actions
     error_counts: std::collections::HashMap<String, u8>,
     no_change_count: u8,
 }
@@ -233,7 +233,11 @@ impl StuckDetector {
             return false;
         }
         let last = self.recent_actions.back();
-        let count = self.recent_actions.iter().filter(|&h| Some(h) == last).count();
+        let count = self
+            .recent_actions
+            .iter()
+            .filter(|&h| Some(h) == last)
+            .count();
         count >= threshold
     }
 
@@ -276,12 +280,12 @@ impl Default for SanityResult {
 /// Triggers for running a sanity check
 #[derive(Debug, Clone)]
 pub enum SanityTrigger {
-    Interval(u32),           // Every N iterations
-    ToolFailure,             // After any tool fails
-    LargeOutput(usize),      // Output exceeded N chars
-    ContextThreshold,        // Context approaching limit
-    MomentumDrop,            // Momentum fell below threshold
-    Explicit,                // User requested via /sanity
+    Interval(u32),      // Every N iterations
+    ToolFailure,        // After any tool fails
+    LargeOutput(usize), // Output exceeded N chars
+    ContextThreshold,   // Context approaching limit
+    MomentumDrop,       // Momentum fell below threshold
+    Explicit,           // User requested via /sanity
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -294,7 +298,10 @@ pub enum LoopDecision {
     Continue,
 
     /// Pause for user confirmation (risky operation)
-    ConfirmRisk { operation: String, risk_level: ToolRisk },
+    ConfirmRisk {
+        operation: String,
+        risk_level: ToolRisk,
+    },
 
     /// Pause because something seems wrong
     PauseConcern { reason: String },
@@ -303,7 +310,10 @@ pub enum LoopDecision {
     Complete { summary: String },
 
     /// Agent is stuck
-    Stuck { reason: String, suggestions: Vec<String> },
+    Stuck {
+        reason: String,
+        suggestions: Vec<String>,
+    },
 
     /// Need user input
     NeedInput { question: String },
@@ -317,10 +327,10 @@ pub enum LoopDecision {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ToolRisk {
-    Safe,       // read, glob, grep
-    Cautious,   // write, edit (reversible)
-    Confirm,    // delete, move, shell commands
-    Dangerous,  // sudo, force flags, etc.
+    Safe,      // read, glob, grep
+    Cautious,  // write, edit (reversible)
+    Confirm,   // delete, move, shell commands
+    Dangerous, // sudo, force flags, etc.
 }
 
 impl ToolRisk {
@@ -333,7 +343,8 @@ impl ToolRisk {
                 let lower = args.to_lowercase();
                 if lower.contains("sudo") || lower.contains("--force") || lower.contains("-rf") {
                     ToolRisk::Dangerous
-                } else if lower.contains("rm ") || lower.contains("mv ") || lower.contains("chmod") {
+                } else if lower.contains("rm ") || lower.contains("mv ") || lower.contains("chmod")
+                {
                     ToolRisk::Confirm
                 } else {
                     ToolRisk::Cautious
@@ -349,7 +360,8 @@ impl ToolRisk {
 // ═══════════════════════════════════════════════════════════════
 
 pub fn summarizer_prompt(exchange: &str) -> String {
-    format!(r#"Summarize this exchange concisely. Extract:
+    format!(
+        r#"Summarize this exchange concisely. Extract:
 1. What was attempted
 2. What succeeded or failed
 3. Key facts learned
@@ -362,11 +374,14 @@ Respond in this format:
 SUMMARY: <one sentence>
 ACTIONS: <bullet list>
 FACTS: <bullet list>
-FILES: <comma-separated list>"#, exchange)
+FILES: <comma-separated list>"#,
+        exchange
+    )
 }
 
 pub fn sanity_check_prompt(goal: &str, actions: &[String], current_state: &str) -> String {
-    format!(r#"You are a sanity checker. Analyze if this agent is on track.
+    format!(
+        r#"You are a sanity checker. Analyze if this agent is on track.
 
 GOAL: {}
 
@@ -386,7 +401,11 @@ Respond in JSON:
   "should_pause": true/false
 }}"#,
         goal,
-        actions.iter().map(|a| format!("- {}", a)).collect::<Vec<_>>().join("\n"),
+        actions
+            .iter()
+            .map(|a| format!("- {}", a))
+            .collect::<Vec<_>>()
+            .join("\n"),
         current_state
     )
 }
@@ -415,7 +434,8 @@ pub fn continuation_prompt(
     }
 
     // Some failures
-    let failures: Vec<_> = tool_results.iter()
+    let failures: Vec<_> = tool_results
+        .iter()
         .filter(|r| !r.success)
         .map(|r| r.tool_name.as_str())
         .collect();
@@ -477,7 +497,8 @@ impl ContextLayers {
         if !self.facts.is_empty() {
             let facts_section = format!(
                 "<facts>\n{}\n</facts>\n",
-                self.facts.iter()
+                self.facts
+                    .iter()
                     .map(|f| format!("- [{:?}] {}", f.category, f.content))
                     .collect::<Vec<_>>()
                     .join("\n")
@@ -533,7 +554,9 @@ impl ContextLayers {
     /// Record a fact
     pub fn add_fact(&mut self, fact: Fact) {
         // Deduplicate or update existing facts
-        if let Some(existing) = self.facts.iter_mut()
+        if let Some(existing) = self
+            .facts
+            .iter_mut()
             .find(|f| f.category == fact.category && similar(&f.content, &fact.content))
         {
             if fact.confidence > existing.confidence {
@@ -556,7 +579,9 @@ fn similar(a: &str, b: &str) -> bool {
     let b_words: std::collections::HashSet<_> = b.split_whitespace().collect();
     let intersection = a_words.intersection(&b_words).count();
     let union = a_words.union(&b_words).count();
-    if union == 0 { return true; }
+    if union == 0 {
+        return true;
+    }
     (intersection as f32 / union as f32) > 0.5
 }
 
@@ -582,7 +607,7 @@ pub enum SalienceTier {
 pub struct ScoredContext {
     pub content: String,
     pub tier: SalienceTier,
-    pub score: f32,           // 0.0 to 1.0, higher = more salient
+    pub score: f32, // 0.0 to 1.0, higher = more salient
     pub tokens: usize,
     pub category: ContextCategory,
 }
@@ -608,7 +633,7 @@ impl ContextCategory {
         match self {
             ContextCategory::SystemPrompt => 1.0,
             ContextCategory::UserMessage => 0.9,
-            ContextCategory::Error => 0.95,       // Errors are very salient
+            ContextCategory::Error => 0.95, // Errors are very salient
             ContextCategory::Intent => 0.85,
             ContextCategory::ToolResult => 0.8,
             ContextCategory::ToolCall => 0.7,
@@ -716,7 +741,12 @@ impl SalienceContext {
     }
 
     /// Add with explicit tier override
-    pub fn add_with_tier(&mut self, content: String, category: ContextCategory, tier: SalienceTier) {
+    pub fn add_with_tier(
+        &mut self,
+        content: String,
+        category: ContextCategory,
+        tier: SalienceTier,
+    ) {
         let tokens = estimate_tokens(&content);
         let score = match tier {
             SalienceTier::Focus => 1.0,
@@ -741,7 +771,9 @@ impl SalienceContext {
         let keyword_match = if self.current_keywords.is_empty() {
             0.0
         } else {
-            let matches = self.current_keywords.iter()
+            let matches = self
+                .current_keywords
+                .iter()
                 .filter(|kw| content_lower.contains(&kw.to_lowercase()))
                 .count();
             (matches as f32 / self.current_keywords.len() as f32).min(1.0)
@@ -751,23 +783,25 @@ impl SalienceContext {
         let file_relevance = if self.focus_files.is_empty() {
             0.0
         } else {
-            let matches = self.focus_files.iter()
+            let matches = self
+                .focus_files
+                .iter()
                 .filter(|f| content.contains(f.as_str()))
                 .count();
             (matches as f32 / self.focus_files.len() as f32).min(1.0)
         };
 
         // Error detection
-        let has_error = content_lower.contains("error") ||
-                       content_lower.contains("failed") ||
-                       content_lower.contains("exception") ||
-                       content_lower.contains("panic");
+        let has_error = content_lower.contains("error")
+            || content_lower.contains("failed")
+            || content_lower.contains("exception")
+            || content_lower.contains("panic");
 
         // Decision detection
-        let has_decision = content_lower.contains("decided") ||
-                          content_lower.contains("will ") ||
-                          content_lower.contains("should ") ||
-                          content_lower.contains("let's ");
+        let has_decision = content_lower.contains("decided")
+            || content_lower.contains("will ")
+            || content_lower.contains("should ")
+            || content_lower.contains("let's ");
 
         SalienceFactors {
             age,
@@ -798,13 +832,12 @@ impl SalienceContext {
 
         // Sort by tier (highest first), then by score within tier
         let mut sorted: Vec<_> = self.items.iter().collect();
-        sorted.sort_by(|a, b| {
-            match b.tier.cmp(&a.tier) {
-                std::cmp::Ordering::Equal => {
-                    b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
-                }
-                other => other,
-            }
+        sorted.sort_by(|a, b| match b.tier.cmp(&a.tier) {
+            std::cmp::Ordering::Equal => b
+                .score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal),
+            other => other,
         });
 
         // Allocate budget by tier
@@ -870,12 +903,13 @@ impl SalienceContext {
         // Find lines with important markers
         for line in &lines[1..] {
             let lower = line.to_lowercase();
-            if lower.contains("error") ||
-               lower.contains("success") ||
-               lower.contains("result:") ||
-               lower.contains("file:") ||
-               line.starts_with("- ") ||
-               line.starts_with("* ") {
+            if lower.contains("error")
+                || lower.contains("success")
+                || lower.contains("result:")
+                || lower.contains("file:")
+                || line.starts_with("- ")
+                || line.starts_with("* ")
+            {
                 kept.push(line.to_string());
                 if estimate_tokens(&kept.join("\n")) >= target_tokens {
                     break;
@@ -925,7 +959,9 @@ pub struct ContextStats {
 
 impl std::fmt::Display for ContextStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Context: {} items, {} tokens ({:.0}% budget), focus:{} recent:{} summary:{} bg:{}",
+        write!(
+            f,
+            "Context: {} items, {} tokens ({:.0}% budget), focus:{} recent:{} summary:{} bg:{}",
             self.total_items,
             self.total_tokens,
             self.budget_used * 100.0,
@@ -940,21 +976,20 @@ impl std::fmt::Display for ContextStats {
 /// Extract keywords from user intent for salience matching
 pub fn extract_keywords(text: &str) -> Vec<String> {
     let stopwords: std::collections::HashSet<&str> = [
-        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-        "have", "has", "had", "do", "does", "did", "will", "would", "could",
-        "should", "may", "might", "must", "shall", "can", "need", "dare",
-        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
-        "into", "through", "during", "before", "after", "above", "below",
-        "between", "under", "again", "further", "then", "once", "here",
-        "there", "when", "where", "why", "how", "all", "each", "few",
-        "more", "most", "other", "some", "such", "no", "nor", "not",
-        "only", "own", "same", "so", "than", "too", "very", "just",
-        "and", "but", "if", "or", "because", "until", "while", "this",
-        "that", "these", "those", "what", "which", "who", "whom",
-        "i", "you", "he", "she", "it", "we", "they", "me", "him", "her",
-        "us", "them", "my", "your", "his", "its", "our", "their",
-        "please", "help", "want", "like", "make", "get", "let",
-    ].iter().cloned().collect();
+        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "shall",
+        "can", "need", "dare", "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
+        "into", "through", "during", "before", "after", "above", "below", "between", "under",
+        "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all",
+        "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own",
+        "same", "so", "than", "too", "very", "just", "and", "but", "if", "or", "because", "until",
+        "while", "this", "that", "these", "those", "what", "which", "who", "whom", "i", "you",
+        "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", "my", "your", "his",
+        "its", "our", "their", "please", "help", "want", "like", "make", "get", "let",
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric() && c != '_')
@@ -976,11 +1011,23 @@ mod tests {
         let mut m = Momentum::default();
         assert_eq!(m.score(), 1.0);
 
-        m.record(ToolOutcome { tool_name: "read".into(), success: true, was_useful: true });
-        m.record(ToolOutcome { tool_name: "read".into(), success: true, was_useful: true });
+        m.record(ToolOutcome {
+            tool_name: "read".into(),
+            success: true,
+            was_useful: true,
+        });
+        m.record(ToolOutcome {
+            tool_name: "read".into(),
+            success: true,
+            was_useful: true,
+        });
         assert_eq!(m.score(), 1.0);
 
-        m.record(ToolOutcome { tool_name: "write".into(), success: false, was_useful: false });
+        m.record(ToolOutcome {
+            tool_name: "write".into(),
+            success: false,
+            was_useful: false,
+        });
         assert!(m.score() < 1.0);
     }
 
@@ -999,8 +1046,14 @@ mod tests {
     #[test]
     fn test_tool_risk() {
         assert_eq!(ToolRisk::from_tool_call("read", "file.txt"), ToolRisk::Safe);
-        assert_eq!(ToolRisk::from_tool_call("bash", "ls -la"), ToolRisk::Cautious);
-        assert_eq!(ToolRisk::from_tool_call("bash", "rm -rf /"), ToolRisk::Dangerous);
+        assert_eq!(
+            ToolRisk::from_tool_call("bash", "ls -la"),
+            ToolRisk::Cautious
+        );
+        assert_eq!(
+            ToolRisk::from_tool_call("bash", "rm -rf /"),
+            ToolRisk::Dangerous
+        );
     }
 
     #[test]
@@ -1028,13 +1081,22 @@ mod tests {
 
     #[test]
     fn test_salience_age_decay() {
-        let young = SalienceFactors { age: 0, ..Default::default() };
-        let old = SalienceFactors { age: 10, ..Default::default() };
+        let young = SalienceFactors {
+            age: 0,
+            ..Default::default()
+        };
+        let old = SalienceFactors {
+            age: 10,
+            ..Default::default()
+        };
 
         let young_score = young.score(ContextCategory::UserMessage);
         let old_score = old.score(ContextCategory::UserMessage);
 
-        assert!(young_score > old_score, "Older content should have lower salience");
+        assert!(
+            young_score > old_score,
+            "Older content should have lower salience"
+        );
     }
 
     #[test]
@@ -1042,8 +1104,16 @@ mod tests {
         let mut ctx = SalienceContext::new(1000);
         ctx.set_keywords(vec!["auth".into(), "login".into()]);
 
-        ctx.add("User message about auth".into(), ContextCategory::UserMessage, 0);
-        ctx.add("Old unrelated message".into(), ContextCategory::UserMessage, 5);
+        ctx.add(
+            "User message about auth".into(),
+            ContextCategory::UserMessage,
+            0,
+        );
+        ctx.add(
+            "Old unrelated message".into(),
+            ContextCategory::UserMessage,
+            5,
+        );
         ctx.add("Error in login module".into(), ContextCategory::Error, 1);
 
         let stats = ctx.stats();

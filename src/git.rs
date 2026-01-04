@@ -61,14 +61,16 @@ impl GitStatus {
 
     /// Get all untracked files
     pub fn untracked(&self) -> Vec<&FileChange> {
-        self.changes.iter()
+        self.changes
+            .iter()
             .filter(|c| c.status == FileStatus::Untracked)
             .collect()
     }
 
     /// Get modified (non-untracked) unstaged changes
     pub fn modified_unstaged(&self) -> Vec<&FileChange> {
-        self.changes.iter()
+        self.changes
+            .iter()
             .filter(|c| !c.staged && c.status != FileStatus::Untracked)
             .collect()
     }
@@ -100,13 +102,13 @@ impl GitStatus {
 
 /// Check if a directory is a git repository
 pub fn is_git_repo(path: &Path) -> bool {
-    path.join(".git").exists() ||
-    Command::new("git")
-        .args(["rev-parse", "--git-dir"])
-        .current_dir(path)
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+    path.join(".git").exists()
+        || Command::new("git")
+            .args(["rev-parse", "--git-dir"])
+            .current_dir(path)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
 }
 
 /// Parse git status output
@@ -286,7 +288,10 @@ pub fn validate_commit_message(msg: &str) -> MessageValidation {
 
     // Subject line checks
     if subject.len() > 72 {
-        result.warn(&format!("Subject line too long ({} chars, max 72)", subject.len()));
+        result.warn(&format!(
+            "Subject line too long ({} chars, max 72)",
+            subject.len()
+        ));
     }
 
     if subject.len() < 10 {
@@ -299,13 +304,29 @@ pub fn validate_commit_message(msg: &str) -> MessageValidation {
     }
 
     // Should start with capital letter
-    if subject.chars().next().map(|c| c.is_lowercase()).unwrap_or(false) {
+    if subject
+        .chars()
+        .next()
+        .map(|c| c.is_lowercase())
+        .unwrap_or(false)
+    {
         result.warn("Subject should start with a capital letter");
     }
 
     // Check for imperative mood (common non-imperative starters)
-    let non_imperative = ["added", "fixed", "updated", "removed", "changed", "implemented"];
-    let first_word = subject.split_whitespace().next().unwrap_or("").to_lowercase();
+    let non_imperative = [
+        "added",
+        "fixed",
+        "updated",
+        "removed",
+        "changed",
+        "implemented",
+    ];
+    let first_word = subject
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .to_lowercase();
     if non_imperative.contains(&first_word.as_str()) {
         result.warn("Use imperative mood (e.g., 'Add' instead of 'Added')");
     }
@@ -316,10 +337,9 @@ pub fn validate_commit_message(msg: &str) -> MessageValidation {
     }
 
     // Body checks
-    if lines.len() > 1
-        && !lines[1].is_empty() {
-            result.warn("Second line should be blank (separates subject from body)");
-        }
+    if lines.len() > 1 && !lines[1].is_empty() {
+        result.warn("Second line should be blank (separates subject from body)");
+    }
 
     result
 }
@@ -393,7 +413,8 @@ pub fn commit(work_dir: &Path, message: &str) -> Result<String> {
 
     // Extract commit hash from output
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let hash = stdout.split_whitespace()
+    let hash = stdout
+        .split_whitespace()
         .find(|s| s.len() >= 7 && s.chars().all(|c| c.is_ascii_hexdigit()))
         .unwrap_or("unknown")
         .to_string();

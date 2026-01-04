@@ -78,14 +78,8 @@ pub fn get_repo_info(work_dir: &Path) -> Result<(String, String)> {
     }
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-    let owner = json["owner"]["login"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
-    let name = json["name"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
+    let owner = json["owner"]["login"].as_str().unwrap_or("").to_string();
+    let name = json["name"].as_str().unwrap_or("").to_string();
 
     Ok((owner, name))
 }
@@ -98,10 +92,14 @@ pub fn get_repo_info(work_dir: &Path) -> Result<(String, String)> {
 pub fn list_prs(work_dir: &Path, state: &str, limit: usize) -> Result<Vec<PullRequest>> {
     let output = Command::new("gh")
         .args([
-            "pr", "list",
-            "--state", state,
-            "--limit", &limit.to_string(),
-            "--json", "number,title,state,author,headRefName,url,isDraft",
+            "pr",
+            "list",
+            "--state",
+            state,
+            "--limit",
+            &limit.to_string(),
+            "--json",
+            "number,title,state,author,headRefName,url,isDraft",
         ])
         .current_dir(work_dir)
         .output()
@@ -113,15 +111,18 @@ pub fn list_prs(work_dir: &Path, state: &str, limit: usize) -> Result<Vec<PullRe
     }
 
     let json: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
-    let prs = json.iter().map(|pr| PullRequest {
-        number: pr["number"].as_u64().unwrap_or(0),
-        title: pr["title"].as_str().unwrap_or("").to_string(),
-        state: pr["state"].as_str().unwrap_or("").to_string(),
-        author: pr["author"]["login"].as_str().unwrap_or("").to_string(),
-        branch: pr["headRefName"].as_str().unwrap_or("").to_string(),
-        url: pr["url"].as_str().unwrap_or("").to_string(),
-        draft: pr["isDraft"].as_bool().unwrap_or(false),
-    }).collect();
+    let prs = json
+        .iter()
+        .map(|pr| PullRequest {
+            number: pr["number"].as_u64().unwrap_or(0),
+            title: pr["title"].as_str().unwrap_or("").to_string(),
+            state: pr["state"].as_str().unwrap_or("").to_string(),
+            author: pr["author"]["login"].as_str().unwrap_or("").to_string(),
+            branch: pr["headRefName"].as_str().unwrap_or("").to_string(),
+            url: pr["url"].as_str().unwrap_or("").to_string(),
+            draft: pr["isDraft"].as_bool().unwrap_or(false),
+        })
+        .collect();
 
     Ok(prs)
 }
@@ -195,10 +196,7 @@ pub fn create_pr(
 /// Get PR review status
 pub fn pr_review_status(work_dir: &Path, pr_number: u64) -> Result<ReviewStatus> {
     let output = Command::new("gh")
-        .args([
-            "pr", "view", &pr_number.to_string(),
-            "--json", "reviews",
-        ])
+        .args(["pr", "view", &pr_number.to_string(), "--json", "reviews"])
         .current_dir(work_dir)
         .output()
         .context("Failed to run gh pr view")?;
@@ -256,10 +254,14 @@ pub fn checkout_pr(work_dir: &Path, pr_number: u64) -> Result<()> {
 pub fn list_issues(work_dir: &Path, state: &str, limit: usize) -> Result<Vec<Issue>> {
     let output = Command::new("gh")
         .args([
-            "issue", "list",
-            "--state", state,
-            "--limit", &limit.to_string(),
-            "--json", "number,title,state,author,labels,url",
+            "issue",
+            "list",
+            "--state",
+            state,
+            "--limit",
+            &limit.to_string(),
+            "--json",
+            "number,title,state,author,labels,url",
         ])
         .current_dir(work_dir)
         .output()
@@ -271,23 +273,26 @@ pub fn list_issues(work_dir: &Path, state: &str, limit: usize) -> Result<Vec<Iss
     }
 
     let json: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
-    let issues = json.iter().map(|issue| {
-        let labels = issue["labels"]
-            .as_array()
-            .unwrap_or(&vec![])
-            .iter()
-            .filter_map(|l| l["name"].as_str().map(String::from))
-            .collect();
+    let issues = json
+        .iter()
+        .map(|issue| {
+            let labels = issue["labels"]
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .filter_map(|l| l["name"].as_str().map(String::from))
+                .collect();
 
-        Issue {
-            number: issue["number"].as_u64().unwrap_or(0),
-            title: issue["title"].as_str().unwrap_or("").to_string(),
-            state: issue["state"].as_str().unwrap_or("").to_string(),
-            author: issue["author"]["login"].as_str().unwrap_or("").to_string(),
-            labels,
-            url: issue["url"].as_str().unwrap_or("").to_string(),
-        }
-    }).collect();
+            Issue {
+                number: issue["number"].as_u64().unwrap_or(0),
+                title: issue["title"].as_str().unwrap_or("").to_string(),
+                state: issue["state"].as_str().unwrap_or("").to_string(),
+                author: issue["author"]["login"].as_str().unwrap_or("").to_string(),
+                labels,
+                url: issue["url"].as_str().unwrap_or("").to_string(),
+            }
+        })
+        .collect();
 
     Ok(issues)
 }
@@ -309,12 +314,7 @@ pub fn view_issue(work_dir: &Path, issue_number: u64) -> Result<String> {
 }
 
 /// Create a new issue
-pub fn create_issue(
-    work_dir: &Path,
-    title: &str,
-    body: &str,
-    labels: &[&str],
-) -> Result<String> {
+pub fn create_issue(work_dir: &Path, title: &str, body: &str, labels: &[&str]) -> Result<String> {
     let mut args = vec!["issue", "create", "--title", title, "--body", body];
 
     for label in labels {
@@ -343,10 +343,7 @@ pub fn create_issue(
 /// List recent workflow runs
 pub fn list_runs(work_dir: &Path, limit: usize) -> Result<String> {
     let output = Command::new("gh")
-        .args([
-            "run", "list",
-            "--limit", &limit.to_string(),
-        ])
+        .args(["run", "list", "--limit", &limit.to_string()])
         .current_dir(work_dir)
         .output()
         .context("Failed to run gh run list")?;
@@ -384,8 +381,7 @@ impl PullRequest {
         let draft = if self.draft { " [DRAFT]" } else { "" };
         format!(
             "#{} {} by @{}{}\n  {} → {}\n  {}",
-            self.number, self.title, self.author, draft,
-            self.branch, self.state, self.url
+            self.number, self.title, self.author, draft, self.branch, self.state, self.url
         )
     }
 }
@@ -399,8 +395,7 @@ impl Issue {
         };
         format!(
             "#{} {} by @{}{}\n  {} {}",
-            self.number, self.title, self.author, labels,
-            self.state, self.url
+            self.number, self.title, self.author, labels, self.state, self.url
         )
     }
 }

@@ -8,7 +8,6 @@
 //! - Tests verify the expected output/behavior
 //! - Logs are captured for debugging
 
-
 /// Test helper to capture and display trace logs
 struct TestTracer {
     name: String,
@@ -91,7 +90,10 @@ fn story_project_name_generation() {
         .collect();
 
     t.expect(words.len() >= 1, "At least one word extracted");
-    t.expect(words[0] == "create" || words[0] == "beautiful", "First significant word found");
+    t.expect(
+        words[0] == "create" || words[0] == "beautiful",
+        "First significant word found",
+    );
 
     t.step("When sanitizing the name");
     let base = words.first().copied().unwrap_or("project");
@@ -104,7 +106,10 @@ fn story_project_name_generation() {
 
     t.expect(!sanitized.is_empty(), "Sanitized name is not empty");
     t.expect(sanitized.len() <= 12, "Name is within length limit");
-    t.expect(sanitized.chars().all(|c| c.is_alphanumeric()), "Name only contains alphanumeric");
+    t.expect(
+        sanitized.chars().all(|c| c.is_alphanumeric()),
+        "Name only contains alphanumeric",
+    );
 
     t.done();
 }
@@ -126,7 +131,10 @@ fn story_project_name_handles_special_chars() {
 
     t.expect(!sanitized.contains('/'), "No slashes in sanitized name");
     t.expect(!sanitized.contains('.'), "No dots in sanitized name");
-    t.expect(sanitized == "fooetcpasswd", "Only alphanumeric chars remain");
+    t.expect(
+        sanitized == "fooetcpasswd",
+        "Only alphanumeric chars remain",
+    );
 
     t.done();
 }
@@ -184,7 +192,10 @@ fn story_rate_limit_detection() {
             || error.to_lowercase().contains("throttl")
             || error.to_lowercase().contains("limit");
 
-        t.expect(is_rate_limit, &format!("'{}' detected as rate limit", error));
+        t.expect(
+            is_rate_limit,
+            &format!("'{}' detected as rate limit", error),
+        );
     }
 
     t.step("Given a non-rate-limit error");
@@ -194,7 +205,10 @@ fn story_rate_limit_detection() {
         || other_error.to_lowercase().contains("throttl")
         || other_error.to_lowercase().contains("limit");
 
-    t.expect(!is_rate_limit, "Connection error not detected as rate limit");
+    t.expect(
+        !is_rate_limit,
+        "Connection error not detected as rate limit",
+    );
 
     t.done();
 }
@@ -260,16 +274,28 @@ fn story_throttle_modes_have_correct_delays() {
     t.step("Given different throttle modes");
 
     t.step("When checking Full mode");
-    t.expect(ThrottleMode::Full.delay_multiplier() == 0.0, "Full mode has 0x delay");
+    t.expect(
+        ThrottleMode::Full.delay_multiplier() == 0.0,
+        "Full mode has 0x delay",
+    );
 
     t.step("When checking Normal mode");
-    t.expect(ThrottleMode::Normal.delay_multiplier() == 1.0, "Normal mode has 1x delay");
+    t.expect(
+        ThrottleMode::Normal.delay_multiplier() == 1.0,
+        "Normal mode has 1x delay",
+    );
 
     t.step("When checking Throttled mode");
-    t.expect(ThrottleMode::Throttled.delay_multiplier() == 3.0, "Throttled mode has 3x delay");
+    t.expect(
+        ThrottleMode::Throttled.delay_multiplier() == 3.0,
+        "Throttled mode has 3x delay",
+    );
 
     t.step("When checking Killed mode");
-    t.expect(ThrottleMode::Killed.delay_multiplier() == 0.0, "Killed mode has 0x delay (N/A)");
+    t.expect(
+        ThrottleMode::Killed.delay_multiplier() == 0.0,
+        "Killed mode has 0x delay (N/A)",
+    );
 
     t.done();
 }
@@ -288,7 +314,10 @@ fn story_session_id_format() {
 
     t.step("When validating format");
     t.expect(formatted.len() == 15, "Timestamp is 15 characters");
-    t.expect(formatted.contains('_'), "Timestamp contains underscore separator");
+    t.expect(
+        formatted.contains('_'),
+        "Timestamp contains underscore separator",
+    );
 
     t.step("When parsing components");
     let parts: Vec<&str> = formatted.split('_').collect();
@@ -366,13 +395,25 @@ Requirements:
 Make it something people want to share. Make it memorable."#;
 
     t.step("When checking for key requirements");
-    t.expect(prompt.contains("INTERNET ARTPIECE"), "Emphasizes artpiece nature");
+    t.expect(
+        prompt.contains("INTERNET ARTPIECE"),
+        "Emphasizes artpiece nature",
+    );
     t.expect(prompt.contains("INTERACT"), "Emphasizes interactivity");
     t.expect(prompt.contains("index.html"), "Specifies single HTML file");
     t.expect(prompt.contains("Responsive"), "Requires responsiveness");
-    t.expect(prompt.contains("60fps"), "Specifies smooth animation target");
-    t.expect(prompt.contains("no external dependencies"), "Requires self-contained");
-    t.expect(prompt.contains("mouse, touch, keyboard"), "Lists input types");
+    t.expect(
+        prompt.contains("60fps"),
+        "Specifies smooth animation target",
+    );
+    t.expect(
+        prompt.contains("no external dependencies"),
+        "Requires self-contained",
+    );
+    t.expect(
+        prompt.contains("mouse, touch, keyboard"),
+        "Lists input types",
+    );
     t.expect(prompt.contains("memorable"), "Emphasizes quality bar");
 
     t.done();
@@ -395,14 +436,20 @@ fn story_tui_poll_timeout_is_reasonable() {
 
     t.expect(
         poll_timeout_ms <= max_frame_time_ms,
-        &format!("Poll timeout {}ms <= {}ms for {}fps", poll_timeout_ms, max_frame_time_ms, target_fps)
+        &format!(
+            "Poll timeout {}ms <= {}ms for {}fps",
+            poll_timeout_ms, max_frame_time_ms, target_fps
+        ),
     );
 
     t.step("When evaluating CPU efficiency");
     let min_poll_ms = 10; // Too fast wastes CPU
     t.expect(
         poll_timeout_ms >= min_poll_ms,
-        &format!("Poll timeout {}ms >= {}ms to avoid CPU spin", poll_timeout_ms, min_poll_ms)
+        &format!(
+            "Poll timeout {}ms >= {}ms to avoid CPU spin",
+            poll_timeout_ms, min_poll_ms
+        ),
     );
 
     t.done();

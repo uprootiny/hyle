@@ -22,13 +22,44 @@ const AUTO_SAVE_THRESHOLD: u32 = 2;
 
 /// Trivial prompts to ignore (lowercase)
 const TRIVIAL_PROMPTS: &[&str] = &[
-    "ok", "okay", "k", "yes", "no", "y", "n",
-    "proceed", "continue", "go", "do it", "yes please",
-    "thanks", "thank you", "thx", "ty",
-    "uh huh", "uhuh", "mhm", "hmm", "hm",
-    "next", "more", "again", "retry",
-    "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
-    "commit", "push", "save", // These are slash commands
+    "ok",
+    "okay",
+    "k",
+    "yes",
+    "no",
+    "y",
+    "n",
+    "proceed",
+    "continue",
+    "go",
+    "do it",
+    "yes please",
+    "thanks",
+    "thank you",
+    "thx",
+    "ty",
+    "uh huh",
+    "uhuh",
+    "mhm",
+    "hmm",
+    "hm",
+    "next",
+    "more",
+    "again",
+    "retry",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "0",
+    "commit",
+    "push",
+    "save", // These are slash commands
 ];
 
 /// A saved prompt with metadata
@@ -46,8 +77,8 @@ pub struct SavedPrompt {
 /// Context when a prompt was used
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptContext {
-    pub files: Vec<String>,      // Files in focus
-    pub keywords: Vec<String>,   // Extracted keywords
+    pub files: Vec<String>,    // Files in focus
+    pub keywords: Vec<String>, // Extracted keywords
     pub project_type: Option<String>,
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
@@ -156,14 +187,17 @@ impl PromptLibrary {
             // Check if appears in recent (repeat detection)
             let appearances = self.recent.iter().filter(|r| *r == &normalized).count();
             if appearances >= AUTO_SAVE_THRESHOLD as usize || text.len() > 50 {
-                self.prompts.insert(normalized.clone(), SavedPrompt {
-                    text: text.trim().to_string(),
-                    count: appearances as u32,
-                    last_used: chrono::Utc::now(),
-                    contexts: context.map(|c| vec![c]).unwrap_or_default(),
-                    category: self.categorize(text),
-                    general_form: self.find_general_form(text),
-                });
+                self.prompts.insert(
+                    normalized.clone(),
+                    SavedPrompt {
+                        text: text.trim().to_string(),
+                        count: appearances as u32,
+                        last_used: chrono::Utc::now(),
+                        contexts: context.map(|c| vec![c]).unwrap_or_default(),
+                        category: self.categorize(text),
+                        general_form: self.find_general_form(text),
+                    },
+                );
             }
         }
     }
@@ -245,14 +279,15 @@ impl PromptLibrary {
     pub fn prune(&mut self, min_count: u32, max_age_days: i64) {
         let cutoff = chrono::Utc::now() - chrono::Duration::days(max_age_days);
 
-        self.prompts.retain(|_, p| {
-            p.count >= min_count || p.last_used > cutoff
-        });
+        self.prompts
+            .retain(|_, p| p.count >= min_count || p.last_used > cutoff);
     }
 
     /// Get prompts matching context
     pub fn suggest(&self, context: &PromptContext, limit: usize) -> Vec<&SavedPrompt> {
-        let mut scored: Vec<_> = self.prompts.values()
+        let mut scored: Vec<_> = self
+            .prompts
+            .values()
             .map(|p| {
                 let score = self.context_score(p, context);
                 (p, score)
@@ -270,13 +305,17 @@ impl PromptLibrary {
 
         for ctx in &prompt.contexts {
             // File overlap
-            let file_overlap = ctx.files.iter()
+            let file_overlap = ctx
+                .files
+                .iter()
                 .filter(|f| context.files.contains(f))
                 .count();
             score += file_overlap as f64 * 2.0;
 
             // Keyword overlap
-            let kw_overlap = ctx.keywords.iter()
+            let kw_overlap = ctx
+                .keywords
+                .iter()
                 .filter(|k| context.keywords.contains(k))
                 .count();
             score += kw_overlap as f64;
@@ -339,13 +378,13 @@ pub struct ToolbeltCommand {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DevelopmentPhase {
-    Init,       // Project setup
-    Implement,  // Core implementation
-    Test,       // Testing
-    Review,     // Code review
-    Polish,     // Cleanup, optimization
-    Document,   // Documentation
-    Ship,       // Final checks, deployment
+    Init,      // Project setup
+    Implement, // Core implementation
+    Test,      // Testing
+    Review,    // Code review
+    Polish,    // Cleanup, optimization
+    Document,  // Documentation
+    Ship,      // Final checks, deployment
 }
 
 impl Default for Toolbelt {
@@ -355,7 +394,8 @@ impl Default for Toolbelt {
             commands: vec![
                 ToolbeltCommand {
                     name: "scaffold".to_string(),
-                    prompt: "Set up the project structure, dependencies, and basic configuration.".to_string(),
+                    prompt: "Set up the project structure, dependencies, and basic configuration."
+                        .to_string(),
                     description: "Initial project setup".to_string(),
                     phase: DevelopmentPhase::Init,
                 },
@@ -373,7 +413,8 @@ impl Default for Toolbelt {
                 },
                 ToolbeltCommand {
                     name: "review".to_string(),
-                    prompt: "Review code for correctness, style, security, and performance.".to_string(),
+                    prompt: "Review code for correctness, style, security, and performance."
+                        .to_string(),
                     description: "Code review".to_string(),
                     phase: DevelopmentPhase::Review,
                 },

@@ -4,12 +4,12 @@
 //! autonomous hyle instances to build out projects.
 
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use chrono::{DateTime, Utc};
 
 // ═══════════════════════════════════════════════════════════════
 // PROJECT TYPES
@@ -41,13 +41,20 @@ pub enum ProjectType {
 impl ProjectType {
     pub fn detect(sketch: &str) -> Self {
         let lower = sketch.to_lowercase();
-        if lower.contains("cargo.toml") || lower.contains("fn main") || lower.contains("use std::") {
+        if lower.contains("cargo.toml") || lower.contains("fn main") || lower.contains("use std::")
+        {
             ProjectType::Rust
         } else if lower.contains("deps.edn") || lower.contains("(defn ") || lower.contains("(ns ") {
             ProjectType::Clojure
-        } else if lower.contains("shadow-cljs") || lower.contains("reagent") || lower.contains("re-frame") {
+        } else if lower.contains("shadow-cljs")
+            || lower.contains("reagent")
+            || lower.contains("re-frame")
+        {
             ProjectType::ClojureScript
-        } else if lower.contains("package.json") || lower.contains("const ") || lower.contains("import ") {
+        } else if lower.contains("package.json")
+            || lower.contains("const ")
+            || lower.contains("import ")
+        {
             ProjectType::Node
         } else if lower.contains("<html") || lower.contains("<!doctype") {
             ProjectType::Static
@@ -180,14 +187,14 @@ pub fn parse_project_spec(sketch: &str) -> Result<ProjectSpec> {
     let lines: Vec<&str> = sketch.lines().collect();
 
     // Try to extract project name from common patterns
-    let name = extract_project_name(sketch)
-        .unwrap_or_else(|| format!("project-{}", &generate_id()[..8]));
+    let name =
+        extract_project_name(sketch).unwrap_or_else(|| format!("project-{}", &generate_id()[..8]));
 
     let project_type = ProjectType::detect(sketch);
 
     // Extract description from first comment block or first paragraph
-    let description = extract_description(sketch)
-        .unwrap_or_else(|| "Auto-generated project".into());
+    let description =
+        extract_description(sketch).unwrap_or_else(|| "Auto-generated project".into());
 
     // Extract subdomain if mentioned
     let subdomain = extract_subdomain(sketch);
@@ -217,7 +224,8 @@ fn extract_project_name(sketch: &str) -> Option<String> {
         if let Some(name) = trimmed.strip_prefix("# ") {
             let name = name.trim();
             if !name.is_empty() && name.len() <= 64 {
-                let clean: String = name.chars()
+                let clean: String = name
+                    .chars()
                     .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_' || *c == ' ')
                     .collect();
                 return Some(clean.to_lowercase().replace(' ', "-"));
@@ -307,9 +315,22 @@ pub fn validate_port(port: u16) -> Result<u16> {
 fn extract_features(sketch: &str) -> Vec<String> {
     let mut features = Vec::new();
     let keywords = [
-        "api", "rest", "graphql", "websocket", "auth", "database",
-        "postgres", "sqlite", "redis", "docker", "kubernetes",
-        "react", "vue", "svelte", "tailwind", "htmx",
+        "api",
+        "rest",
+        "graphql",
+        "websocket",
+        "auth",
+        "database",
+        "postgres",
+        "sqlite",
+        "redis",
+        "docker",
+        "kubernetes",
+        "react",
+        "vue",
+        "svelte",
+        "tailwind",
+        "htmx",
     ];
 
     let lower = sketch.to_lowercase();
@@ -333,13 +354,15 @@ pub fn scaffold_project(project: &Project, projects_root: &Path) -> Result<()> {
     let dir = &project.project_dir;
 
     // SECURITY: Validate path is under projects_root
-    let canonical_root = projects_root.canonicalize()
+    let canonical_root = projects_root
+        .canonicalize()
         .context("projects_root must exist")?;
 
     // Create the directory first so we can canonicalize it
     fs::create_dir_all(dir)?;
 
-    let canonical_dir = dir.canonicalize()
+    let canonical_dir = dir
+        .canonicalize()
         .context("Failed to canonicalize project directory")?;
 
     if !canonical_dir.starts_with(&canonical_root) {
@@ -347,7 +370,8 @@ pub fn scaffold_project(project: &Project, projects_root: &Path) -> Result<()> {
         let _ = fs::remove_dir_all(dir);
         anyhow::bail!(
             "Path traversal detected: {:?} is not under {:?}",
-            canonical_dir, canonical_root
+            canonical_dir,
+            canonical_root
         );
     }
 
@@ -412,11 +436,14 @@ fn scaffold_clojure(dir: &Path, spec: &ProjectSpec) -> Result<()> {
     let deps_edn = if let Some(deps) = extract_code_block(&spec.sketch, "edn") {
         deps
     } else {
-        format!(r#"{{:paths ["src" "resources"]
+        format!(
+            r#"{{:paths ["src" "resources"]
  :deps {{org.clojure/clojure {{:mvn/version "1.11.1"}}}}
  :aliases {{:dev {{:extra-paths ["test"]}}
             :run {{:main-opts ["-m" "{}.core"]}}}}}}
-"#, spec.name.replace('-', "_"))
+"#,
+            spec.name.replace('-', "_")
+        )
     };
     fs::write(dir.join("deps.edn"), deps_edn)?;
 
@@ -428,11 +455,14 @@ fn scaffold_clojure(dir: &Path, spec: &ProjectSpec) -> Result<()> {
     let core_clj = if let Some(code) = extract_code_block(&spec.sketch, "clojure") {
         code
     } else {
-        format!(r#"(ns {}.core)
+        format!(
+            r#"(ns {}.core)
 
 (defn -main [& args]
   (println "Hello from {}!"))
-"#, ns_name, spec.name)
+"#,
+            ns_name, spec.name
+        )
     };
     fs::write(src_dir.join("core.clj"), core_clj)?;
 
@@ -444,18 +474,22 @@ fn scaffold_clojurescript(dir: &Path, spec: &ProjectSpec) -> Result<()> {
     fs::create_dir_all(dir.join("public"))?;
 
     // Create shadow-cljs.edn
-    let shadow_config = format!(r#"{{:source-paths ["src"]
+    let shadow_config = format!(
+        r#"{{:source-paths ["src"]
  :dependencies [[reagent "1.2.0"]]
  :builds {{:app {{:target :browser
                  :output-dir "public/js"
                  :asset-path "/js"
                  :modules {{:main {{:init-fn {}.core/init}}}}}}}}}}
-"#, spec.name.replace('-', "_"));
+"#,
+        spec.name.replace('-', "_")
+    );
     let shadow_path = dir.join("shadow-cljs.edn");
     fs::write(&shadow_path, shadow_config)?;
 
     // Create package.json
-    let package_json = format!(r#"{{
+    let package_json = format!(
+        r#"{{
   "name": "{}",
   "scripts": {{
     "dev": "shadow-cljs watch app",
@@ -465,12 +499,15 @@ fn scaffold_clojurescript(dir: &Path, spec: &ProjectSpec) -> Result<()> {
     "shadow-cljs": "^2.26.0"
   }}
 }}
-"#, spec.name);
+"#,
+        spec.name
+    );
     let pkg_path = dir.join("package.json");
     fs::write(&pkg_path, package_json)?;
 
     // Create index.html
-    let index_html = format!(r#"<!DOCTYPE html>
+    let index_html = format!(
+        r#"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -481,7 +518,9 @@ fn scaffold_clojurescript(dir: &Path, spec: &ProjectSpec) -> Result<()> {
     <script src="/js/main.js"></script>
 </body>
 </html>
-"#, spec.name);
+"#,
+        spec.name
+    );
     let html_path = dir.join("public").join("index.html");
     fs::write(&html_path, index_html)?;
 
@@ -495,7 +534,8 @@ fn scaffold_node(dir: &Path, spec: &ProjectSpec) -> Result<()> {
     let package_json = if let Some(pkg) = extract_code_block(&spec.sketch, "json") {
         pkg
     } else {
-        format!(r#"{{
+        format!(
+            r#"{{
   "name": "{}",
   "version": "0.1.0",
   "description": "{}",
@@ -506,7 +546,9 @@ fn scaffold_node(dir: &Path, spec: &ProjectSpec) -> Result<()> {
     "test": "node --test"
   }}
 }}
-"#, spec.name, spec.description)
+"#,
+            spec.name, spec.description
+        )
     };
     let pkg_path = dir.join("package.json");
     fs::write(&pkg_path, package_json)?;
@@ -530,7 +572,8 @@ fn scaffold_static(dir: &Path, spec: &ProjectSpec) -> Result<()> {
     let index_html = if let Some(html) = extract_code_block(&spec.sketch, "html") {
         html
     } else {
-        format!(r#"<!DOCTYPE html>
+        format!(
+            r#"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -541,7 +584,9 @@ fn scaffold_static(dir: &Path, spec: &ProjectSpec) -> Result<()> {
     <p>{}</p>
 </body>
 </html>
-"#, spec.name, spec.name, spec.description)
+"#,
+            spec.name, spec.name, spec.description
+        )
     };
     let html_path = dir.join("public").join("index.html");
     fs::write(&html_path, index_html)?;
@@ -552,7 +597,10 @@ fn scaffold_static(dir: &Path, spec: &ProjectSpec) -> Result<()> {
 fn scaffold_generic(dir: &Path, spec: &ProjectSpec) -> Result<()> {
     // Create a basic structure with the sketch
     fs::create_dir_all(dir.join("src"))?;
-    fs::write(dir.join("README.md"), format!("# {}\n\n{}\n", spec.name, spec.description))?;
+    fs::write(
+        dir.join("README.md"),
+        format!("# {}\n\n{}\n", spec.name, spec.description),
+    )?;
     Ok(())
 }
 
@@ -591,7 +639,8 @@ fn extract_code_block(sketch: &str, lang: &str) -> Option<String> {
 
 /// Generate nginx config for a subdomain
 pub fn generate_nginx_config(subdomain: &str, domain: &str, port: u16) -> String {
-    format!(r#"server {{
+    format!(
+        r#"server {{
     listen 80;
     listen [::]:80;
     server_name {subdomain}.{domain};
@@ -618,21 +667,26 @@ server {{
         proxy_cache_bypass $http_upgrade;
     }}
 }}
-"#)
+"#
+    )
 }
 
 /// Generate systemd service for a project
 pub fn generate_systemd_service(project: &Project) -> String {
     let exec_start = match project.spec.project_type {
-        ProjectType::Rust => format!("{}/target/release/{}",
-            project.project_dir.display(), project.spec.name),
+        ProjectType::Rust => format!(
+            "{}/target/release/{}",
+            project.project_dir.display(),
+            project.spec.name
+        ),
         ProjectType::Clojure => "clj -M:run".to_string(),
         ProjectType::ClojureScript => "npx shadow-cljs server".into(),
         ProjectType::Node => "node src/index.js".into(),
         _ => "echo 'No start command'".into(),
     };
 
-    format!(r#"[Unit]
+    format!(
+        r#"[Unit]
 Description={name} - {desc}
 After=network.target
 
@@ -664,7 +718,8 @@ WantedBy=multi-user.target
 
 /// Build prompt for dispatched hyle instance
 pub fn build_dispatch_prompt(project: &Project) -> String {
-    format!(r#"You are building project "{name}" from the following sketch.
+    format!(
+        r#"You are building project "{name}" from the following sketch.
 
 PROJECT SKETCH:
 {sketch}
@@ -698,7 +753,7 @@ pub fn dispatch_hyle(
     prompt: &str,
 ) -> Result<std::process::Child> {
     let child = Command::new(hyle_binary)
-        .arg("--trust")  // Auto-approve tool calls
+        .arg("--trust") // Auto-approve tool calls
         .arg(prompt)
         .current_dir(project_dir)
         .stdin(Stdio::null())
@@ -742,8 +797,14 @@ mod tests {
     #[test]
     fn test_project_type_detection() {
         assert_eq!(ProjectType::detect("fn main() { }"), ProjectType::Rust);
-        assert_eq!(ProjectType::detect("(defn foo [] 42)"), ProjectType::Clojure);
-        assert_eq!(ProjectType::detect("shadow-cljs.edn"), ProjectType::ClojureScript);
+        assert_eq!(
+            ProjectType::detect("(defn foo [] 42)"),
+            ProjectType::Clojure
+        );
+        assert_eq!(
+            ProjectType::detect("shadow-cljs.edn"),
+            ProjectType::ClojureScript
+        );
         assert_eq!(ProjectType::detect("package.json"), ProjectType::Node);
         assert_eq!(ProjectType::detect("<html>"), ProjectType::Static);
     }
@@ -790,12 +851,12 @@ fn main() {
         // Valid ports
         assert!(validate_port(3000).is_ok());
         assert!(validate_port(8080).is_ok());
-        assert!(validate_port(1024).is_ok());  // minimum
+        assert!(validate_port(1024).is_ok()); // minimum
         assert!(validate_port(65535).is_ok()); // maximum
 
         // Invalid ports
-        assert!(validate_port(80).is_err());   // privileged
-        assert!(validate_port(443).is_err());  // privileged
+        assert!(validate_port(80).is_err()); // privileged
+        assert!(validate_port(443).is_err()); // privileged
         assert!(validate_port(1023).is_err()); // just below minimum
     }
 
@@ -814,7 +875,10 @@ fn main() {
     fn test_subdomain_validation() {
         // Valid subdomains
         assert_eq!(extract_subdomain("subdomain = foo"), Some("foo".into()));
-        assert_eq!(extract_subdomain("subdomain = my-app"), Some("my-app".into()));
+        assert_eq!(
+            extract_subdomain("subdomain = my-app"),
+            Some("my-app".into())
+        );
 
         // Reject path traversal attempts in subdomain
         assert_eq!(extract_subdomain("subdomain = ../etc"), None);

@@ -8,10 +8,10 @@
 
 #![allow(dead_code)] // Forward-looking module for self-bootstrapping
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::fs;
-use serde::{Serialize, Deserialize};
+use std::path::{Path, PathBuf};
 
 // ═══════════════════════════════════════════════════════════════
 // PROJECT DETECTION
@@ -86,7 +86,11 @@ impl Project {
     /// Build structure summary
     fn build_structure(&mut self) {
         let mut structure = String::new();
-        structure.push_str(&format!("# {} ({})\n\n", self.name, format_project_type(&self.project_type)));
+        structure.push_str(&format!(
+            "# {} ({})\n\n",
+            self.name,
+            format_project_type(&self.project_type)
+        ));
 
         // Group files by directory
         let mut by_dir: HashMap<String, Vec<&SourceFile>> = HashMap::new();
@@ -106,8 +110,12 @@ impl Project {
             let files = &by_dir[dir];
             structure.push_str(&format!("## {}/\n", dir));
             for file in files {
-                structure.push_str(&format!("- {} ({} lines)\n",
-                    Path::new(&file.relative).file_name().unwrap().to_string_lossy(),
+                structure.push_str(&format!(
+                    "- {} ({} lines)\n",
+                    Path::new(&file.relative)
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy(),
                     file.lines
                 ));
             }
@@ -116,7 +124,11 @@ impl Project {
 
         // Summary stats
         let total_lines: usize = self.files.iter().map(|f| f.lines).sum();
-        structure.push_str(&format!("**Total:** {} files, {} lines\n", self.files.len(), total_lines));
+        structure.push_str(&format!(
+            "**Total:** {} files, {} lines\n",
+            self.files.len(),
+            total_lines
+        ));
 
         self.structure = structure;
     }
@@ -125,8 +137,11 @@ impl Project {
     pub fn context_for_llm(&self) -> String {
         let mut ctx = String::new();
 
-        ctx.push_str(&format!("<project name=\"{}\" type=\"{}\">\n",
-            self.name, format_project_type(&self.project_type)));
+        ctx.push_str(&format!(
+            "<project name=\"{}\" type=\"{}\">\n",
+            self.name,
+            format_project_type(&self.project_type)
+        ));
 
         ctx.push_str("<structure>\n");
         ctx.push_str(&self.structure);
@@ -169,7 +184,8 @@ impl Project {
 
     /// Get files matching pattern
     pub fn files_matching(&self, pattern: &str) -> Vec<&SourceFile> {
-        self.files.iter()
+        self.files
+            .iter()
             .filter(|f| f.relative.contains(pattern))
             .collect()
     }
@@ -186,7 +202,13 @@ impl Project {
 
 /// Find project root by walking up looking for markers
 fn find_project_root(start: &Path) -> Option<PathBuf> {
-    let markers = ["Cargo.toml", "package.json", "pyproject.toml", "go.mod", ".git"];
+    let markers = [
+        "Cargo.toml",
+        "package.json",
+        "pyproject.toml",
+        "go.mod",
+        ".git",
+    ];
 
     let mut current = start.to_path_buf();
     loop {
@@ -252,16 +274,25 @@ fn collect_files_recursive(
     root: &Path,
     current: &Path,
     extensions: &[&str],
-    files: &mut Vec<SourceFile>
+    files: &mut Vec<SourceFile>,
 ) {
-    let Ok(entries) = fs::read_dir(current) else { return };
+    let Ok(entries) = fs::read_dir(current) else {
+        return;
+    };
 
     for entry in entries.flatten() {
         let path = entry.path();
 
         // Skip hidden and common ignored directories
-        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-        if name.starts_with('.') || name == "target" || name == "node_modules" || name == "__pycache__" {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if name.starts_with('.')
+            || name == "target"
+            || name == "node_modules"
+            || name == "__pycache__"
+        {
             continue;
         }
 
@@ -271,7 +302,8 @@ fn collect_files_recursive(
             if let Some(ext) = path.extension() {
                 let ext_str = ext.to_string_lossy();
                 if extensions.iter().any(|e| *e == ext_str) {
-                    let relative = path.strip_prefix(root)
+                    let relative = path
+                        .strip_prefix(root)
                         .map(|p| p.to_string_lossy().to_string())
                         .unwrap_or_default();
 
@@ -301,7 +333,11 @@ pub fn self_project() -> Option<Project> {
     if let Ok(exe) = std::env::current_exe() {
         // Development: exe is in target/release or target/debug
         if let Some(target) = exe.parent() {
-            if target.file_name().map(|n| n == "release" || n == "debug").unwrap_or(false) {
+            if target
+                .file_name()
+                .map(|n| n == "release" || n == "debug")
+                .unwrap_or(false)
+            {
                 if let Some(target_dir) = target.parent() {
                     if let Some(project_root) = target_dir.parent() {
                         if project_root.join("Cargo.toml").exists() {
@@ -375,7 +411,10 @@ mod tests {
         let src = temp.join("src");
         let _ = fs::create_dir_all(&src);
         let _ = fs::write(temp.join("Cargo.toml"), "[package]\nname = \"myproject\"");
-        let _ = fs::write(src.join("main.rs"), "fn main() {\n    println!(\"Hello\");\n}");
+        let _ = fs::write(
+            src.join("main.rs"),
+            "fn main() {\n    println!(\"Hello\");\n}",
+        );
         let _ = fs::write(src.join("lib.rs"), "pub fn foo() {}");
 
         let project = Project::detect(&temp).unwrap();

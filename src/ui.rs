@@ -11,36 +11,36 @@
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind, EnableBracketedPaste, DisableBracketedPaste},
+    event::{self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap, Tabs},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Tabs, Wrap},
 };
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
+use crate::agent::{execute_tool_calls, format_tool_results, parse_tool_calls};
 use crate::client::{self, StreamEvent};
+use crate::cognitive::{
+    extract_keywords, CognitiveConfig, ContextCategory, LoopDecision, Momentum, SalienceContext,
+    SalienceTier, StuckDetector,
+};
+use crate::eval::ModelTracker;
+use crate::intent::{IntentStack, IntentView, Verbosity};
 use crate::models::Model;
 use crate::project::{Project, ProjectType};
 use crate::session::Session;
-use crate::skills::{is_slash_command, execute_slash_command_with_context, SlashContext};
-use crate::telemetry::{Telemetry, TelemetryMsg, TelemetrySampler, ThrottleMode, PressureLevel};
+use crate::skills::{execute_slash_command_with_context, is_slash_command, SlashContext};
+use crate::telemetry::{PressureLevel, Telemetry, TelemetryMsg, TelemetrySampler, ThrottleMode};
+use crate::tools::{ToolCallDisplay, ToolCallTracker, ToolExecutor};
 use crate::traces::Traces;
-use crate::tools::{ToolCallTracker, ToolExecutor, ToolCallDisplay};
-use crate::agent::{parse_tool_calls, execute_tool_calls, format_tool_results};
-use crate::eval::ModelTracker;
-use crate::intent::{IntentStack, IntentView, Verbosity};
-use crate::cognitive::{
-    CognitiveConfig, LoopDecision, Momentum, StuckDetector,
-    SalienceContext, SalienceTier, ContextCategory, extract_keywords,
-};
 
 // ═══════════════════════════════════════════════════════════════
 // API KEY PROMPT
@@ -106,7 +106,10 @@ pub fn pick_model(models: &[Model]) -> Result<String> {
     result
 }
 
-fn run_picker(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, models: &[Model]) -> Result<String> {
+fn run_picker(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    models: &[Model],
+) -> Result<String> {
     let matcher = SkimMatcherV2::default();
     let mut filter = String::new();
     let mut list_state = ListState::default();
@@ -117,10 +120,9 @@ fn run_picker(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, models: &[M
         let filtered: Vec<_> = if filter.is_empty() {
             models.iter().collect()
         } else {
-            let mut scored: Vec<_> = models.iter()
-                .filter_map(|m| {
-                    matcher.fuzzy_match(&m.id, &filter).map(|score| (m, score))
-                })
+            let mut scored: Vec<_> = models
+                .iter()
+                .filter_map(|m| matcher.fuzzy_match(&m.id, &filter).map(|score| (m, score)))
                 .collect();
             scored.sort_by(|a, b| b.1.cmp(&a.1));
             scored.into_iter().map(|(m, _)| m).collect()
@@ -145,20 +147,34 @@ fn run_picker(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, models: &[M
                 .split(f.size());
 
             // Filter input
-            let input = Paragraph::new(filter.as_str())
-                .block(Block::default().borders(Borders::ALL).title("Search models"));
+            let input = Paragraph::new(filter.as_str()).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Search models"),
+            );
             f.render_widget(input, chunks[0]);
 
             // Model list
-            let items: Vec<ListItem> = filtered.iter().map(|m| {
-                let ctx = format!("{}k", m.context_length / 1000);
-                let free = if m.is_free() { " [FREE]" } else { "" };
-                ListItem::new(format!("{} ({}){}", m.id, ctx, free))
-            }).collect();
+            let items: Vec<ListItem> = filtered
+                .iter()
+                .map(|m| {
+                    let ctx = format!("{}k", m.context_length / 1000);
+                    let free = if m.is_free() { " [FREE]" } else { "" };
+                    ListItem::new(format!("{} ({}){}", m.id, ctx, free))
+                })
+                .collect();
 
             let list = List::new(items)
-                .block(Block::default().borders(Borders::ALL).title(format!("Models ({}/{})", filtered.len(), models.len())))
-                .highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+                .block(Block::default().borders(Borders::ALL).title(format!(
+                    "Models ({}/{})",
+                    filtered.len(),
+                    models.len()
+                )))
+                .highlight_style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                )
                 .highlight_symbol("> ");
             f.render_stateful_widget(list, chunks[1], &mut list_state);
 
@@ -217,16 +233,25 @@ enum View {
     Chat,
     Telemetry,
     Log,
-    Sessions,   // Backburners + foreign sessions
-    Prompts,    // Prompt inventory
-    Git,        // Git navigation
-    Artifacts,  // Generated files, diffs
-    Plans,      // Task plans
+    Sessions,  // Backburners + foreign sessions
+    Prompts,   // Prompt inventory
+    Git,       // Git navigation
+    Artifacts, // Generated files, diffs
+    Plans,     // Task plans
 }
 
 impl View {
     fn all() -> &'static [View] {
-        &[View::Chat, View::Telemetry, View::Log, View::Sessions, View::Prompts, View::Git, View::Artifacts, View::Plans]
+        &[
+            View::Chat,
+            View::Telemetry,
+            View::Log,
+            View::Sessions,
+            View::Prompts,
+            View::Git,
+            View::Artifacts,
+            View::Plans,
+        ]
     }
 
     fn main_views() -> &'static [View] {
@@ -247,7 +272,10 @@ impl View {
     }
 
     fn is_overlay(&self) -> bool {
-        matches!(self, View::Prompts | View::Git | View::Artifacts | View::Plans)
+        matches!(
+            self,
+            View::Prompts | View::Git | View::Artifacts | View::Plans
+        )
     }
 }
 
@@ -255,8 +283,8 @@ impl View {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ExitState {
     Running,
-    WarnOnce,  // First Ctrl-C pressed, show warning
-    Exiting,   // Second Ctrl-C, actually exit
+    WarnOnce, // First Ctrl-C pressed, show warning
+    Exiting,  // Second Ctrl-C, actually exit
 }
 
 // Keep Tab as alias for backward compatibility in rendering
@@ -268,15 +296,32 @@ enum TuiMsg {
     Done(client::TokenUsage),
     Error(String),
     /// Continue agentic loop with tool results
-    ContinueLoop { results: String, iteration: u8 },
+    ContinueLoop {
+        results: String,
+        iteration: u8,
+    },
     /// Agent mode events
     AgentStatus(String),
-    AgentToolExecuting { name: String },
-    AgentToolDone { name: String, success: bool, output: String },
-    AgentIterationDone { iteration: usize, tools: usize },
-    AgentComplete { iterations: usize, success: bool },
+    AgentToolExecuting {
+        name: String,
+    },
+    AgentToolDone {
+        name: String,
+        success: bool,
+        output: String,
+    },
+    AgentIterationDone {
+        iteration: usize,
+        tools: usize,
+    },
+    AgentComplete {
+        iterations: usize,
+        success: bool,
+    },
     /// Tool execution completed (non-blocking path)
-    ToolsComplete { feedback: String },
+    ToolsComplete {
+        feedback: String,
+    },
 }
 
 /// Main TUI state
@@ -401,7 +446,7 @@ struct Plan {
 #[derive(Debug, Clone)]
 struct DetectedSession {
     id: String,
-    tool: String,           // "hyle", "claude-code", "aider", "codex", etc.
+    tool: String, // "hyle", "claude-code", "aider", "codex", etc.
     status: SessionStatus,
     age: String,
     tokens: u64,
@@ -411,10 +456,10 @@ struct DetectedSession {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum SessionStatus {
-    Active,      // Currently running
-    Backburner,  // Running in background
-    Cold,        // Stale, can be revived
-    Foreign,     // Different tool
+    Active,     // Currently running
+    Backburner, // Running in background
+    Cold,       // Stale, can be revived
+    Foreign,    // Different tool
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -440,13 +485,21 @@ impl TuiState {
         let mut welcome_lines = Vec::new();
 
         if let Some(ref p) = project {
-            welcome_lines.push(format!("hyle: {} ({} files, {} lines)",
-                p.name, p.files.len(), p.total_lines()));
+            welcome_lines.push(format!(
+                "hyle: {} ({} files, {} lines)",
+                p.name,
+                p.files.len(),
+                p.total_lines()
+            ));
         } else {
             welcome_lines.push("hyle - Rust-native code assistant".into());
         }
 
-        welcome_lines.push(format!("Model: {}  Context: {}k tokens", model_short, context_window / 1000));
+        welcome_lines.push(format!(
+            "Model: {}  Context: {}k tokens",
+            model_short,
+            context_window / 1000
+        ));
         welcome_lines.push(String::new());
         welcome_lines.push("Quick tips:".into());
         welcome_lines.push("  /help     - show available commands".into());
@@ -559,7 +612,10 @@ impl TuiState {
         }
 
         // Auth errors
-        if lower.contains("401") || lower.contains("unauthorized") || lower.contains("invalid api key") {
+        if lower.contains("401")
+            || lower.contains("unauthorized")
+            || lower.contains("invalid api key")
+        {
             return "Invalid API key - check OPENROUTER_API_KEY".into();
         }
         if lower.contains("403") || lower.contains("forbidden") {
@@ -595,19 +651,26 @@ impl TuiState {
     /// Check if error is a rate limit and handle it
     /// Returns (handled, should_retry)
     fn handle_rate_limit_error(&mut self, error: &str) -> (bool, bool) {
-        if error.contains("429") || error.to_lowercase().contains("rate") ||
-           error.to_lowercase().contains("too many requests") {
+        if error.contains("429")
+            || error.to_lowercase().contains("rate")
+            || error.to_lowercase().contains("too many requests")
+        {
             self.rate_limit_pending = true;
 
             if let Some(new_model) = self.switch_to_next_model() {
-                self.output.push(format!("\n[Rate limited on {}. Auto-switching to {}]",
+                self.output.push(format!(
+                    "\n[Rate limited on {}. Auto-switching to {}]",
                     self.rate_limited_models.last().unwrap_or(&"?".to_string()),
-                    new_model));
-                self.output.push("[Press ESC to select a different model, or wait to retry...]".into());
+                    new_model
+                ));
+                self.output
+                    .push("[Press ESC to select a different model, or wait to retry...]".into());
                 self.rate_limit_pending = false; // Switched, no longer pending
                 return (true, true); // Handled, should retry
             } else {
-                self.output.push("\n[All free models rate limited. Press ESC to pick a different model.]".into());
+                self.output.push(
+                    "\n[All free models rate limited. Press ESC to pick a different model.]".into(),
+                );
                 return (true, false); // Handled, but no retry - user must pick
             }
         }
@@ -881,9 +944,7 @@ impl TuiState {
 
     /// Update line count cache
     fn update_line_count(&mut self) {
-        self.output_line_count = self.output.iter()
-            .map(|s| s.lines().count().max(1))
-            .sum();
+        self.output_line_count = self.output.iter().map(|s| s.lines().count().max(1)).sum();
     }
 
     /// Mark output as dirty (needs cache rebuild)
@@ -945,12 +1006,20 @@ impl TuiState {
         self.salience_keywords = extract_keywords(prompt);
 
         // Extract file references for focus tracking
-        self.focus_files = prompt.split_whitespace()
-            .filter(|w| w.contains('.') && (
-                w.ends_with(".rs") || w.ends_with(".py") || w.ends_with(".js") ||
-                w.ends_with(".ts") || w.ends_with(".go") || w.ends_with(".md") ||
-                w.ends_with(".json") || w.ends_with(".toml") || w.ends_with(".yaml")
-            ))
+        self.focus_files = prompt
+            .split_whitespace()
+            .filter(|w| {
+                w.contains('.')
+                    && (w.ends_with(".rs")
+                        || w.ends_with(".py")
+                        || w.ends_with(".js")
+                        || w.ends_with(".ts")
+                        || w.ends_with(".go")
+                        || w.ends_with(".md")
+                        || w.ends_with(".json")
+                        || w.ends_with(".toml")
+                        || w.ends_with(".yaml"))
+            })
             .map(|s| s.to_string())
             .collect();
 
@@ -958,7 +1027,10 @@ impl TuiState {
         let prompt_lower = prompt.to_lowercase();
 
         // Detect intent type
-        if prompt_lower.starts_with("fix ") || prompt_lower.contains("bug") || prompt_lower.contains("error") {
+        if prompt_lower.starts_with("fix ")
+            || prompt_lower.contains("bug")
+            || prompt_lower.contains("error")
+        {
             let intent = Intent::new(&prompt[..prompt.len().min(100)], IntentKind::Fix);
             self.intent_stack.push(intent);
         } else if prompt_lower.starts_with("also ") || prompt_lower.starts_with("and ") {
@@ -1005,9 +1077,10 @@ impl TuiState {
         }
 
         // Check for completion signals in results
-        if tool_results.contains("Task complete") ||
-           tool_results.contains("No more changes needed") ||
-           tool_results.contains("All done") {
+        if tool_results.contains("Task complete")
+            || tool_results.contains("No more changes needed")
+            || tool_results.contains("All done")
+        {
             return LoopDecision::Complete {
                 summary: "Task appears complete based on tool results".into(),
             };
@@ -1051,11 +1124,11 @@ impl TuiState {
 
         // Add intent view at appropriate verbosity based on loop iteration
         let verbosity = if self.loop_iteration == 0 {
-            Verbosity::Full  // First iteration: full context
+            Verbosity::Full // First iteration: full context
         } else if self.loop_iteration < 3 {
             Verbosity::Normal
         } else {
-            Verbosity::Minimal  // Later iterations: minimal
+            Verbosity::Minimal // Later iterations: minimal
         };
 
         ctx.push_str(&self.intent_view.for_llm(verbosity));
@@ -1064,7 +1137,11 @@ impl TuiState {
 
     /// Build salience-aware context from conversation history
     /// Returns context string with most salient items in full detail
-    fn build_salient_context(&self, messages: &[serde_json::Value], budget_tokens: usize) -> String {
+    fn build_salient_context(
+        &self,
+        messages: &[serde_json::Value],
+        budget_tokens: usize,
+    ) -> String {
         let mut salience = SalienceContext::new(budget_tokens);
         salience.set_keywords(self.salience_keywords.clone());
         salience.set_focus_files(self.focus_files.clone());
@@ -1073,7 +1150,10 @@ impl TuiState {
         let total = messages.len();
         for (i, msg) in messages.iter().enumerate() {
             let age = (total - i - 1) as u32;
-            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("unknown");
+            let role = msg
+                .get("role")
+                .and_then(|r| r.as_str())
+                .unwrap_or("unknown");
             let content = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
 
             let category = match role {
@@ -1106,7 +1186,7 @@ impl TuiState {
             salience.add_with_tier(
                 format!("[Current Focus]\n{}", intent_ctx),
                 ContextCategory::Intent,
-                SalienceTier::Focus
+                SalienceTier::Focus,
             );
         }
 
@@ -1123,7 +1203,10 @@ impl TuiState {
 
         for (i, msg) in messages.iter().enumerate() {
             let age = (messages.len() - i - 1) as u32;
-            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("unknown");
+            let role = msg
+                .get("role")
+                .and_then(|r| r.as_str())
+                .unwrap_or("unknown");
             let content = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
 
             let category = match role {
@@ -1150,7 +1233,16 @@ pub async fn run_tui(
     claude_context: Option<Vec<crate::session::Message>>,
 ) -> Result<()> {
     let mut terminal = setup_terminal()?;
-    let result = run_tui_loop(&mut terminal, api_key, model, paths, resume, project, claude_context).await;
+    let result = run_tui_loop(
+        &mut terminal,
+        api_key,
+        model,
+        paths,
+        resume,
+        project,
+        claude_context,
+    )
+    .await;
     restore_terminal(terminal)?;
     result
 }
@@ -1173,13 +1265,19 @@ async fn run_tui_loop(
         match Session::load_or_create(model) {
             Ok(s) => {
                 if s.messages.len() > 1 {
-                    state.log(format!("Resumed session {} ({} messages)", s.meta.id, s.messages.len()));
+                    state.log(format!(
+                        "Resumed session {} ({} messages)",
+                        s.meta.id,
+                        s.messages.len()
+                    ));
                     // Restore conversation to output
                     for msg in &s.messages {
                         if msg.role == "user" {
                             state.output.push(format!("> {}", msg.content));
                         } else if msg.role == "assistant" {
-                            state.output.push(format!("  {}", msg.content.lines().next().unwrap_or("")));
+                            state
+                                .output
+                                .push(format!("  {}", msg.content.lines().next().unwrap_or("")));
                             if msg.content.lines().count() > 1 {
                                 state.output.push("  ...".into());
                             }
@@ -1201,7 +1299,10 @@ async fn run_tui_loop(
     // Inject Claude Code context if available
     if let Some(claude_msgs) = claude_context {
         if !claude_msgs.is_empty() {
-            state.log(format!("Imported {} prompts from Claude Code session", claude_msgs.len()));
+            state.log(format!(
+                "Imported {} prompts from Claude Code session",
+                claude_msgs.len()
+            ));
             state.output.push("─── Imported Claude Context ───".into());
             for msg in claude_msgs {
                 // Add to session for API context
@@ -1241,7 +1342,9 @@ async fn run_tui_loop(
                     state.traces.memory.sample(); // This is cheap, keep inline
 
                     // Auto-throttle on high pressure
-                    if state.telemetry.pressure() == PressureLevel::Critical && state.throttle == ThrottleMode::Normal {
+                    if state.telemetry.pressure() == PressureLevel::Critical
+                        && state.throttle == ThrottleMode::Normal
+                    {
                         state.throttle = ThrottleMode::Throttled;
                         state.log("Auto-throttled due to high CPU pressure");
                     }
@@ -1252,7 +1355,9 @@ async fn run_tui_loop(
         // Handle pending retry after model switch
         if state.pending_retry && !state.last_prompt.is_empty() {
             state.pending_retry = false;
-            state.output.push(format!("[Retrying with {}...]", state.current_model));
+            state
+                .output
+                .push(format!("[Retrying with {}...]", state.current_model));
             state.mark_dirty();
 
             // Spawn retry API call
@@ -1264,7 +1369,15 @@ async fn run_tui_loop(
             let prompt = state.last_prompt.clone();
 
             tokio::spawn(async move {
-                match client::stream_completion_full(&api_key, &model, &prompt, project_clone.as_ref(), &history).await {
+                match client::stream_completion_full(
+                    &api_key,
+                    &model,
+                    &prompt,
+                    project_clone.as_ref(),
+                    &history,
+                )
+                .await
+                {
                     Ok(mut stream) => {
                         while let Some(event) = stream.recv().await {
                             match event {
@@ -1319,7 +1432,7 @@ async fn run_tui_loop(
                     let request_cost = crate::models::calculate_cost(
                         &state.current_model,
                         usage.prompt_tokens,
-                        usage.completion_tokens
+                        usage.completion_tokens,
                     );
                     state.session_cost += request_cost;
 
@@ -1329,7 +1442,7 @@ async fn run_tui_loop(
                     state.traces.tokens.record(
                         usage.prompt_tokens,
                         usage.completion_tokens,
-                        duration.as_secs_f64()
+                        duration.as_secs_f64(),
                     );
                     state.traces.context.record(usage.prompt_tokens);
 
@@ -1338,7 +1451,7 @@ async fn run_tui_loop(
                         state.model_tracker.record_response(
                             &state.last_prompt,
                             &state.current_response,
-                            usage.completion_tokens as u64
+                            usage.completion_tokens as u64,
                         );
 
                         if let Some(stats) = state.model_tracker.current_stats() {
@@ -1355,7 +1468,7 @@ async fn run_tui_loop(
                     if !state.current_response.is_empty() {
                         if let Err(e) = session.add_assistant_message(
                             &state.current_response,
-                            Some(usage.completion_tokens)
+                            Some(usage.completion_tokens),
                         ) {
                             state.log(format!("Session save error: {}", e));
                         }
@@ -1365,7 +1478,9 @@ async fn run_tui_loop(
                         let calls = parse_tool_calls(&response_copy);
                         if !calls.is_empty() {
                             state.executing_tools = true;
-                            state.output.push(format!("[Executing {} tool(s)...]", calls.len()));
+                            state
+                                .output
+                                .push(format!("[Executing {} tool(s)...]", calls.len()));
                             state.mark_dirty();
 
                             // Spawn tool execution in blocking thread pool
@@ -1375,8 +1490,10 @@ async fn run_tui_loop(
                                 let mut executor = ToolExecutor::new();
                                 let mut tracker = ToolCallTracker::new();
 
-                                let results = execute_tool_calls(&calls, &mut executor, &mut tracker);
-                                let indices: Vec<usize> = results.iter().map(|(idx, _)| *idx).collect();
+                                let results =
+                                    execute_tool_calls(&calls, &mut executor, &mut tracker);
+                                let indices: Vec<usize> =
+                                    results.iter().map(|(idx, _)| *idx).collect();
                                 let feedback = format_tool_results(&tracker, &indices);
 
                                 // Send results back to main loop
@@ -1400,11 +1517,17 @@ async fn run_tui_loop(
 
                     state.output.push(format!(
                         "\n[{} + {} = {} tokens, {:.1}s]",
-                        usage.prompt_tokens, usage.completion_tokens, usage.total_tokens,
+                        usage.prompt_tokens,
+                        usage.completion_tokens,
+                        usage.total_tokens,
                         duration.as_secs_f64()
                     ));
                     state.mark_dirty();
-                    state.log(format!("Completed: {} tokens in {:.1}s", usage.total_tokens, duration.as_secs_f64()));
+                    state.log(format!(
+                        "Completed: {} tokens in {:.1}s",
+                        usage.total_tokens,
+                        duration.as_secs_f64()
+                    ));
                 }
                 TuiMsg::Error(e) => {
                     state.is_generating = false;
@@ -1419,7 +1542,10 @@ async fn run_tui_loop(
                             // Set flag to retry with new model
                             state.pending_retry = true;
                             state.is_generating = true; // Keep generating state
-                            state.log(format!("Rate limit: switched to {}, retrying...", state.current_model));
+                            state.log(format!(
+                                "Rate limit: switched to {}, retrying...",
+                                state.current_model
+                            ));
                         } else {
                             state.log("All models rate limited. Press ESC to pick a model.");
                         }
@@ -1439,7 +1565,11 @@ async fn run_tui_loop(
                     state.output.push(format!("  → Executing: {}", name));
                     state.mark_dirty();
                 }
-                TuiMsg::AgentToolDone { name, success, output } => {
+                TuiMsg::AgentToolDone {
+                    name,
+                    success,
+                    output,
+                } => {
                     let icon = if success { "✓" } else { "✗" };
                     state.output.push(format!("  {} {}", icon, name));
                     // Show first few lines of output
@@ -1452,14 +1582,22 @@ async fn run_tui_loop(
                     state.mark_dirty();
                 }
                 TuiMsg::AgentIterationDone { iteration, tools } => {
-                    state.output.push(format!("─── Iteration {} ({} tools) ───", iteration, tools));
+                    state
+                        .output
+                        .push(format!("─── Iteration {} ({} tools) ───", iteration, tools));
                     state.mark_dirty();
                 }
-                TuiMsg::AgentComplete { iterations, success } => {
+                TuiMsg::AgentComplete {
+                    iterations,
+                    success,
+                } => {
                     state.agent_running = false;
                     state.is_generating = false;
                     let status = if success { "completed" } else { "stopped" };
-                    state.output.push(format!("[Agent {} after {} iterations]", status, iterations));
+                    state.output.push(format!(
+                        "[Agent {} after {} iterations]",
+                        status, iterations
+                    ));
                     state.mark_dirty();
                 }
                 TuiMsg::ToolsComplete { feedback } => {
@@ -1477,17 +1615,22 @@ async fn run_tui_loop(
                     // AGENTIC LOOP: Continue if we have tool results and haven't hit max iterations
                     if state.loop_iteration < state.max_iterations {
                         state.loop_iteration += 1;
-                        state.log(format!("Agentic loop iteration {}/{}", state.loop_iteration, state.max_iterations));
+                        state.log(format!(
+                            "Agentic loop iteration {}/{}",
+                            state.loop_iteration, state.max_iterations
+                        ));
 
                         // Send continuation message
                         let tx = tx.clone();
                         let tool_results = feedback.clone();
                         let iteration = state.loop_iteration;
                         tokio::spawn(async move {
-                            let _ = tx.send(TuiMsg::ContinueLoop {
-                                results: tool_results,
-                                iteration,
-                            }).await;
+                            let _ = tx
+                                .send(TuiMsg::ContinueLoop {
+                                    results: tool_results,
+                                    iteration,
+                                })
+                                .await;
                         });
                     } else {
                         state.loop_iteration = 0;
@@ -1496,7 +1639,9 @@ async fn run_tui_loop(
                 TuiMsg::ContinueLoop { results, iteration } => {
                     // AGENTIC LOOP: Continue with tool results
                     state.output.push(String::new());
-                    state.output.push(format!("─── Continuing (iteration {}) ───", iteration));
+                    state
+                        .output
+                        .push(format!("─── Continuing (iteration {}) ───", iteration));
                     state.mark_dirty();
 
                     // Add tool results to session as a system message
@@ -1509,13 +1654,18 @@ async fn run_tui_loop(
                     let decision = state.should_continue_loop(&results);
                     match decision {
                         LoopDecision::MaxIterations => {
-                            state.output.push("[Max iterations reached - pausing for input]".into());
+                            state
+                                .output
+                                .push("[Max iterations reached - pausing for input]".into());
                             state.is_generating = false;
                             state.loop_iteration = 0;
                             state.mark_dirty();
                             continue;
                         }
-                        LoopDecision::Stuck { reason, suggestions } => {
+                        LoopDecision::Stuck {
+                            reason,
+                            suggestions,
+                        } => {
                             state.output.push(format!("[Stuck: {}]", reason));
                             for s in suggestions {
                                 state.output.push(format!("  - {}", s));
@@ -1555,14 +1705,20 @@ async fn run_tui_loop(
                     let continuation = if intent_ctx.is_empty() {
                         "Continue based on the tool results above. If the task is complete, summarize what was done. If more steps are needed, proceed with the next step.".to_string()
                     } else {
-                        format!("{}\n\nContinue with the next step. If done, summarize.", intent_ctx)
+                        format!(
+                            "{}\n\nContinue with the next step. If done, summarize.",
+                            intent_ctx
+                        )
                     };
 
-                    state.output.push(format!("> {}", if continuation.len() > 60 {
-                        format!("{}...", &continuation[..60])
-                    } else {
-                        continuation.clone()
-                    }));
+                    state.output.push(format!(
+                        "> {}",
+                        if continuation.len() > 60 {
+                            format!("{}...", &continuation[..60])
+                        } else {
+                            continuation.clone()
+                        }
+                    ));
                     state.output.push(String::new()); // For response
                     state.is_generating = true;
                     state.ttft = None;
@@ -1578,7 +1734,15 @@ async fn run_tui_loop(
                     let cont_prompt = continuation;
 
                     tokio::spawn(async move {
-                        match client::stream_completion_full(&api_key, &model, &cont_prompt, project_clone.as_ref(), &history).await {
+                        match client::stream_completion_full(
+                            &api_key,
+                            &model,
+                            &cont_prompt,
+                            project_clone.as_ref(),
+                            &history,
+                        )
+                        .await
+                        {
                             Ok(mut stream) => {
                                 while let Some(event) = stream.recv().await {
                                     match event {
@@ -1620,9 +1784,7 @@ async fn run_tui_loop(
                 Event::Paste(pasted) => {
                     if state.tab == View::Chat {
                         // Replace newlines with spaces for single-line input
-                        let cleaned: String = pasted.lines()
-                            .collect::<Vec<_>>()
-                            .join(" ");
+                        let cleaned: String = pasted.lines().collect::<Vec<_>>().join(" ");
                         for c in cleaned.chars() {
                             state.input.insert(state.cursor_pos, c);
                             state.cursor_pos += 1;
@@ -1632,437 +1794,580 @@ async fn run_tui_loop(
                     continue;
                 }
                 Event::Key(key) => {
-                if key.kind != KeyEventKind::Press {
-                    continue;
-                }
+                    if key.kind != KeyEventKind::Press {
+                        continue;
+                    }
 
-                // Check exit timeout
-                state.check_exit_timeout();
+                    // Check exit timeout
+                    state.check_exit_timeout();
 
-                // Global controls
-                match key.code {
-                    // Ctrl-C: warn first, then exit
-                    KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        if state.handle_ctrl_c() {
-                            // Save session before exit
-                            if let Err(e) = session.save_meta() {
-                                state.log(format!("Session save error: {}", e));
-                            }
-                            break;
-                        }
-                    }
-                    // Esc: zoom out (context-dependent)
-                    KeyCode::Esc => {
-                        if state.in_overlay() {
-                            // Pop back from overlay view
-                            state.pop_view();
-                        } else if state.rate_limit_pending {
-                            // We hit rate limit - show available models
-                            state.output.push(String::new());
-                            state.output.push("─── Available Models (use /switch <model>) ───".into());
-                            for (i, m) in FREE_MODEL_FALLBACKS.iter().enumerate() {
-                                let marker = if state.rate_limited_models.contains(&m.to_string()) {
-                                    "✗" // Rate limited
-                                } else if *m == state.current_model {
-                                    "●" // Current
-                                } else {
-                                    " "
-                                };
-                                state.output.push(format!("  [{}] {}: {}", marker, i + 1, m));
-                            }
-                            state.output.push("─── Type /switch <name> or /switch 1-5 ───".into());
-                            state.rate_limit_pending = false;
-                            state.mark_dirty();
-                        } else if state.input.is_empty() {
-                            // Clear any selection state, but don't exit
-                            state.history_index = None;
-                            state.auto_scroll = true;
-                        } else {
-                            // Clear input
-                            state.input.clear();
-                            state.cursor_pos = 0;
-                            state.history_index = None;
-                        }
-                    }
-                    // Tab: cycle through main views
-                    KeyCode::Tab => {
-                        let views = View::main_views();
-                        let idx = views.iter().position(|v| *v == state.tab).unwrap_or(0);
-                        state.tab = views[(idx + 1) % views.len()];
-                        state.view_stack.clear(); // Clear stack when switching tabs
-                        // Auto-refresh when entering Sessions
-                        if state.tab == View::Sessions {
-                            state.refresh_sessions();
-                        }
-                    }
-                    // Shift+Tab: cycle backwards
-                    KeyCode::BackTab => {
-                        let views = View::main_views();
-                        let idx = views.iter().position(|v| *v == state.tab).unwrap_or(0);
-                        state.tab = views[(idx + views.len() - 1) % views.len()];
-                        state.view_stack.clear();
-                        // Auto-refresh when entering Sessions
-                        if state.tab == View::Sessions {
-                            state.refresh_sessions();
-                        }
-                    }
-                    // Quick access to overlay views
-                    KeyCode::Char('p') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        state.push_view(View::Prompts);
-                    }
-                    KeyCode::Char('g') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        state.refresh_git_status();
-                        state.push_view(View::Git);
-                    }
-                    KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        state.push_view(View::Artifacts);
-                    }
-                    KeyCode::Char('k') if key.modifiers.is_empty() && state.is_generating => {
-                        state.throttle = ThrottleMode::Killed;
-                        state.log("Operation killed");
-                    }
-                    KeyCode::Char('c') if key.modifiers.is_empty() && state.telemetry.spike_snapshot.is_some() => {
-                        state.telemetry.clear_spike();
-                        state.log("Spike snapshot cleared");
-                    }
-                    KeyCode::Char('t') if key.modifiers.is_empty() => {
-                        state.throttle = ThrottleMode::Throttled;
-                        state.log("Switched to throttled mode");
-                    }
-                    KeyCode::Char('f') if key.modifiers.is_empty() && !state.is_generating => {
-                        state.throttle = ThrottleMode::Full;
-                        state.log("Switched to full speed mode");
-                    }
-                    KeyCode::Char('n') if key.modifiers.is_empty() => {
-                        state.throttle = ThrottleMode::Normal;
-                        state.log("Switched to normal mode");
-                    }
-                    // Refresh sessions with 'r' in Sessions view
-                    KeyCode::Char('r') if state.tab == View::Sessions => {
-                        state.refresh_sessions();
-                        state.log(format!("Refreshed: {} sessions found", state.detected_sessions.len()));
-                    }
-                    _ => {}
-                }
-
-                // Chat view - scrolling always works
-                if state.tab == Tab::Chat {
+                    // Global controls
                     match key.code {
-                        KeyCode::PageUp => {
-                            state.scroll_offset = state.scroll_offset.saturating_sub(10);
-                            state.auto_scroll = false;
+                        // Ctrl-C: warn first, then exit
+                        KeyCode::Char('c')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            if state.handle_ctrl_c() {
+                                // Save session before exit
+                                if let Err(e) = session.save_meta() {
+                                    state.log(format!("Session save error: {}", e));
+                                }
+                                break;
+                            }
                         }
-                        KeyCode::PageDown => {
-                            state.scroll_offset = state.scroll_offset.saturating_add(10);
-                        }
-                        KeyCode::End => {
-                            state.auto_scroll = true;
-                        }
-                        _ => {}
-                    }
-                }
-
-                // Chat view input - typing always works, Enter blocked during generation
-                if state.tab == Tab::Chat {
-                    match key.code {
-                        // History navigation - only when not generating
-                        KeyCode::Up if !state.is_generating => {
-                            state.history_up();
-                        }
-                        KeyCode::Down if !state.is_generating => {
-                            state.history_down();
-                        }
-                        // Enter - only when not generating
-                        KeyCode::Enter if !state.is_generating => {
-                            if !state.input.is_empty() {
-                                let prompt = state.input.clone();
-                                state.add_to_history(&prompt);
+                        // Esc: zoom out (context-dependent)
+                        KeyCode::Esc => {
+                            if state.in_overlay() {
+                                // Pop back from overlay view
+                                state.pop_view();
+                            } else if state.rate_limit_pending {
+                                // We hit rate limit - show available models
+                                state.output.push(String::new());
+                                state
+                                    .output
+                                    .push("─── Available Models (use /switch <model>) ───".into());
+                                for (i, m) in FREE_MODEL_FALLBACKS.iter().enumerate() {
+                                    let marker =
+                                        if state.rate_limited_models.contains(&m.to_string()) {
+                                            "✗" // Rate limited
+                                        } else if *m == state.current_model {
+                                            "●" // Current
+                                        } else {
+                                            " "
+                                        };
+                                    state
+                                        .output
+                                        .push(format!("  [{}] {}: {}", marker, i + 1, m));
+                                }
+                                state
+                                    .output
+                                    .push("─── Type /switch <name> or /switch 1-5 ───".into());
+                                state.rate_limit_pending = false;
+                                state.mark_dirty();
+                            } else if state.input.is_empty() {
+                                // Clear any selection state, but don't exit
+                                state.history_index = None;
+                                state.auto_scroll = true;
+                            } else {
+                                // Clear input
                                 state.input.clear();
                                 state.cursor_pos = 0;
                                 state.history_index = None;
-                                state.output.push(format!("> {}", prompt));
-                                state.mark_dirty();
+                            }
+                        }
+                        // Tab: cycle through main views
+                        KeyCode::Tab => {
+                            let views = View::main_views();
+                            let idx = views.iter().position(|v| *v == state.tab).unwrap_or(0);
+                            state.tab = views[(idx + 1) % views.len()];
+                            state.view_stack.clear(); // Clear stack when switching tabs
+                                                      // Auto-refresh when entering Sessions
+                            if state.tab == View::Sessions {
+                                state.refresh_sessions();
+                            }
+                        }
+                        // Shift+Tab: cycle backwards
+                        KeyCode::BackTab => {
+                            let views = View::main_views();
+                            let idx = views.iter().position(|v| *v == state.tab).unwrap_or(0);
+                            state.tab = views[(idx + views.len() - 1) % views.len()];
+                            state.view_stack.clear();
+                            // Auto-refresh when entering Sessions
+                            if state.tab == View::Sessions {
+                                state.refresh_sessions();
+                            }
+                        }
+                        // Quick access to overlay views
+                        KeyCode::Char('p')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            state.push_view(View::Prompts);
+                        }
+                        KeyCode::Char('g')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            state.refresh_git_status();
+                            state.push_view(View::Git);
+                        }
+                        KeyCode::Char('a')
+                            if key
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
+                            state.push_view(View::Artifacts);
+                        }
+                        KeyCode::Char('k') if key.modifiers.is_empty() && state.is_generating => {
+                            state.throttle = ThrottleMode::Killed;
+                            state.log("Operation killed");
+                        }
+                        KeyCode::Char('c')
+                            if key.modifiers.is_empty()
+                                && state.telemetry.spike_snapshot.is_some() =>
+                        {
+                            state.telemetry.clear_spike();
+                            state.log("Spike snapshot cleared");
+                        }
+                        KeyCode::Char('t') if key.modifiers.is_empty() => {
+                            state.throttle = ThrottleMode::Throttled;
+                            state.log("Switched to throttled mode");
+                        }
+                        KeyCode::Char('f') if key.modifiers.is_empty() && !state.is_generating => {
+                            state.throttle = ThrottleMode::Full;
+                            state.log("Switched to full speed mode");
+                        }
+                        KeyCode::Char('n') if key.modifiers.is_empty() => {
+                            state.throttle = ThrottleMode::Normal;
+                            state.log("Switched to normal mode");
+                        }
+                        // Refresh sessions with 'r' in Sessions view
+                        KeyCode::Char('r') if state.tab == View::Sessions => {
+                            state.refresh_sessions();
+                            state.log(format!(
+                                "Refreshed: {} sessions found",
+                                state.detected_sessions.len()
+                            ));
+                        }
+                        _ => {}
+                    }
+
+                    // Chat view - scrolling always works
+                    if state.tab == Tab::Chat {
+                        match key.code {
+                            KeyCode::PageUp => {
+                                state.scroll_offset = state.scroll_offset.saturating_sub(10);
+                                state.auto_scroll = false;
+                            }
+                            KeyCode::PageDown => {
+                                state.scroll_offset = state.scroll_offset.saturating_add(10);
+                            }
+                            KeyCode::End => {
                                 state.auto_scroll = true;
+                            }
+                            _ => {}
+                        }
+                    }
 
-                                // Check for slash commands first
-                                if is_slash_command(&prompt) {
-                                    let project_type = state.project_type_str();
-                                    let ctx = SlashContext {
-                                        project_type: project_type.map(|s| s.to_string()),
-                                        model: state.current_model.clone(),
-                                        session_id: session.meta.id.clone(),
-                                        total_tokens: session.meta.total_tokens,
-                                        message_count: session.messages.len(),
-                                    };
-                                    if let Some(result) = execute_slash_command_with_context(&prompt, project_type, Some(&ctx)) {
-                                        // Handle special SWITCH_MODEL signals
-                                        if result.output == "SWITCH_MODEL_PICKER" {
-                                            state.output.push("─── Available Models ───".into());
-                                            for (i, m) in FREE_MODEL_FALLBACKS.iter().enumerate() {
-                                                let marker = if state.rate_limited_models.contains(&m.to_string()) {
-                                                    "✗"
-                                                } else if *m == state.current_model {
-                                                    "●"
+                    // Chat view input - typing always works, Enter blocked during generation
+                    if state.tab == Tab::Chat {
+                        match key.code {
+                            // History navigation - only when not generating
+                            KeyCode::Up if !state.is_generating => {
+                                state.history_up();
+                            }
+                            KeyCode::Down if !state.is_generating => {
+                                state.history_down();
+                            }
+                            // Enter - only when not generating
+                            KeyCode::Enter if !state.is_generating => {
+                                if !state.input.is_empty() {
+                                    let prompt = state.input.clone();
+                                    state.add_to_history(&prompt);
+                                    state.input.clear();
+                                    state.cursor_pos = 0;
+                                    state.history_index = None;
+                                    state.output.push(format!("> {}", prompt));
+                                    state.mark_dirty();
+                                    state.auto_scroll = true;
+
+                                    // Check for slash commands first
+                                    if is_slash_command(&prompt) {
+                                        let project_type = state.project_type_str();
+                                        let ctx = SlashContext {
+                                            project_type: project_type.map(|s| s.to_string()),
+                                            model: state.current_model.clone(),
+                                            session_id: session.meta.id.clone(),
+                                            total_tokens: session.meta.total_tokens,
+                                            message_count: session.messages.len(),
+                                        };
+                                        if let Some(result) = execute_slash_command_with_context(
+                                            &prompt,
+                                            project_type,
+                                            Some(&ctx),
+                                        ) {
+                                            // Handle special SWITCH_MODEL signals
+                                            if result.output == "SWITCH_MODEL_PICKER" {
+                                                state
+                                                    .output
+                                                    .push("─── Available Models ───".into());
+                                                for (i, m) in
+                                                    FREE_MODEL_FALLBACKS.iter().enumerate()
+                                                {
+                                                    let marker = if state
+                                                        .rate_limited_models
+                                                        .contains(&m.to_string())
+                                                    {
+                                                        "✗"
+                                                    } else if *m == state.current_model {
+                                                        "●"
+                                                    } else {
+                                                        " "
+                                                    };
+                                                    state.output.push(format!(
+                                                        "  [{}] {}: {}",
+                                                        marker,
+                                                        i + 1,
+                                                        m
+                                                    ));
+                                                }
+                                                state.output.push(
+                                                    "Use /switch <name> or /switch 1-5".into(),
+                                                );
+                                                state.mark_dirty();
+                                                continue;
+                                            } else if result.output.starts_with("SWITCH_MODEL:") {
+                                                let target = result
+                                                    .output
+                                                    .trim_start_matches("SWITCH_MODEL:");
+                                                // Try to parse as number first
+                                                let new_model =
+                                                    if let Ok(n) = target.parse::<usize>() {
+                                                        FREE_MODEL_FALLBACKS
+                                                            .get(n.saturating_sub(1))
+                                                            .map(|s| s.to_string())
+                                                    } else {
+                                                        // Find by partial match
+                                                        FREE_MODEL_FALLBACKS
+                                                            .iter()
+                                                            .find(|m| m.contains(target))
+                                                            .map(|s| s.to_string())
+                                                    };
+
+                                                if let Some(model) = new_model {
+                                                    state.current_model = model.clone();
+                                                    state.rate_limited_models.clear(); // Clear rate limits when manually switching
+                                                    state.rate_limit_pending = false;
+                                                    state.output.push(format!(
+                                                        "[✓] Switched to: {}",
+                                                        model
+                                                    ));
+                                                    state.log(format!(
+                                                        "Model switched to: {}",
+                                                        model
+                                                    ));
                                                 } else {
-                                                    " "
-                                                };
-                                                state.output.push(format!("  [{}] {}: {}", marker, i + 1, m));
+                                                    state.output.push(format!(
+                                                        "[✗] Unknown model: {}",
+                                                        target
+                                                    ));
+                                                }
+                                                state.mark_dirty();
+                                                continue;
+                                            } else if result.output == "TOGGLE_AGENT_MODE" {
+                                                state.agent_mode = !state.agent_mode;
+                                                let mode =
+                                                    if state.agent_mode { "ON" } else { "OFF" };
+                                                state
+                                                    .output
+                                                    .push(format!("[Agent Mode: {}]", mode));
+                                                if state.agent_mode {
+                                                    state.output.push("  LLM will autonomously execute tools until task complete".into());
+                                                } else {
+                                                    state.output.push("  LLM will respond without automatic tool execution".into());
+                                                }
+                                                state.mark_dirty();
+                                                continue;
                                             }
-                                            state.output.push("Use /switch <name> or /switch 1-5".into());
-                                            state.mark_dirty();
-                                            continue;
-                                        } else if result.output.starts_with("SWITCH_MODEL:") {
-                                            let target = result.output.trim_start_matches("SWITCH_MODEL:");
-                                            // Try to parse as number first
-                                            let new_model = if let Ok(n) = target.parse::<usize>() {
-                                                FREE_MODEL_FALLBACKS.get(n.saturating_sub(1)).map(|s| s.to_string())
-                                            } else {
-                                                // Find by partial match
-                                                FREE_MODEL_FALLBACKS.iter()
-                                                    .find(|m| m.contains(target))
-                                                    .map(|s| s.to_string())
-                                            };
 
-                                            if let Some(model) = new_model {
-                                                state.current_model = model.clone();
-                                                state.rate_limited_models.clear(); // Clear rate limits when manually switching
-                                                state.rate_limit_pending = false;
-                                                state.output.push(format!("[✓] Switched to: {}", model));
-                                                state.log(format!("Model switched to: {}", model));
-                                            } else {
-                                                state.output.push(format!("[✗] Unknown model: {}", target));
+                                            let status = if result.success { "✓" } else { "✗" };
+                                            state.output.push(format!("[{}] {}", status, prompt));
+                                            for line in result.output.lines().take(50) {
+                                                state.output.push(format!("  {}", line));
+                                            }
+                                            if result.output.lines().count() > 50 {
+                                                state.output.push("  ... (truncated)".into());
                                             }
                                             state.mark_dirty();
-                                            continue;
-                                        } else if result.output == "TOGGLE_AGENT_MODE" {
-                                            state.agent_mode = !state.agent_mode;
-                                            let mode = if state.agent_mode { "ON" } else { "OFF" };
-                                            state.output.push(format!("[Agent Mode: {}]", mode));
-                                            if state.agent_mode {
-                                                state.output.push("  LLM will autonomously execute tools until task complete".into());
-                                            } else {
-                                                state.output.push("  LLM will respond without automatic tool execution".into());
-                                            }
-                                            state.mark_dirty();
+                                            state.log(format!(
+                                                "Slash: {} -> {}",
+                                                prompt,
+                                                if result.success { "ok" } else { "failed" }
+                                            ));
                                             continue;
                                         }
-
-                                        let status = if result.success { "✓" } else { "✗" };
-                                        state.output.push(format!("[{}] {}", status, prompt));
-                                        for line in result.output.lines().take(50) {
-                                            state.output.push(format!("  {}", line));
-                                        }
-                                        if result.output.lines().count() > 50 {
-                                            state.output.push("  ... (truncated)".into());
-                                        }
-                                        state.mark_dirty();
-                                        state.log(format!("Slash: {} -> {}", prompt, if result.success { "ok" } else { "failed" }));
-                                        continue;
+                                        // Unknown slash command falls through to LLM
                                     }
-                                    // Unknown slash command falls through to LLM
-                                }
 
-                                state.output.push(String::new()); // For response
-                                state.is_generating = true;
-                                state.ttft = None;
-                                state.request_start = std::time::Instant::now();
-                                state.last_token_time = std::time::Instant::now();
-                                state.log(format!("Sending: {}", &prompt[..prompt.len().min(50)]));
-                                state.last_prompt = prompt.clone();
+                                    state.output.push(String::new()); // For response
+                                    state.is_generating = true;
+                                    state.ttft = None;
+                                    state.request_start = std::time::Instant::now();
+                                    state.last_token_time = std::time::Instant::now();
+                                    state.log(format!(
+                                        "Sending: {}",
+                                        &prompt[..prompt.len().min(50)]
+                                    ));
+                                    state.last_prompt = prompt.clone();
 
-                                // Save user message to session
-                                if let Err(e) = session.add_user_message(&prompt) {
-                                    state.log(format!("Session save error: {}", e));
-                                }
+                                    // Save user message to session
+                                    if let Err(e) = session.add_user_message(&prompt) {
+                                        state.log(format!("Session save error: {}", e));
+                                    }
 
-                                // Update intent tracking
-                                state.update_intent_from_prompt(&prompt);
-                                state.loop_iteration = 0; // New prompt resets loop counter
-                                state.stuck_detector.clear(); // Clear stuck detection for new task
+                                    // Update intent tracking
+                                    state.update_intent_from_prompt(&prompt);
+                                    state.loop_iteration = 0; // New prompt resets loop counter
+                                    state.stuck_detector.clear(); // Clear stuck detection for new task
 
-                                // Spawn API call with session history
-                                let tx = tx.clone();
-                                let api_key = state.api_key.clone();
-                                let model = state.current_model.clone(); // Use state model, can switch on rate limit
-                                let project_clone = state.project.clone();
-                                let history = session.messages_for_api();
+                                    // Spawn API call with session history
+                                    let tx = tx.clone();
+                                    let api_key = state.api_key.clone();
+                                    let model = state.current_model.clone(); // Use state model, can switch on rate limit
+                                    let project_clone = state.project.clone();
+                                    let history = session.messages_for_api();
 
-                                tokio::spawn(async move {
-                                    match client::stream_completion_full(&api_key, &model, &prompt, project_clone.as_ref(), &history).await {
-                                        Ok(mut stream) => {
-                                            while let Some(event) = stream.recv().await {
-                                                match event {
-                                                    StreamEvent::Token(t) => {
-                                                        let _ = tx.send(TuiMsg::Token(t)).await;
-                                                    }
-                                                    StreamEvent::Done(u) => {
-                                                        let _ = tx.send(TuiMsg::Done(u)).await;
-                                                    }
-                                                    StreamEvent::Error(e) => {
-                                                        let _ = tx.send(TuiMsg::Error(e)).await;
+                                    tokio::spawn(async move {
+                                        match client::stream_completion_full(
+                                            &api_key,
+                                            &model,
+                                            &prompt,
+                                            project_clone.as_ref(),
+                                            &history,
+                                        )
+                                        .await
+                                        {
+                                            Ok(mut stream) => {
+                                                while let Some(event) = stream.recv().await {
+                                                    match event {
+                                                        StreamEvent::Token(t) => {
+                                                            let _ = tx.send(TuiMsg::Token(t)).await;
+                                                        }
+                                                        StreamEvent::Done(u) => {
+                                                            let _ = tx.send(TuiMsg::Done(u)).await;
+                                                        }
+                                                        StreamEvent::Error(e) => {
+                                                            let _ = tx.send(TuiMsg::Error(e)).await;
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            let _ = tx.send(TuiMsg::Error(e.to_string())).await;
-                                        }
-                                    }
-                                });
-                            }
-                        }
-                        // Readline: Ctrl-A = jump to start
-                        KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                            state.cursor_pos = 0;
-                        }
-                        // Readline: Ctrl-E = jump to end
-                        KeyCode::Char('e') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                            state.cursor_pos = state.input.len();
-                        }
-                        // Readline: Ctrl-K = kill to end of line
-                        KeyCode::Char('k') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                            state.input.truncate(state.cursor_pos);
-                        }
-                        // Readline: Ctrl-U = kill to start of line
-                        KeyCode::Char('u') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                            state.input = state.input[state.cursor_pos..].to_string();
-                            state.cursor_pos = 0;
-                        }
-                        // Left arrow: move cursor left
-                        KeyCode::Left => {
-                            state.cursor_pos = state.cursor_pos.saturating_sub(1);
-                        }
-                        // Right arrow: move cursor right
-                        KeyCode::Right => {
-                            state.cursor_pos = (state.cursor_pos + 1).min(state.input.len());
-                        }
-                        // Home: jump to start
-                        KeyCode::Home => {
-                            state.cursor_pos = 0;
-                        }
-                        // Insert character at cursor position
-                        KeyCode::Char(c) => {
-                            state.input.insert(state.cursor_pos, c);
-                            state.cursor_pos += 1;
-                        }
-                        // Backspace: delete char before cursor
-                        KeyCode::Backspace => {
-                            if state.cursor_pos > 0 {
-                                state.input.remove(state.cursor_pos - 1);
-                                state.cursor_pos -= 1;
-                            }
-                        }
-                        // Delete: delete char at cursor
-                        KeyCode::Delete => {
-                            if state.cursor_pos < state.input.len() {
-                                state.input.remove(state.cursor_pos);
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-
-                // Prompts view navigation
-                if state.tab == View::Prompts {
-                    match key.code {
-                        KeyCode::Up => {
-                            if state.prompt_selected > 0 {
-                                state.prompt_selected -= 1;
-                            }
-                        }
-                        KeyCode::Down => {
-                            if state.prompt_selected < state.prompt_history.len().saturating_sub(1) {
-                                state.prompt_selected += 1;
-                            }
-                        }
-                        KeyCode::Enter => {
-                            // Copy selected prompt to input and switch to Chat
-                            if let Some(prompt) = state.prompt_history.get(state.prompt_selected) {
-                                state.input = prompt.clone();
-                                state.cursor_pos = state.input.len();
-                                state.pop_view();
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-
-                // Sessions view navigation
-                if state.tab == View::Sessions {
-                    match key.code {
-                        KeyCode::Up => {
-                            if state.session_selected > 0 {
-                                state.session_selected -= 1;
-                            }
-                        }
-                        KeyCode::Down => {
-                            if state.session_selected < state.detected_sessions.len().saturating_sub(1) {
-                                state.session_selected += 1;
-                            }
-                        }
-                        KeyCode::Enter => {
-                            // Restore selected session
-                            if let Some(session) = state.detected_sessions.get(state.session_selected).cloned() {
-                                match session.tool.as_str() {
-                                    "hyle" => {
-                                        // Restore hyle session by loading and displaying its contents
-                                        match crate::session::Session::load(&session.id) {
-                                            Ok(loaded) => {
-                                                // Add session messages to output display
-                                                state.output.push(format!("\n─── Restored session {} ───", session.id));
-                                                for msg in &loaded.messages {
-                                                    let prefix = if msg.role == "user" { "You" } else { "AI" };
-                                                    state.output.push(format!("[{}] {}", prefix, msg.content));
-                                                }
-                                                state.output.push("─── End of restored session ───\n".into());
-                                                state.output_dirty = true;
-                                                state.log(format!("Restored {} messages from session {}", loaded.messages.len(), session.id));
-                                                state.tab = View::Chat;
                                             }
                                             Err(e) => {
-                                                state.log(format!("Failed to load session: {}", e));
+                                                let _ = tx.send(TuiMsg::Error(e.to_string())).await;
                                             }
                                         }
-                                    }
-                                    "claude-code" => {
-                                        // Import Claude Code context from current directory
-                                        let cwd = std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default();
-                                        match crate::session::import_claude_context(&cwd, 10) {
-                                            Ok(msgs) if !msgs.is_empty() => {
-                                                state.output.push(format!("\n─── Imported {} Claude Code prompts ───", msgs.len()));
-                                                for msg in &msgs {
-                                                    state.output.push(format!("[Claude] {}", msg.content));
+                                    });
+                                }
+                            }
+                            // Readline: Ctrl-A = jump to start
+                            KeyCode::Char('a')
+                                if key
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                            {
+                                state.cursor_pos = 0;
+                            }
+                            // Readline: Ctrl-E = jump to end
+                            KeyCode::Char('e')
+                                if key
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                            {
+                                state.cursor_pos = state.input.len();
+                            }
+                            // Readline: Ctrl-K = kill to end of line
+                            KeyCode::Char('k')
+                                if key
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                            {
+                                state.input.truncate(state.cursor_pos);
+                            }
+                            // Readline: Ctrl-U = kill to start of line
+                            KeyCode::Char('u')
+                                if key
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                            {
+                                state.input = state.input[state.cursor_pos..].to_string();
+                                state.cursor_pos = 0;
+                            }
+                            // Left arrow: move cursor left
+                            KeyCode::Left => {
+                                state.cursor_pos = state.cursor_pos.saturating_sub(1);
+                            }
+                            // Right arrow: move cursor right
+                            KeyCode::Right => {
+                                state.cursor_pos = (state.cursor_pos + 1).min(state.input.len());
+                            }
+                            // Home: jump to start
+                            KeyCode::Home => {
+                                state.cursor_pos = 0;
+                            }
+                            // Insert character at cursor position
+                            KeyCode::Char(c) => {
+                                state.input.insert(state.cursor_pos, c);
+                                state.cursor_pos += 1;
+                            }
+                            // Backspace: delete char before cursor
+                            KeyCode::Backspace => {
+                                if state.cursor_pos > 0 {
+                                    state.input.remove(state.cursor_pos - 1);
+                                    state.cursor_pos -= 1;
+                                }
+                            }
+                            // Delete: delete char at cursor
+                            KeyCode::Delete => {
+                                if state.cursor_pos < state.input.len() {
+                                    state.input.remove(state.cursor_pos);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    // Prompts view navigation
+                    if state.tab == View::Prompts {
+                        match key.code {
+                            KeyCode::Up => {
+                                if state.prompt_selected > 0 {
+                                    state.prompt_selected -= 1;
+                                }
+                            }
+                            KeyCode::Down => {
+                                if state.prompt_selected
+                                    < state.prompt_history.len().saturating_sub(1)
+                                {
+                                    state.prompt_selected += 1;
+                                }
+                            }
+                            KeyCode::Enter => {
+                                // Copy selected prompt to input and switch to Chat
+                                if let Some(prompt) =
+                                    state.prompt_history.get(state.prompt_selected)
+                                {
+                                    state.input = prompt.clone();
+                                    state.cursor_pos = state.input.len();
+                                    state.pop_view();
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    // Sessions view navigation
+                    if state.tab == View::Sessions {
+                        match key.code {
+                            KeyCode::Up => {
+                                if state.session_selected > 0 {
+                                    state.session_selected -= 1;
+                                }
+                            }
+                            KeyCode::Down => {
+                                if state.session_selected
+                                    < state.detected_sessions.len().saturating_sub(1)
+                                {
+                                    state.session_selected += 1;
+                                }
+                            }
+                            KeyCode::Enter => {
+                                // Restore selected session
+                                if let Some(session) =
+                                    state.detected_sessions.get(state.session_selected).cloned()
+                                {
+                                    match session.tool.as_str() {
+                                        "hyle" => {
+                                            // Restore hyle session by loading and displaying its contents
+                                            match crate::session::Session::load(&session.id) {
+                                                Ok(loaded) => {
+                                                    // Add session messages to output display
+                                                    state.output.push(format!(
+                                                        "\n─── Restored session {} ───",
+                                                        session.id
+                                                    ));
+                                                    for msg in &loaded.messages {
+                                                        let prefix = if msg.role == "user" {
+                                                            "You"
+                                                        } else {
+                                                            "AI"
+                                                        };
+                                                        state.output.push(format!(
+                                                            "[{}] {}",
+                                                            prefix, msg.content
+                                                        ));
+                                                    }
+                                                    state.output.push(
+                                                        "─── End of restored session ───\n".into(),
+                                                    );
+                                                    state.output_dirty = true;
+                                                    state.log(format!(
+                                                        "Restored {} messages from session {}",
+                                                        loaded.messages.len(),
+                                                        session.id
+                                                    ));
+                                                    state.tab = View::Chat;
                                                 }
-                                                state.output.push("─── End of import ───\n".into());
-                                                state.output_dirty = true;
-                                                state.log(format!("Imported {} prompts from Claude Code", msgs.len()));
-                                                state.tab = View::Chat;
-                                            }
-                                            _ => {
-                                                state.log("No context found in Claude Code session");
+                                                Err(e) => {
+                                                    state.log(format!(
+                                                        "Failed to load session: {}",
+                                                        e
+                                                    ));
+                                                }
                                             }
                                         }
-                                    }
-                                    _ => {
-                                        state.log(format!("Cannot restore {} session (read-only)", session.tool));
+                                        "claude-code" => {
+                                            // Import Claude Code context from current directory
+                                            let cwd = std::env::current_dir()
+                                                .map(|p| p.display().to_string())
+                                                .unwrap_or_default();
+                                            match crate::session::import_claude_context(&cwd, 10) {
+                                                Ok(msgs) if !msgs.is_empty() => {
+                                                    state.output.push(format!(
+                                                        "\n─── Imported {} Claude Code prompts ───",
+                                                        msgs.len()
+                                                    ));
+                                                    for msg in &msgs {
+                                                        state.output.push(format!(
+                                                            "[Claude] {}",
+                                                            msg.content
+                                                        ));
+                                                    }
+                                                    state
+                                                        .output
+                                                        .push("─── End of import ───\n".into());
+                                                    state.output_dirty = true;
+                                                    state.log(format!(
+                                                        "Imported {} prompts from Claude Code",
+                                                        msgs.len()
+                                                    ));
+                                                    state.tab = View::Chat;
+                                                }
+                                                _ => {
+                                                    state.log(
+                                                        "No context found in Claude Code session",
+                                                    );
+                                                }
+                                            }
+                                        }
+                                        _ => {
+                                            state.log(format!(
+                                                "Cannot restore {} session (read-only)",
+                                                session.tool
+                                            ));
+                                        }
                                     }
                                 }
                             }
-                        }
-                        KeyCode::Char('v') => {
-                            // View session details
-                            if let Some(session) = state.detected_sessions.get(state.session_selected) {
-                                state.log(format!(
-                                    "Session: {} | Tool: {} | {} msgs | {} tokens",
-                                    session.id, session.tool, session.messages, session.tokens
-                                ));
+                            KeyCode::Char('v') => {
+                                // View session details
+                                if let Some(session) =
+                                    state.detected_sessions.get(state.session_selected)
+                                {
+                                    state.log(format!(
+                                        "Session: {} | Tool: {} | {} msgs | {} tokens",
+                                        session.id, session.tool, session.messages, session.tokens
+                                    ));
+                                }
                             }
+                            _ => {}
                         }
-                        _ => {}
                     }
-                }
-                }  // end Event::Key
-                _ => {}  // ignore other events (resize, focus, etc.)
+                } // end Event::Key
+                _ => {} // ignore other events (resize, focus, etc.)
             }
         }
     }
@@ -2076,10 +2381,10 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Header + tabs
-            Constraint::Min(5),     // Main content
-            Constraint::Length(3),  // Input
-            Constraint::Length(1),  // Status
+            Constraint::Length(3), // Header + tabs
+            Constraint::Min(5),    // Main content
+            Constraint::Length(3), // Input
+            Constraint::Length(1), // Status
         ])
         .split(area);
 
@@ -2097,7 +2402,11 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
 
     // Use current_model from state (can change at runtime via /switch or rate limit)
     let model_display = if !state.rate_limited_models.is_empty() {
-        format!("{} ({}✗)", state.current_model, state.rate_limited_models.len())
+        format!(
+            "{} ({}✗)",
+            state.current_model,
+            state.rate_limited_models.len()
+        )
     } else {
         state.current_model.clone()
     };
@@ -2122,15 +2431,30 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
     };
 
     let header_title = if exit_warning {
-        format!("hyle | {} | ⚠ Press Ctrl-C again to quit{}", model_display, nav_hint)
+        format!(
+            "hyle | {} | ⚠ Press Ctrl-C again to quit{}",
+            model_display, nav_hint
+        )
     } else if state.rate_limit_pending {
-        format!("hyle | {} | ⚠ Rate limited - press ESC{}", model_display, nav_hint)
+        format!(
+            "hyle | {} | ⚠ Rate limited - press ESC{}",
+            model_display, nav_hint
+        )
     } else if state.traces.context.is_full() {
-        format!("hyle | {}{}{} | ⚠ CONTEXT FULL{}", model_display, context_indicator, agent_indicator, nav_hint)
+        format!(
+            "hyle | {}{}{} | ⚠ CONTEXT FULL{}",
+            model_display, context_indicator, agent_indicator, nav_hint
+        )
     } else if state.traces.context.is_warning() {
-        format!("hyle | {}{}{} | ⚠ >80%{}", model_display, context_indicator, agent_indicator, nav_hint)
+        format!(
+            "hyle | {}{}{} | ⚠ >80%{}",
+            model_display, context_indicator, agent_indicator, nav_hint
+        )
     } else {
-        format!("hyle | {}{}{}{}", model_display, context_indicator, agent_indicator, nav_hint)
+        format!(
+            "hyle | {}{}{}{}",
+            model_display, context_indicator, agent_indicator, nav_hint
+        )
     };
 
     let header_style = if exit_warning {
@@ -2148,10 +2472,24 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
     };
 
     let tabs = Tabs::new(View::main_views().iter().map(|t| t.name()))
-        .select(View::main_views().iter().position(|v| *v == state.tab).unwrap_or(0))
+        .select(
+            View::main_views()
+                .iter()
+                .position(|v| *v == state.tab)
+                .unwrap_or(0),
+        )
         .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-        .block(Block::default().borders(Borders::ALL).title(header_title).style(header_style));
+        .highlight_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(header_title)
+                .style(header_style),
+        );
     f.render_widget(tabs, chunks[0]);
 
     // Main content based on view
@@ -2177,7 +2515,10 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
         let elapsed = state.request_start.elapsed().as_secs_f32();
         let estimated_tokens = (elapsed * state.tokens_per_sec).round() as u32;
         if state.ttft.is_some() {
-            format!("Generating... ~{} tokens ({:.1} tok/s)", estimated_tokens, state.tokens_per_sec)
+            format!(
+                "Generating... ~{} tokens ({:.1} tok/s)",
+                estimated_tokens, state.tokens_per_sec
+            )
         } else {
             "Waiting for first token...".into()
         }
@@ -2222,8 +2563,16 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
 
     // Build generation status with model name
     let gen_status = if state.is_generating {
-        let model_short = state.current_model.split('/').next_back().unwrap_or(&state.current_model);
-        let model_short = if model_short.len() > 20 { &model_short[..20] } else { model_short };
+        let model_short = state
+            .current_model
+            .split('/')
+            .next_back()
+            .unwrap_or(&state.current_model);
+        let model_short = if model_short.len() > 20 {
+            &model_short[..20]
+        } else {
+            model_short
+        };
         let elapsed = state.request_start.elapsed().as_secs();
         format!("{} {}..{}s", spinner_char(state.tick), model_short, elapsed)
     } else {
@@ -2241,7 +2590,9 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
     );
 
     let status_style = if exit_warning {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         match pressure {
             PressureLevel::Critical => Style::default().fg(Color::Red),
@@ -2263,7 +2614,9 @@ fn render_chat(f: &mut Frame, state: &TuiState, area: Rect) {
     let scroll = if state.auto_scroll {
         line_count.saturating_sub(visible_height)
     } else {
-        state.scroll_offset.min(line_count.saturating_sub(visible_height))
+        state
+            .scroll_offset
+            .min(line_count.saturating_sub(visible_height))
     };
 
     // Build title with scroll indicator
@@ -2279,9 +2632,11 @@ fn render_chat(f: &mut Frame, state: &TuiState, area: Rect) {
     };
 
     let history_indicator = if state.history_index.is_some() {
-        format!(" [history {}/{}]",
+        format!(
+            " [history {}/{}]",
             state.history_index.unwrap() + 1,
-            state.prompt_history.len())
+            state.prompt_history.len()
+        )
     } else {
         String::new()
     };
@@ -2330,7 +2685,8 @@ fn render_telemetry(f: &mut Frame, state: &TuiState, area: Rect) {
     // Show recent samples summary with all metrics
     let recent = state.telemetry.recent(5);
     if !recent.is_empty() {
-        let recent_cpu: Vec<String> = recent.iter()
+        let recent_cpu: Vec<String> = recent
+            .iter()
             .map(|s| format!("{:.0}", s.cpu_percent))
             .collect();
         lines.push(format!("Recent CPU: [{}]", recent_cpu.join(", ")));
@@ -2361,7 +2717,7 @@ fn render_telemetry(f: &mut Frame, state: &TuiState, area: Rect) {
     // Add trace statistics
     if let (Some(avg), Some(max)) = (
         state.traces.tokens.tokens_per_sec.average(),
-        state.traces.tokens.tokens_per_sec.max()
+        state.traces.tokens.tokens_per_sec.max(),
     ) {
         lines.push(format!("Token rate: avg {:.1}/s, max {:.1}/s", avg, max));
     }
@@ -2389,7 +2745,7 @@ fn render_telemetry(f: &mut Frame, state: &TuiState, area: Rect) {
     // Latency stats
     if let (Some(avg), Some(max)) = (
         state.traces.latency.ttft.average(),
-        state.traces.latency.ttft.max()
+        state.traces.latency.ttft.max(),
     ) {
         lines.push(format!("TTFT: avg {:.0}ms, max {:.0}ms", avg, max));
     }
@@ -2409,9 +2765,15 @@ fn render_telemetry(f: &mut Frame, state: &TuiState, area: Rect) {
 }
 
 fn render_log(f: &mut Frame, state: &TuiState, area: Rect) {
-    let text: String = state.log.iter().rev().take(50).cloned().collect::<Vec<_>>().join("\n");
-    let para = Paragraph::new(text)
-        .block(Block::default().borders(Borders::ALL).title("Log"));
+    let text: String = state
+        .log
+        .iter()
+        .rev()
+        .take(50)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join("\n");
+    let para = Paragraph::new(text).block(Block::default().borders(Borders::ALL).title("Log"));
     f.render_widget(para, area);
 }
 
@@ -2428,15 +2790,24 @@ fn render_sessions(f: &mut Frame, state: &TuiState, area: Rect) {
         lines.push("  - claude-code, aider, codex, gemini".into());
     } else {
         // Group by status for display, but use original indices for selection
-        let active_indices: Vec<_> = state.detected_sessions.iter().enumerate()
+        let active_indices: Vec<_> = state
+            .detected_sessions
+            .iter()
+            .enumerate()
             .filter(|(_, s)| matches!(s.status, SessionStatus::Active | SessionStatus::Backburner))
             .map(|(i, _)| i)
             .collect();
-        let cold_indices: Vec<_> = state.detected_sessions.iter().enumerate()
+        let cold_indices: Vec<_> = state
+            .detected_sessions
+            .iter()
+            .enumerate()
             .filter(|(_, s)| matches!(s.status, SessionStatus::Cold))
             .map(|(i, _)| i)
             .collect();
-        let foreign_indices: Vec<_> = state.detected_sessions.iter().enumerate()
+        let foreign_indices: Vec<_> = state
+            .detected_sessions
+            .iter()
+            .enumerate()
             .filter(|(_, s)| matches!(s.status, SessionStatus::Foreign))
             .map(|(i, _)| i)
             .collect();
@@ -2445,7 +2816,11 @@ fn render_sessions(f: &mut Frame, state: &TuiState, area: Rect) {
             lines.push("── Active/Backburner ──".into());
             for idx in &active_indices {
                 let s = &state.detected_sessions[*idx];
-                let marker = if *idx == state.session_selected { "▶" } else { " " };
+                let marker = if *idx == state.session_selected {
+                    "▶"
+                } else {
+                    " "
+                };
                 let status_icon = match s.status {
                     SessionStatus::Active => "●",
                     SessionStatus::Backburner => "◐",
@@ -2456,9 +2831,10 @@ fn render_sessions(f: &mut Frame, state: &TuiState, area: Rect) {
                     Integration::Partial => "☆",
                     Integration::ReadOnly => "○",
                 };
-                lines.push(format!("{} {} {} {} | {}msg {}tok | {} {}",
-                    marker, status_icon, s.tool, s.id,
-                    s.messages, s.tokens, s.age, int_icon));
+                lines.push(format!(
+                    "{} {} {} {} | {}msg {}tok | {} {}",
+                    marker, status_icon, s.tool, s.id, s.messages, s.tokens, s.age, int_icon
+                ));
             }
             lines.push("".into());
         }
@@ -2467,9 +2843,15 @@ fn render_sessions(f: &mut Frame, state: &TuiState, area: Rect) {
             lines.push("── Cold (can revive) ──".into());
             for idx in cold_indices.iter().take(5) {
                 let s = &state.detected_sessions[*idx];
-                let marker = if *idx == state.session_selected { "▶" } else { " " };
-                lines.push(format!("{} ○ {} {} | {}msg {}tok | {}",
-                    marker, s.tool, s.id, s.messages, s.tokens, s.age));
+                let marker = if *idx == state.session_selected {
+                    "▶"
+                } else {
+                    " "
+                };
+                lines.push(format!(
+                    "{} ○ {} {} | {}msg {}tok | {}",
+                    marker, s.tool, s.id, s.messages, s.tokens, s.age
+                ));
             }
             lines.push("".into());
         }
@@ -2478,7 +2860,11 @@ fn render_sessions(f: &mut Frame, state: &TuiState, area: Rect) {
             lines.push("── Foreign Tools (read-only) ──".into());
             for idx in foreign_indices.iter().take(5) {
                 let s = &state.detected_sessions[*idx];
-                let marker = if *idx == state.session_selected { "▶" } else { " " };
+                let marker = if *idx == state.session_selected {
+                    "▶"
+                } else {
+                    " "
+                };
                 lines.push(format!("{} ◇ {} {}", marker, s.tool, s.id));
             }
         }
@@ -2509,16 +2895,16 @@ fn render_prompts(f: &mut Frame, state: &TuiState, area: Rect) {
         }
     }
 
-    let para = Paragraph::new(lines.join("\n"))
-        .block(Block::default().borders(Borders::ALL).title("Prompt Inventory [Ctrl-P]"));
+    let para = Paragraph::new(lines.join("\n")).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Prompt Inventory [Ctrl-P]"),
+    );
     f.render_widget(para, area);
 }
 
 fn render_git(f: &mut Frame, state: &TuiState, area: Rect) {
-    let mut lines = vec![
-        "Git Status (Esc to close)".into(),
-        "".into(),
-    ];
+    let mut lines = vec!["Git Status (Esc to close)".into(), "".into()];
 
     if state.git_status.is_empty() {
         lines.push("Not a git repository or git not available.".into());
@@ -2535,10 +2921,7 @@ fn render_git(f: &mut Frame, state: &TuiState, area: Rect) {
 }
 
 fn render_artifacts(f: &mut Frame, state: &TuiState, area: Rect) {
-    let mut lines = vec![
-        "Generated Artifacts (Esc to close)".into(),
-        "".into(),
-    ];
+    let mut lines = vec!["Generated Artifacts (Esc to close)".into(), "".into()];
 
     if state.artifacts.is_empty() {
         lines.push("No artifacts generated yet.".into());
@@ -2549,21 +2932,28 @@ fn render_artifacts(f: &mut Frame, state: &TuiState, area: Rect) {
         lines.push("  - Code snippets".into());
     } else {
         for (i, artifact) in state.artifacts.iter().enumerate() {
-            let marker = if i == state.artifact_selected { ">" } else { " " };
-            lines.push(format!("{} [{}] {} - {}", marker, artifact.kind, artifact.name, artifact.preview));
+            let marker = if i == state.artifact_selected {
+                ">"
+            } else {
+                " "
+            };
+            lines.push(format!(
+                "{} [{}] {} - {}",
+                marker, artifact.kind, artifact.name, artifact.preview
+            ));
         }
     }
 
-    let para = Paragraph::new(lines.join("\n"))
-        .block(Block::default().borders(Borders::ALL).title("Artifacts [Ctrl-A]"));
+    let para = Paragraph::new(lines.join("\n")).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Artifacts [Ctrl-A]"),
+    );
     f.render_widget(para, area);
 }
 
 fn render_plans(f: &mut Frame, state: &TuiState, area: Rect) {
-    let mut lines = vec![
-        "Task Plans (Esc to close)".into(),
-        "".into(),
-    ];
+    let mut lines = vec!["Task Plans (Esc to close)".into(), "".into()];
 
     if state.plans.is_empty() {
         lines.push("No plans created yet.".into());
@@ -2577,7 +2967,13 @@ fn render_plans(f: &mut Frame, state: &TuiState, area: Rect) {
                 "in_progress" => "◐",
                 _ => "○",
             };
-            lines.push(format!("{} {} {} ({} steps)", marker, status_icon, plan.name, plan.steps.len()));
+            lines.push(format!(
+                "{} {} {} ({} steps)",
+                marker,
+                status_icon,
+                plan.name,
+                plan.steps.len()
+            ));
         }
     }
 
@@ -2605,7 +3001,11 @@ fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
 
 fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), DisableBracketedPaste, LeaveAlternateScreen)?;
+    execute!(
+        terminal.backend_mut(),
+        DisableBracketedPaste,
+        LeaveAlternateScreen
+    )?;
     terminal.show_cursor()?;
     Ok(())
 }

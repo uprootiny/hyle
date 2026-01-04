@@ -7,8 +7,8 @@
 
 #![allow(dead_code)] // Forward-looking module for self-bootstrapping
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 use crate::agent::parse_tool_calls;
 
@@ -19,12 +19,12 @@ use crate::agent::parse_tool_calls;
 /// Quality score for a single response (0.0 - 1.0)
 #[derive(Debug, Clone, Default)]
 pub struct QualityScore {
-    pub coherence: f32,      // Does it make sense?
-    pub completeness: f32,   // Did it answer the question?
-    pub tool_validity: f32,  // Are tool calls valid?
-    pub code_quality: f32,   // Does generated code look valid?
-    pub relevance: f32,      // Is it on-topic?
-    pub overall: f32,        // Weighted average
+    pub coherence: f32,     // Does it make sense?
+    pub completeness: f32,  // Did it answer the question?
+    pub tool_validity: f32, // Are tool calls valid?
+    pub code_quality: f32,  // Does generated code look valid?
+    pub relevance: f32,     // Is it on-topic?
+    pub overall: f32,       // Weighted average
 }
 
 impl QualityScore {
@@ -140,9 +140,13 @@ impl ResponseEvaluator {
         }
 
         // Check for garbled text (high ratio of special chars)
-        let special_ratio = response.chars()
-            .filter(|c| !c.is_alphanumeric() && !c.is_whitespace() && !".,:;!?-'\"()[]{}".contains(*c))
-            .count() as f32 / response.len().max(1) as f32;
+        let special_ratio = response
+            .chars()
+            .filter(|c| {
+                !c.is_alphanumeric() && !c.is_whitespace() && !".,:;!?-'\"()[]{}".contains(*c)
+            })
+            .count() as f32
+            / response.len().max(1) as f32;
         if special_ratio > 0.1 {
             score -= 0.3;
         }
@@ -173,12 +177,11 @@ impl ResponseEvaluator {
         let mut score = 0.5; // Start neutral
 
         // Check if response mentions key terms from prompt
-        let prompt_words: Vec<&str> = prompt.split_whitespace()
-            .filter(|w| w.len() > 3)
-            .collect();
+        let prompt_words: Vec<&str> = prompt.split_whitespace().filter(|w| w.len() > 3).collect();
 
         let response_lower = response.to_lowercase();
-        let matched = prompt_words.iter()
+        let matched = prompt_words
+            .iter()
             .filter(|w| response_lower.contains(&w.to_lowercase()))
             .count();
 
@@ -187,12 +190,21 @@ impl ResponseEvaluator {
 
         // Bonus for acknowledgment phrases
         let acknowledgments = ["here", "let me", "i'll", "i will", "sure", "certainly"];
-        if acknowledgments.iter().any(|a| response_lower.starts_with(a)) {
+        if acknowledgments
+            .iter()
+            .any(|a| response_lower.starts_with(a))
+        {
             score += 0.1;
         }
 
         // Bonus for conclusion phrases
-        let conclusions = ["done", "complete", "finished", "let me know", "hope this helps"];
+        let conclusions = [
+            "done",
+            "complete",
+            "finished",
+            "let me know",
+            "hope this helps",
+        ];
         if conclusions.iter().any(|c| response_lower.contains(c)) {
             score += 0.1;
         }
@@ -211,9 +223,9 @@ impl ResponseEvaluator {
 
         if calls.is_empty() {
             // No tool calls - check if response looks like it should have them
-            let should_have_tools = response.contains("```") ||
-                response.to_lowercase().contains("let me read") ||
-                response.to_lowercase().contains("i'll check");
+            let should_have_tools = response.contains("```")
+                || response.to_lowercase().contains("let me read")
+                || response.to_lowercase().contains("i'll check");
 
             if should_have_tools {
                 return 0.3; // Probably should have had tool calls
@@ -277,8 +289,11 @@ impl ResponseEvaluator {
             }
 
             // Check for common syntax patterns
-            if code.contains("fn ") || code.contains("def ") ||
-               code.contains("function ") || code.contains("class ") {
+            if code.contains("fn ")
+                || code.contains("def ")
+                || code.contains("function ")
+                || code.contains("class ")
+            {
                 block_score += 0.2;
             }
 
@@ -310,7 +325,8 @@ impl ResponseEvaluator {
             return 0.7; // Can't assess without key terms
         }
 
-        let matched = key_terms.iter()
+        let matched = key_terms
+            .iter()
             .filter(|t| response_lower.contains(t.as_str()))
             .count();
 
@@ -366,8 +382,8 @@ impl ModelStats {
         }
 
         // Update rolling average
-        self.average_quality = self.recent_scores.iter().sum::<f32>()
-            / self.recent_scores.len() as f32;
+        self.average_quality =
+            self.recent_scores.iter().sum::<f32>() / self.recent_scores.len() as f32;
     }
 
     /// Record a failed response
@@ -383,8 +399,8 @@ impl ModelStats {
             self.recent_scores.remove(0);
         }
 
-        self.average_quality = self.recent_scores.iter().sum::<f32>()
-            / self.recent_scores.len() as f32;
+        self.average_quality =
+            self.recent_scores.iter().sum::<f32>() / self.recent_scores.len() as f32;
     }
 
     /// Should we switch away from this model?
@@ -427,7 +443,8 @@ impl ModelTracker {
     /// Set current model
     pub fn set_model(&mut self, model_id: &str) {
         self.current_model = Some(model_id.to_string());
-        self.stats.entry(model_id.to_string())
+        self.stats
+            .entry(model_id.to_string())
             .or_insert_with(|| ModelStats::new(model_id));
     }
 
@@ -469,17 +486,17 @@ impl ModelTracker {
 
     /// Get current model stats
     pub fn current_stats(&self) -> Option<&ModelStats> {
-        self.current_model.as_ref()
+        self.current_model
+            .as_ref()
             .and_then(|id| self.stats.get(id))
     }
 
     /// Get best performing model from tracked models
     pub fn best_model(&self) -> Option<&str> {
-        self.stats.iter()
+        self.stats
+            .iter()
             .filter(|(_, s)| s.total_requests >= 3) // Need enough data
-            .max_by(|(_, a), (_, b)| {
-                a.average_quality.partial_cmp(&b.average_quality).unwrap()
-            })
+            .max_by(|(_, a), (_, b)| a.average_quality.partial_cmp(&b.average_quality).unwrap())
             .map(|(id, _)| id.as_str())
     }
 
@@ -534,11 +551,18 @@ impl ModelSwitcher {
 
     /// Get current model
     pub fn current_model(&self) -> Option<&str> {
-        self.available_models.get(self.current_index).map(|s| s.as_str())
+        self.available_models
+            .get(self.current_index)
+            .map(|s| s.as_str())
     }
 
     /// Record response and possibly trigger switch
-    pub fn record_and_maybe_switch(&mut self, prompt: &str, response: &str, tokens: u64) -> (QualityScore, bool) {
+    pub fn record_and_maybe_switch(
+        &mut self,
+        prompt: &str,
+        response: &str,
+        tokens: u64,
+    ) -> (QualityScore, bool) {
         let score = self.tracker.record_response(prompt, response, tokens);
 
         let switched = if self.should_switch() {
@@ -661,7 +685,7 @@ mod tests {
         let score = eval.evaluate(
             "What is Rust?",
             "Rust is a systems programming language focused on safety and performance. \
-             It provides memory safety without garbage collection."
+             It provides memory safety without garbage collection.",
         );
 
         assert!(score.coherence > 0.7);
@@ -762,11 +786,7 @@ fn main() {
         let mut tracker = ModelTracker::new();
         tracker.set_model("model-a");
 
-        let score = tracker.record_response(
-            "What is Rust?",
-            "Rust is a programming language.",
-            50
-        );
+        let score = tracker.record_response("What is Rust?", "Rust is a programming language.", 50);
 
         assert!(score.overall > 0.0);
         assert!(!tracker.should_switch());
@@ -813,7 +833,7 @@ fn main() {
             let (score, switched) = switcher.record_and_maybe_switch(
                 "What is Rust?",
                 "Rust is a systems programming language.",
-                100
+                100,
             );
             assert!(score.overall > 0.5);
             assert!(!switched);
@@ -844,11 +864,15 @@ fn main() {
         let eval = ResponseEvaluator::new();
 
         // Low repetition
-        let low_rep = eval.calculate_repetition("The quick brown fox jumps over the lazy dog repeatedly in this sentence structure.");
+        let low_rep = eval.calculate_repetition(
+            "The quick brown fox jumps over the lazy dog repeatedly in this sentence structure.",
+        );
         assert!(low_rep < 0.3);
 
         // High repetition
-        let high_rep = eval.calculate_repetition("the same words the same words the same words the same words the same words");
+        let high_rep = eval.calculate_repetition(
+            "the same words the same words the same words the same words the same words",
+        );
         assert!(high_rep > 0.3);
     }
 }

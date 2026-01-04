@@ -185,7 +185,10 @@ pub enum PermissionCheck {
     /// Operation is allowed
     Allowed,
     /// Operation needs user confirmation
-    NeedsConfirmation { category: &'static str, description: String },
+    NeedsConfirmation {
+        category: &'static str,
+        description: String,
+    },
     /// Operation is denied
     Denied { reason: String },
 }
@@ -388,8 +391,12 @@ pub struct Config {
     pub trust_mode: bool,
 }
 
-fn default_sample_rate() -> u32 { 4 }
-fn default_true() -> bool { true }
+fn default_sample_rate() -> u32 {
+    4
+}
+fn default_true() -> bool {
+    true
+}
 
 impl Config {
     /// Load config from disk, or return defaults
@@ -431,8 +438,7 @@ impl Config {
         }
 
         // Atomic rename (POSIX guarantees)
-        fs::rename(&tmp_path, &path)
-            .with_context(|| "Failed to rename config".to_string())?;
+        fs::rename(&tmp_path, &path).with_context(|| "Failed to rename config".to_string())?;
 
         Ok(())
     }
@@ -449,7 +455,9 @@ pub fn get_api_key() -> Result<String> {
 
     // Otherwise, check config
     let cfg = Config::load()?;
-    cfg.api_key.context("No API key configured. Set OPENROUTER_API_KEY or run: codish config set key <your-key>")
+    cfg.api_key.context(
+        "No API key configured. Set OPENROUTER_API_KEY or run: codish config set key <your-key>",
+    )
 }
 
 #[cfg(test)]
@@ -567,7 +575,8 @@ mod tests {
         cfg.trust_mode = true;
         cfg.permissions = Permissions::restrictive();
 
-        let check = check_tool_permission(&cfg, "bash", &serde_json::json!({"command": "rm -rf /"}));
+        let check =
+            check_tool_permission(&cfg, "bash", &serde_json::json!({"command": "rm -rf /"}));
         assert_eq!(check, PermissionCheck::Allowed);
     }
 
@@ -576,7 +585,8 @@ mod tests {
         let mut cfg = Config::default();
         cfg.permissions.denied_commands.insert("rm -rf".to_string());
 
-        let check = check_tool_permission(&cfg, "bash", &serde_json::json!({"command": "rm -rf /"}));
+        let check =
+            check_tool_permission(&cfg, "bash", &serde_json::json!({"command": "rm -rf /"}));
         assert!(matches!(check, PermissionCheck::Denied { .. }));
     }
 
@@ -586,7 +596,8 @@ mod tests {
         cfg.permissions.execute = PermissionMode::Ask;
         cfg.permissions.allowed_commands.insert("cargo".to_string());
 
-        let check = check_tool_permission(&cfg, "bash", &serde_json::json!({"command": "cargo build"}));
+        let check =
+            check_tool_permission(&cfg, "bash", &serde_json::json!({"command": "cargo build"}));
         assert_eq!(check, PermissionCheck::Allowed);
     }
 
@@ -603,7 +614,8 @@ mod tests {
     fn test_check_permission_read_auto() {
         let cfg = Config::default();
 
-        let check = check_tool_permission(&cfg, "read", &serde_json::json!({"path": "/etc/passwd"}));
+        let check =
+            check_tool_permission(&cfg, "read", &serde_json::json!({"path": "/etc/passwd"}));
         assert_eq!(check, PermissionCheck::Allowed);
     }
 

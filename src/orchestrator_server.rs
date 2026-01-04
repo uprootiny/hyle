@@ -11,9 +11,8 @@ use tokio::sync::RwLock;
 
 use crate::intake::INTAKE_HTML;
 use crate::orchestrator::{
-    Orchestrator, Project, ProjectStatus, scaffold_project,
-    build_dispatch_prompt, dispatch_hyle, generate_nginx_config,
-    generate_systemd_service,
+    build_dispatch_prompt, dispatch_hyle, generate_nginx_config, generate_systemd_service,
+    scaffold_project, Orchestrator, Project, ProjectStatus,
 };
 
 /// Shared orchestrator state
@@ -40,7 +39,10 @@ pub async fn run_orchestrator(port: u16, projects_root: PathBuf, domain: String)
     let listener = TcpListener::bind(addr).await?;
 
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║  hyle orchestrator listening on http://0.0.0.0:{}         ║", port);
+    println!(
+        "║  hyle orchestrator listening on http://0.0.0.0:{}         ║",
+        port
+    );
     println!("╠════════════════════════════════════════════════════════════╣");
     println!("║  Projects root: {}  ", projects_root.display());
     println!("║  Domain: {}  ", domain);
@@ -82,7 +84,9 @@ pub async fn run_orchestrator(port: u16, projects_root: PathBuf, domain: String)
                     if let Some(len) = line.split(':').nth(1) {
                         content_length = len.trim().parse().unwrap_or(0);
                         if content_length > MAX_BODY_SIZE {
-                            let _ = writer.write_all(b"HTTP/1.1 413 Payload Too Large\r\n\r\n").await;
+                            let _ = writer
+                                .write_all(b"HTTP/1.1 413 Payload Too Large\r\n\r\n")
+                                .await;
                             return;
                         }
                     }
@@ -119,7 +123,10 @@ pub async fn run_orchestrator(port: u16, projects_root: PathBuf, domain: String)
                 ("OPTIONS", _) => cors_preflight(),
                 (_, p) if p.starts_with("/api/projects/") => {
                     let id = p.trim_start_matches("/api/projects/");
-                    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+                    if !id
+                        .chars()
+                        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+                    {
                         json_response(400, r#"{"error": "Invalid project ID"}"#)
                     } else {
                         handle_get_project(&state, id).await
@@ -177,7 +184,8 @@ fn cors_preflight() -> String {
     Access-Control-Allow-Origin: *\r\n\
     Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\
     Access-Control-Allow-Headers: Content-Type\r\n\
-    \r\n".to_string()
+    \r\n"
+        .to_string()
 }
 
 async fn handle_list_projects(state: &Arc<RwLock<OrchestratorState>>) -> String {
@@ -271,7 +279,10 @@ async fn handle_create_project(state: &Arc<RwLock<OrchestratorState>>, body: &st
         project.log.push(crate::orchestrator::ProjectEvent {
             timestamp: chrono::Utc::now(),
             kind: "deploy".into(),
-            message: format!("Generated nginx and systemd configs for {}.{}", subdomain, domain),
+            message: format!(
+                "Generated nginx and systemd configs for {}.{}",
+                subdomain, domain
+            ),
         });
     }
 

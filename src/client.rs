@@ -69,7 +69,8 @@ pub async fn chat_completion_simple(
 /// Check connectivity to OpenRouter
 pub async fn check_connectivity() -> Result<()> {
     let client = reqwest::Client::new();
-    client.get("https://openrouter.ai/api/v1/models")
+    client
+        .get("https://openrouter.ai/api/v1/models")
         .timeout(std::time::Duration::from_secs(5))
         .send()
         .await
@@ -81,7 +82,8 @@ pub async fn check_connectivity() -> Result<()> {
 pub async fn fetch_models(api_key: &str) -> Result<Vec<Model>> {
     let client = reqwest::Client::new();
 
-    let response = client.get(OPENROUTER_MODELS_URL)
+    let response = client
+        .get(OPENROUTER_MODELS_URL)
         .header("Authorization", format!("Bearer {}", api_key))
         .send()
         .await
@@ -93,26 +95,32 @@ pub async fn fetch_models(api_key: &str) -> Result<Vec<Model>> {
         anyhow::bail!("API error {}: {}", status, body);
     }
 
-    let data: ModelsResponse = response.json().await
+    let data: ModelsResponse = response
+        .json()
+        .await
         .context("Failed to parse models response")?;
 
-    let models: Vec<Model> = data.data.into_iter().map(|m| {
-        let (pricing_prompt, pricing_completion) = match m.pricing {
-            Some(p) => (
-                p.prompt.parse().unwrap_or(0.0),
-                p.completion.parse().unwrap_or(0.0),
-            ),
-            None => (0.0, 0.0),
-        };
+    let models: Vec<Model> = data
+        .data
+        .into_iter()
+        .map(|m| {
+            let (pricing_prompt, pricing_completion) = match m.pricing {
+                Some(p) => (
+                    p.prompt.parse().unwrap_or(0.0),
+                    p.completion.parse().unwrap_or(0.0),
+                ),
+                None => (0.0, 0.0),
+            };
 
-        Model {
-            id: m.id,
-            name: m.name.unwrap_or_default(),
-            context_length: m.context_length.unwrap_or(4096),
-            pricing_prompt,
-            pricing_completion,
-        }
-    }).collect();
+            Model {
+                id: m.id,
+                name: m.name.unwrap_or_default(),
+                context_length: m.context_length.unwrap_or(4096),
+                pricing_prompt,
+                pricing_completion,
+            }
+        })
+        .collect();
 
     Ok(models)
 }
@@ -149,12 +157,10 @@ pub async fn stream_completion_full(
     let system_prompt = build_system_prompt(project);
 
     // Build messages: system + history + current user message
-    let mut messages = vec![
-        ChatMessage {
-            role: "system".to_string(),
-            content: system_prompt,
-        },
-    ];
+    let mut messages = vec![ChatMessage {
+        role: "system".to_string(),
+        content: system_prompt,
+    }];
 
     // Add conversation history
     for msg in history {
@@ -220,7 +226,12 @@ async fn do_stream(
         if attempt > 0 {
             // Exponential backoff: 500ms, 1s, 2s
             let delay = RETRY_BASE_DELAY_MS * (1 << (attempt - 1));
-            let _ = tx.send(StreamEvent::Token(format!("\n[Retrying in {}ms...]\n", delay))).await;
+            let _ = tx
+                .send(StreamEvent::Token(format!(
+                    "\n[Retrying in {}ms...]\n",
+                    delay
+                )))
+                .await;
             tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
         }
 
@@ -233,8 +244,11 @@ async fn do_stream(
                     return Err(e);
                 }
                 // Retry on network/timeout errors
-                if err_str.contains("timeout") || err_str.contains("connect") ||
-                   err_str.contains("reset") || err_str.contains("closed") {
+                if err_str.contains("timeout")
+                    || err_str.contains("connect")
+                    || err_str.contains("reset")
+                    || err_str.contains("closed")
+                {
                     last_error = Some(e);
                     continue;
                 }
@@ -253,7 +267,8 @@ async fn do_stream_attempt(
     request: &ChatRequest,
     tx: &mpsc::Sender<StreamEvent>,
 ) -> Result<TokenUsage> {
-    let response = client.post(OPENROUTER_API_URL)
+    let response = client
+        .post(OPENROUTER_API_URL)
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .header("HTTP-Referer", "https://github.com/hyle-org/hyle")
@@ -394,7 +409,13 @@ mod tests {
         let json = r#"{"choices":[{"delta":{"content":"Hello"}}]}"#;
         let chunk: StreamChunk = serde_json::from_str(json).unwrap();
         assert_eq!(
-            chunk.choices[0].delta.as_ref().unwrap().content.as_ref().unwrap(),
+            chunk.choices[0]
+                .delta
+                .as_ref()
+                .unwrap()
+                .content
+                .as_ref()
+                .unwrap(),
             "Hello"
         );
     }

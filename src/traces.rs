@@ -65,13 +65,22 @@ impl TraceBuffer {
     }
 
     pub fn max(&self) -> Option<f64> {
-        self.samples.iter().map(|s| s.value).max_by(|a, b| a.partial_cmp(b).unwrap())
+        self.samples
+            .iter()
+            .map(|s| s.value)
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
     }
 
     pub fn sparkline(&self, width: usize) -> String {
         const BARS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
-        let samples: Vec<f64> = self.samples.iter().rev().take(width).map(|s| s.value).collect();
+        let samples: Vec<f64> = self
+            .samples
+            .iter()
+            .rev()
+            .take(width)
+            .map(|s| s.value)
+            .collect();
         if samples.is_empty() {
             return " ".repeat(width);
         }
@@ -164,7 +173,10 @@ impl ContextTrace {
     }
 
     pub fn is_warning(&self) -> bool {
-        self.usage.last().map(|v| v / 100.0 > self.warn_threshold).unwrap_or(false)
+        self.usage
+            .last()
+            .map(|v| v / 100.0 > self.warn_threshold)
+            .unwrap_or(false)
     }
 
     pub fn is_full(&self) -> bool {
@@ -294,17 +306,23 @@ impl Traces {
                 self.context.usage.last().unwrap_or(0.0),
                 self.context.usage.len()
             ),
-            render_buf(&self.memory.rss, &format!(" [{:.1} MB]", self.memory.rss.last().unwrap_or(0.0))),
-            render_buf(&self.latency.ttft, &format!(" [{:.0}ms]", self.latency.ttft.last().unwrap_or(0.0))),
+            render_buf(
+                &self.memory.rss,
+                &format!(" [{:.1} MB]", self.memory.rss.last().unwrap_or(0.0)),
+            ),
+            render_buf(
+                &self.latency.ttft,
+                &format!(" [{:.0}ms]", self.latency.ttft.last().unwrap_or(0.0)),
+            ),
         ]
     }
 
     /// Check if any traces have data
     pub fn has_data(&self) -> bool {
-        !self.tokens.tokens_per_sec.is_empty() ||
-        !self.context.usage.is_empty() ||
-        !self.memory.rss.is_empty() ||
-        !self.latency.ttft.is_empty()
+        !self.tokens.tokens_per_sec.is_empty()
+            || !self.context.usage.is_empty()
+            || !self.memory.rss.is_empty()
+            || !self.latency.ttft.is_empty()
     }
 }
 

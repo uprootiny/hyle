@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::bootstrap::SelfAnalyzer;
 use crate::backburner::parse_test_output;
+use crate::bootstrap::SelfAnalyzer;
 use crate::prompts::{PromptLibrary, Toolbelt};
 
 // ═══════════════════════════════════════════════════════════════
@@ -187,7 +187,11 @@ pub mod git {
 
     /// Get git diff
     pub fn diff(staged: bool) -> ToolResult {
-        let cmd = if staged { "git diff --cached" } else { "git diff" };
+        let cmd = if staged {
+            "git diff --cached"
+        } else {
+            "git diff"
+        };
         tool_shell(cmd, None)
     }
 
@@ -199,7 +203,10 @@ pub mod git {
 
     /// Commit with message
     pub fn commit(message: &str) -> ToolResult {
-        tool_shell(&format!("git commit -m '{}'", message.replace('\'', "\\'")), None)
+        tool_shell(
+            &format!("git commit -m '{}'", message.replace('\'', "\\'")),
+            None,
+        )
     }
 
     /// Get recent commits
@@ -301,7 +308,7 @@ pub struct SubagentDef {
     pub name: String,
     pub description: String,
     pub system_prompt: String,
-    pub model: Option<String>,  // Override model if needed
+    pub model: Option<String>, // Override model if needed
 }
 
 /// Built-in subagents
@@ -455,32 +462,44 @@ impl ToolRegistry {
 
     /// Convert to OpenRouter tool format
     pub fn to_openrouter_format(&self) -> Vec<serde_json::Value> {
-        self.tools.values().map(|t| {
-            let properties: serde_json::Map<String, serde_json::Value> = t.parameters.iter().map(|p| {
-                (p.name.clone(), serde_json::json!({
-                    "type": p.param_type,
-                    "description": p.description
-                }))
-            }).collect();
+        self.tools
+            .values()
+            .map(|t| {
+                let properties: serde_json::Map<String, serde_json::Value> = t
+                    .parameters
+                    .iter()
+                    .map(|p| {
+                        (
+                            p.name.clone(),
+                            serde_json::json!({
+                                "type": p.param_type,
+                                "description": p.description
+                            }),
+                        )
+                    })
+                    .collect();
 
-            let required: Vec<String> = t.parameters.iter()
-                .filter(|p| p.required)
-                .map(|p| p.name.clone())
-                .collect();
+                let required: Vec<String> = t
+                    .parameters
+                    .iter()
+                    .filter(|p| p.required)
+                    .map(|p| p.name.clone())
+                    .collect();
 
-            serde_json::json!({
-                "type": "function",
-                "function": {
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": {
-                        "type": "object",
-                        "properties": properties,
-                        "required": required
+                serde_json::json!({
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": {
+                            "type": "object",
+                            "properties": properties,
+                            "required": required
+                        }
                     }
-                }
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -585,7 +604,9 @@ pub fn execute_slash_command_with_context(
             success: true,
         }),
         "model" | "models" => Some(SlashResult {
-            output: ctx.map(|c| format!("Current model: {}", c.model)).unwrap_or_else(|| "unknown".into()),
+            output: ctx
+                .map(|c| format!("Current model: {}", c.model))
+                .unwrap_or_else(|| "unknown".into()),
             success: true,
         }),
         "switch" => Some(SlashResult {
@@ -652,14 +673,12 @@ pub fn execute_slash_command_with_context(
 /// Suggest similar slash commands for typos
 fn suggest_slash_command(input: &str) -> Vec<String> {
     const COMMANDS: &[&str] = &[
-        "build", "test", "update", "clean", "check", "lint",
-        "clear", "compact", "cost", "tokens", "usage", "status",
-        "git", "diff", "commit", "pr", "prs", "issue", "issues", "runs", "actions",
-        "cd", "ls", "files", "find", "glob", "grep", "search",
-        "help", "doctor", "version", "model", "models", "switch", "agent",
-        "edit", "open", "view", "cat", "read",
-        "analyze", "health", "improve", "deps", "graph", "selftest",
-        "map", "env", "apply", "revert", "toolbelt", "prompts",
+        "build", "test", "update", "clean", "check", "lint", "clear", "compact", "cost", "tokens",
+        "usage", "status", "git", "diff", "commit", "pr", "prs", "issue", "issues", "runs",
+        "actions", "cd", "ls", "files", "find", "glob", "grep", "search", "help", "doctor",
+        "version", "model", "models", "switch", "agent", "edit", "open", "view", "cat", "read",
+        "analyze", "health", "improve", "deps", "graph", "selftest", "map", "env", "apply",
+        "revert", "toolbelt", "prompts",
     ];
 
     let mut matches: Vec<(&str, usize)> = COMMANDS
@@ -678,7 +697,11 @@ fn suggest_slash_command(input: &str) -> Vec<String> {
         .collect();
 
     matches.sort_by_key(|(_, d)| *d);
-    matches.into_iter().take(3).map(|(s, _)| format!("/{}", s)).collect()
+    matches
+        .into_iter()
+        .take(3)
+        .map(|(s, _)| format!("/{}", s))
+        .collect()
 }
 
 /// Simple Levenshtein distance for command suggestions
@@ -688,8 +711,12 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     let m = a_chars.len();
     let n = b_chars.len();
 
-    if m == 0 { return n; }
-    if n == 0 { return m; }
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
 
     let mut prev = (0..=n).collect::<Vec<_>>();
     let mut curr = vec![0; n + 1];
@@ -697,7 +724,11 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     for i in 1..=m {
         curr[0] = i;
         for j in 1..=n {
-            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
             curr[j] = (prev[j] + 1).min((curr[j - 1] + 1).min(prev[j - 1] + cost));
         }
         std::mem::swap(&mut prev, &mut curr);
@@ -715,7 +746,10 @@ fn run_build(project_type: Option<&str>) -> SlashResult {
         _ => "make build 2>/dev/null || cargo build 2>/dev/null || npm run build 2>/dev/null",
     };
     let result = tool_shell(cmd, None);
-    SlashResult { output: result.output, success: result.success }
+    SlashResult {
+        output: result.output,
+        success: result.success,
+    }
 }
 
 fn run_test(project_type: Option<&str>) -> SlashResult {
@@ -727,7 +761,10 @@ fn run_test(project_type: Option<&str>) -> SlashResult {
         _ => "make test 2>/dev/null || cargo test 2>/dev/null || npm test 2>/dev/null || pytest 2>/dev/null",
     };
     let result = tool_shell(cmd, None);
-    SlashResult { output: result.output, success: result.success }
+    SlashResult {
+        output: result.output,
+        success: result.success,
+    }
 }
 
 fn run_update(project_type: Option<&str>) -> SlashResult {
@@ -739,7 +776,10 @@ fn run_update(project_type: Option<&str>) -> SlashResult {
         _ => "cargo update 2>/dev/null || npm update 2>/dev/null",
     };
     let result = tool_shell(cmd, None);
-    SlashResult { output: result.output, success: result.success }
+    SlashResult {
+        output: result.output,
+        success: result.success,
+    }
 }
 
 fn run_clean(project_type: Option<&str>) -> SlashResult {
@@ -751,7 +791,10 @@ fn run_clean(project_type: Option<&str>) -> SlashResult {
         _ => "cargo clean 2>/dev/null || rm -rf node_modules 2>/dev/null",
     };
     let result = tool_shell(cmd, None);
-    SlashResult { output: result.output, success: result.success }
+    SlashResult {
+        output: result.output,
+        success: result.success,
+    }
 }
 
 fn run_check(project_type: Option<&str>) -> SlashResult {
@@ -763,7 +806,10 @@ fn run_check(project_type: Option<&str>) -> SlashResult {
         _ => "cargo check 2>/dev/null || npm run lint 2>/dev/null",
     };
     let result = tool_shell(cmd, None);
-    SlashResult { output: result.output, success: result.success }
+    SlashResult {
+        output: result.output,
+        success: result.success,
+    }
 }
 
 fn slash_help_full() -> SlashResult {
@@ -829,7 +875,8 @@ fn slash_help_full() -> SlashResult {
 
 ═══ Patch Operations ═══
   /apply <file>   Apply unified diff to file
-  /revert <file>  Restore from .bak backup"#.into(),
+  /revert <file>  Restore from .bak backup"#
+            .into(),
         success: true,
     }
 }
@@ -871,7 +918,11 @@ fn run_status(project_type: Option<&str>, ctx: Option<&SlashContext>) -> SlashRe
     }
 
     SlashResult {
-        output: if lines.is_empty() { "No status available".into() } else { lines.join("\n") },
+        output: if lines.is_empty() {
+            "No status available".into()
+        } else {
+            lines.join("\n")
+        },
         success: true,
     }
 }
@@ -921,11 +972,15 @@ fn run_pr(args: &str) -> SlashResult {
                             success: true,
                         }
                     } else {
-                        let output = prs.iter()
+                        let output = prs
+                            .iter()
                             .map(|pr| pr.display())
                             .collect::<Vec<_>>()
                             .join("\n\n");
-                        SlashResult { output, success: true }
+                        SlashResult {
+                            output,
+                            success: true,
+                        }
                     }
                 }
                 Err(e) => SlashResult {
@@ -960,7 +1015,10 @@ fn run_pr(args: &str) -> SlashResult {
             let num = parts.get(1).and_then(|s| s.trim().parse::<u64>().ok());
             match num {
                 Some(n) => match github::pr_diff(&work_dir, n) {
-                    Ok(diff) => SlashResult { output: diff, success: true },
+                    Ok(diff) => SlashResult {
+                        output: diff,
+                        success: true,
+                    },
                     Err(e) => SlashResult {
                         output: format!("Failed to get PR diff: {}", e),
                         success: false,
@@ -996,7 +1054,10 @@ fn run_pr(args: &str) -> SlashResult {
             // /pr <number> - view specific PR
             if let Ok(num) = s.parse::<u64>() {
                 match github::view_pr(&work_dir, num) {
-                    Ok(info) => SlashResult { output: info, success: true },
+                    Ok(info) => SlashResult {
+                        output: info,
+                        success: true,
+                    },
                     Err(e) => SlashResult {
                         output: format!("Failed to view PR: {}", e),
                         success: false,
@@ -1036,11 +1097,15 @@ fn run_issue(args: &str) -> SlashResult {
                             success: true,
                         }
                     } else {
-                        let output = issues.iter()
+                        let output = issues
+                            .iter()
                             .map(|i| i.display())
                             .collect::<Vec<_>>()
                             .join("\n\n");
-                        SlashResult { output, success: true }
+                        SlashResult {
+                            output,
+                            success: true,
+                        }
                     }
                 }
                 Err(e) => SlashResult {
@@ -1074,7 +1139,10 @@ fn run_issue(args: &str) -> SlashResult {
             // /issue <number> - view specific issue
             if let Ok(num) = s.parse::<u64>() {
                 match github::view_issue(&work_dir, num) {
-                    Ok(info) => SlashResult { output: info, success: true },
+                    Ok(info) => SlashResult {
+                        output: info,
+                        success: true,
+                    },
                     Err(e) => SlashResult {
                         output: format!("Failed to view issue: {}", e),
                         success: false,
@@ -1105,7 +1173,10 @@ fn run_actions(args: &str) -> SlashResult {
     if args.is_empty() {
         // /runs - list recent runs
         match github::list_runs(&work_dir, 10) {
-            Ok(runs) => SlashResult { output: runs, success: true },
+            Ok(runs) => SlashResult {
+                output: runs,
+                success: true,
+            },
             Err(e) => SlashResult {
                 output: format!("Failed to list runs: {}", e),
                 success: false,
@@ -1114,7 +1185,10 @@ fn run_actions(args: &str) -> SlashResult {
     } else if let Ok(run_id) = args.parse::<u64>() {
         // /runs <id> - view specific run
         match github::view_run(&work_dir, run_id) {
-            Ok(info) => SlashResult { output: info, success: true },
+            Ok(info) => SlashResult {
+                output: info,
+                success: true,
+            },
             Err(e) => SlashResult {
                 output: format!("Failed to view run: {}", e),
                 success: false,
@@ -1183,43 +1257,42 @@ fn run_edit(path: &str) -> SlashResult {
 
 fn run_improve() -> SlashResult {
     match SelfAnalyzer::new() {
-        Ok(analyzer) => {
-            match analyzer.improvement_prompt() {
-                Ok(prompt) => SlashResult {
-                    output: prompt,
-                    success: true,
-                },
-                Err(e) => SlashResult {
-                    output: format!("Failed to generate improvement prompt: {}", e),
-                    success: false,
-                }
-            }
-        }
+        Ok(analyzer) => match analyzer.improvement_prompt() {
+            Ok(prompt) => SlashResult {
+                output: prompt,
+                success: true,
+            },
+            Err(e) => SlashResult {
+                output: format!("Failed to generate improvement prompt: {}", e),
+                success: false,
+            },
+        },
         Err(e) => SlashResult {
             output: format!("Not in hyle project: {}", e),
             success: false,
-        }
+        },
     }
 }
 
 fn run_deps() -> SlashResult {
     match SelfAnalyzer::new() {
-        Ok(analyzer) => {
-            match analyzer.dependency_graph() {
-                Ok(graph) => SlashResult {
-                    output: format!("Module Dependencies (Mermaid):\n\n```mermaid\n{}\n```", graph),
-                    success: true,
-                },
-                Err(e) => SlashResult {
-                    output: format!("Failed to generate dependency graph: {}", e),
-                    success: false,
-                }
-            }
-        }
+        Ok(analyzer) => match analyzer.dependency_graph() {
+            Ok(graph) => SlashResult {
+                output: format!(
+                    "Module Dependencies (Mermaid):\n\n```mermaid\n{}\n```",
+                    graph
+                ),
+                success: true,
+            },
+            Err(e) => SlashResult {
+                output: format!("Failed to generate dependency graph: {}", e),
+                success: false,
+            },
+        },
         Err(e) => SlashResult {
             output: format!("Not in hyle project: {}", e),
             success: false,
-        }
+        },
     }
 }
 
@@ -1241,9 +1314,11 @@ fn run_apply(args: &str) -> SlashResult {
     let original = match std::fs::read_to_string(file_path) {
         Ok(content) => content,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return SlashResult {
-            output: format!("Failed to read {}: {}", path, e),
-            success: false,
+        Err(e) => {
+            return SlashResult {
+                output: format!("Failed to read {}: {}", path, e),
+                success: false,
+            }
         }
     };
 
@@ -1281,19 +1356,22 @@ fn run_apply(args: &str) -> SlashResult {
             // Write patched content
             match std::fs::write(file_path, &patched) {
                 Ok(()) => SlashResult {
-                    output: format!("{}\n\nApplied successfully. Backup saved as {}.bak", preview, path),
+                    output: format!(
+                        "{}\n\nApplied successfully. Backup saved as {}.bak",
+                        preview, path
+                    ),
                     success: true,
                 },
                 Err(e) => SlashResult {
                     output: format!("Failed to write: {}", e),
                     success: false,
-                }
+                },
             }
         }
         Err(e) => SlashResult {
             output: format!("Failed to apply patch: {}", e),
             success: false,
-        }
+        },
     }
 }
 
@@ -1327,7 +1405,7 @@ fn run_revert(args: &str) -> SlashResult {
         Err(e) => SlashResult {
             output: format!("Failed to revert: {}", e),
             success: false,
-        }
+        },
     }
 }
 
@@ -1387,7 +1465,7 @@ fn run_selftest() -> SlashResult {
         Err(e) => SlashResult {
             output: format!("Failed to run tests: {}", e),
             success: false,
-        }
+        },
     }
 }
 
@@ -1411,12 +1489,17 @@ fn run_analyze() -> SlashResult {
                     for m in analysis.modules.iter().take(5) {
                         output.push_str(&format!(
                             "  {} ({} lines, {} tests, {:.0}% doc)\n",
-                            m.name, m.lines, m.tests, m.doc_coverage * 100.0
+                            m.name,
+                            m.lines,
+                            m.tests,
+                            m.doc_coverage * 100.0
                         ));
                     }
 
                     // Add high priority TODOs
-                    let high_todos: Vec<_> = analysis.todos.iter()
+                    let high_todos: Vec<_> = analysis
+                        .todos
+                        .iter()
                         .filter(|t| t.priority == crate::bootstrap::TodoPriority::High)
                         .take(5)
                         .collect();
@@ -1433,18 +1516,21 @@ fn run_analyze() -> SlashResult {
                         }
                     }
 
-                    SlashResult { output, success: true }
+                    SlashResult {
+                        output,
+                        success: true,
+                    }
                 }
                 Err(e) => SlashResult {
                     output: format!("Analysis failed: {}", e),
                     success: false,
-                }
+                },
             }
         }
         Err(e) => SlashResult {
             output: format!("Not in hyle project: {}", e),
             success: false,
-        }
+        },
     }
 }
 
@@ -1453,7 +1539,8 @@ fn run_doctor() -> SlashResult {
 
     // Check git
     let git_ok = git::is_repo();
-    lines.push(format!("[{}] Git repo: {}",
+    lines.push(format!(
+        "[{}] Git repo: {}",
         if git_ok { "✓" } else { "○" },
         if git_ok { "detected" } else { "not a repo" }
     ));
@@ -1479,8 +1566,16 @@ fn run_doctor() -> SlashResult {
     // Check tools
     let has_rg = tool_shell("which rg", None).success;
     let has_fd = tool_shell("which fd", None).success;
-    lines.push(format!("[{}] ripgrep: {}", if has_rg { "✓" } else { "○" }, if has_rg { "available" } else { "not found" }));
-    lines.push(format!("[{}] fd: {}", if has_fd { "✓" } else { "○" }, if has_fd { "available" } else { "not found" }));
+    lines.push(format!(
+        "[{}] ripgrep: {}",
+        if has_rg { "✓" } else { "○" },
+        if has_rg { "available" } else { "not found" }
+    ));
+    lines.push(format!(
+        "[{}] fd: {}",
+        if has_fd { "✓" } else { "○" },
+        if has_fd { "available" } else { "not found" }
+    ));
 
     SlashResult {
         output: lines.join("\n"),
@@ -1501,7 +1596,10 @@ fn run_toolbelt(args: &str) -> SlashResult {
     if !args.is_empty() {
         if let Some(cmd) = belt.commands.iter().find(|c| c.name == args) {
             return SlashResult {
-                output: format!("{}: {}\n\nPrompt: {}", cmd.name, cmd.description, cmd.prompt),
+                output: format!(
+                    "{}: {}\n\nPrompt: {}",
+                    cmd.name, cmd.description, cmd.prompt
+                ),
                 success: true,
             };
         }
@@ -1515,7 +1613,10 @@ fn run_toolbelt(args: &str) -> SlashResult {
     let mut lines = vec!["Development Toolbelt:".to_string(), String::new()];
 
     for cmd in &belt.commands {
-        lines.push(format!("  {:12} {:?} - {}", cmd.name, cmd.phase, cmd.description));
+        lines.push(format!(
+            "  {:12} {:?} - {}",
+            cmd.name, cmd.phase, cmd.description
+        ));
     }
 
     lines.push(String::new());
@@ -1534,7 +1635,10 @@ fn run_prompts() -> SlashResult {
     let mut lines = vec!["Command Mappings:".to_string(), String::new()];
 
     for mapping in lib.mappings() {
-        lines.push(format!("  \"{}\" → {}", mapping.general, mapping.description));
+        lines.push(format!(
+            "  \"{}\" → {}",
+            mapping.general, mapping.description
+        ));
     }
 
     lines.push(String::new());

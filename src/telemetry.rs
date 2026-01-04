@@ -9,7 +9,7 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use sysinfo::{System, Networks};
+use sysinfo::{Networks, System};
 use tokio::sync::mpsc;
 
 /// Telemetry sample
@@ -34,10 +34,15 @@ pub enum PressureLevel {
 
 impl PressureLevel {
     pub fn from_cpu(cpu: f32) -> Self {
-        if cpu > 90.0 { PressureLevel::Critical }
-        else if cpu > 75.0 { PressureLevel::High }
-        else if cpu > 50.0 { PressureLevel::Medium }
-        else { PressureLevel::Low }
+        if cpu > 90.0 {
+            PressureLevel::Critical
+        } else if cpu > 75.0 {
+            PressureLevel::High
+        } else if cpu > 50.0 {
+            PressureLevel::Medium
+        } else {
+            PressureLevel::Low
+        }
     }
 
     pub fn symbol(&self) -> &'static str {
@@ -95,7 +100,11 @@ impl Telemetry {
 
         let total_mem = self.system.total_memory() as f32;
         let used_mem = self.system.used_memory() as f32;
-        let mem_percent = if total_mem > 0.0 { (used_mem / total_mem) * 100.0 } else { 0.0 };
+        let mem_percent = if total_mem > 0.0 {
+            (used_mem / total_mem) * 100.0
+        } else {
+            0.0
+        };
 
         let mut net_rx: u64 = 0;
         let mut net_tx: u64 = 0;
@@ -158,7 +167,8 @@ impl Telemetry {
 
     /// Get current pressure level
     pub fn pressure(&self) -> PressureLevel {
-        self.samples.back()
+        self.samples
+            .back()
             .map(|s| PressureLevel::from_cpu(s.cpu_percent))
             .unwrap_or(PressureLevel::Low)
     }

@@ -34,7 +34,7 @@ pub enum FeatureStatus {
     Untested,
     Passing,
     Failing,
-    Partial,  // Partially passing/implemented
+    Partial, // Partially passing/implemented
 }
 
 impl FeatureStatus {
@@ -135,31 +135,181 @@ impl Backburner {
 
     fn default_features() -> Vec<Feature> {
         vec![
-            Feature { path: "cli".into(), name: "--help".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "cli".into(), name: "--free".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "cli".into(), name: "--new".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "cli".into(), name: "--model".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "cli".into(), name: "--task".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "cli".into(), name: "--backburner".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "cmd".into(), name: "doctor".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "cmd".into(), name: "models".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "cmd".into(), name: "sessions".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "cmd".into(), name: "config".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "tui".into(), name: "model_picker".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "tui".into(), name: "chat_tab".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "tui".into(), name: "telemetry_tab".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "tui".into(), name: "log_tab".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "session".into(), name: "create".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "session".into(), name: "resume".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "session".into(), name: "persist_user".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "session".into(), name: "persist_assistant".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "telemetry".into(), name: "cpu_monitor".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "telemetry".into(), name: "mem_monitor".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "telemetry".into(), name: "pressure_detect".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "telemetry".into(), name: "auto_throttle".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "api".into(), name: "streaming".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "api".into(), name: "model_cache".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
-            Feature { path: "api".into(), name: "free_filter".into(), status: FeatureStatus::Untested, last_check: None, notes: vec![] },
+            Feature {
+                path: "cli".into(),
+                name: "--help".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "cli".into(),
+                name: "--free".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "cli".into(),
+                name: "--new".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "cli".into(),
+                name: "--model".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "cli".into(),
+                name: "--task".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "cli".into(),
+                name: "--backburner".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "cmd".into(),
+                name: "doctor".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "cmd".into(),
+                name: "models".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "cmd".into(),
+                name: "sessions".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "cmd".into(),
+                name: "config".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "tui".into(),
+                name: "model_picker".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "tui".into(),
+                name: "chat_tab".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "tui".into(),
+                name: "telemetry_tab".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "tui".into(),
+                name: "log_tab".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "session".into(),
+                name: "create".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "session".into(),
+                name: "resume".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "session".into(),
+                name: "persist_user".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "session".into(),
+                name: "persist_assistant".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "telemetry".into(),
+                name: "cpu_monitor".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "telemetry".into(),
+                name: "mem_monitor".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "telemetry".into(),
+                name: "pressure_detect".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "telemetry".into(),
+                name: "auto_throttle".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "api".into(),
+                name: "streaming".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "api".into(),
+                name: "model_cache".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
+            Feature {
+                path: "api".into(),
+                name: "free_filter".into(),
+                status: FeatureStatus::Untested,
+                last_check: None,
+                notes: vec![],
+            },
         ]
     }
 
@@ -168,7 +318,8 @@ impl Backburner {
 
         ctrlc::set_handler(move || {
             running.store(false, Ordering::SeqCst);
-        }).ok();
+        })
+        .ok();
 
         self.print_header();
 
@@ -204,7 +355,14 @@ impl Backburner {
         println!("Started: {}", now);
         println!("Working dir: {}", self.work_dir.display());
         println!("Model: {}", self.model);
-        println!("API Key: {}", if self.api_key.is_some() { "configured" } else { "missing" });
+        println!(
+            "API Key: {}",
+            if self.api_key.is_some() {
+                "configured"
+            } else {
+                "missing"
+            }
+        );
         println!("{}", "-".repeat(60));
         println!("Press Ctrl-C to stop\n");
     }
@@ -228,13 +386,24 @@ impl Backburner {
 
             match result {
                 Ok(output) if output.status.success() => {
-                    self.update_feature_status(&format!("cli.{}", feature_key), FeatureStatus::Passing);
+                    self.update_feature_status(
+                        &format!("cli.{}", feature_key),
+                        FeatureStatus::Passing,
+                    );
                     println!("  {} {} PASS", FeatureStatus::Passing.symbol(), name);
                 }
                 Ok(output) => {
-                    self.update_feature_status(&format!("cli.{}", feature_key), FeatureStatus::Failing);
+                    self.update_feature_status(
+                        &format!("cli.{}", feature_key),
+                        FeatureStatus::Failing,
+                    );
                     let stderr = String::from_utf8_lossy(&output.stderr);
-                    println!("  {} {} FAIL: {}", FeatureStatus::Failing.symbol(), name, stderr.lines().next().unwrap_or(""));
+                    println!(
+                        "  {} {} FAIL: {}",
+                        FeatureStatus::Failing.symbol(),
+                        name,
+                        stderr.lines().next().unwrap_or("")
+                    );
                 }
                 Err(e) => {
                     println!("  [!] {} ERROR: {}", name, e);
@@ -317,9 +486,12 @@ impl Backburner {
             }
 
             // Group changes by directory/module
-            let mut by_dir: std::collections::HashMap<String, Vec<&str>> = std::collections::HashMap::new();
+            let mut by_dir: std::collections::HashMap<String, Vec<&str>> =
+                std::collections::HashMap::new();
             for line in &lines {
-                if line.len() < 3 { continue; }
+                if line.len() < 3 {
+                    continue;
+                }
                 let path = &line[3..];
                 let dir = path.split('/').next().unwrap_or("root");
                 by_dir.entry(dir.to_string()).or_default().push(line);
@@ -327,9 +499,15 @@ impl Backburner {
 
             // Suggest atomic commits
             if by_dir.len() == 1 {
-                println!("  [~] {} changes in single area - good for atomic commit", lines.len());
+                println!(
+                    "  [~] {} changes in single area - good for atomic commit",
+                    lines.len()
+                );
             } else {
-                println!("  [!] Changes span {} areas - consider separate commits:", by_dir.len());
+                println!(
+                    "  [!] Changes span {} areas - consider separate commits:",
+                    by_dir.len()
+                );
                 for (dir, files) in &by_dir {
                     println!("      {}: {} files", dir, files.len());
                 }
@@ -348,7 +526,10 @@ impl Backburner {
             if !msg.is_empty() {
                 let issues = self.analyze_commit_message(&msg);
                 if issues.is_empty() {
-                    println!("  [x] Last commit message OK: {}", &msg[..msg.len().min(50)]);
+                    println!(
+                        "  [x] Last commit message OK: {}",
+                        &msg[..msg.len().min(50)]
+                    );
                 } else {
                     println!("  [!] Last commit message issues:");
                     for issue in &issues {
@@ -391,7 +572,12 @@ impl Backburner {
         }
 
         // Check capitalization
-        if msg.chars().next().map(|c| c.is_lowercase()).unwrap_or(false) {
+        if msg
+            .chars()
+            .next()
+            .map(|c| c.is_lowercase())
+            .unwrap_or(false)
+        {
             issues.push("Should start with capital letter".into());
         }
 
@@ -528,11 +714,19 @@ impl Backburner {
                 let results = parse_test_output(&stdout, &stderr);
 
                 if results.failed == 0 {
-                    println!("{} passed in {:.1}s", results.passed, duration.as_secs_f64());
+                    println!(
+                        "{} passed in {:.1}s",
+                        results.passed,
+                        duration.as_secs_f64()
+                    );
                     self.observe(format!("Tests: {} passed", results.passed));
                 } else {
-                    println!("{} passed, {} FAILED in {:.1}s",
-                        results.passed, results.failed, duration.as_secs_f64());
+                    println!(
+                        "{} passed, {} FAILED in {:.1}s",
+                        results.passed,
+                        results.failed,
+                        duration.as_secs_f64()
+                    );
                     self.observe(format!("Tests: {} FAILED!", results.failed));
 
                     // Show failed test names
@@ -573,8 +767,14 @@ impl Backburner {
             }
         }
 
-        println!("[{}] Code stats: {} files, {} lines", now, file_count, total_lines);
-        self.observe(format!("Codebase: {} files, {} lines", file_count, total_lines));
+        println!(
+            "[{}] Code stats: {} files, {} lines",
+            now, file_count, total_lines
+        );
+        self.observe(format!(
+            "Codebase: {} files, {} lines",
+            file_count, total_lines
+        ));
     }
 
     async fn generate_suggestions(&mut self) {
@@ -629,13 +829,17 @@ impl Backburner {
         println!("{}", "-".repeat(50));
 
         // Group by path
-        let mut by_path: std::collections::HashMap<&str, Vec<&Feature>> = std::collections::HashMap::new();
+        let mut by_path: std::collections::HashMap<&str, Vec<&Feature>> =
+            std::collections::HashMap::new();
         for f in &self.features {
             by_path.entry(&f.path).or_default().push(f);
         }
 
         for (path, features) in &by_path {
-            let passing = features.iter().filter(|f| f.status == FeatureStatus::Passing).count();
+            let passing = features
+                .iter()
+                .filter(|f| f.status == FeatureStatus::Passing)
+                .count();
             let total = features.len();
             let pct = (passing * 100) / total.max(1);
 
@@ -648,17 +852,29 @@ impl Backburner {
             }
         }
 
-        let total_passing = self.features.iter().filter(|f| f.status == FeatureStatus::Passing).count();
+        let total_passing = self
+            .features
+            .iter()
+            .filter(|f| f.status == FeatureStatus::Passing)
+            .count();
         let total = self.features.len();
         println!("{}", "-".repeat(50));
-        println!("Total: {}/{} ({:.0}%)", total_passing, total, (total_passing as f64 / total as f64) * 100.0);
+        println!(
+            "Total: {}/{} ({:.0}%)",
+            total_passing,
+            total,
+            (total_passing as f64 / total as f64) * 100.0
+        );
         println!();
     }
 
     fn print_heartbeat(&self) {
         let now = self.timestamp();
         let uptime = self.cycle * 30; // seconds
-        println!("[{}] Heartbeat (cycle {}, uptime {}s)", now, self.cycle, uptime);
+        println!(
+            "[{}] Heartbeat (cycle {}, uptime {}s)",
+            now, self.cycle, uptime
+        );
     }
 
     fn print_summary(&self) {
@@ -668,7 +884,11 @@ impl Backburner {
         println!("Total cycles: {}", self.cycle);
         println!("Observations: {}", self.observations.len());
 
-        let passing = self.features.iter().filter(|f| f.status == FeatureStatus::Passing).count();
+        let passing = self
+            .features
+            .iter()
+            .filter(|f| f.status == FeatureStatus::Passing)
+            .count();
         println!("Features passing: {}/{}", passing, self.features.len());
 
         if !self.observations.is_empty() {
@@ -718,7 +938,8 @@ impl Backburner {
 
         ctrlc::set_handler(move || {
             running.store(false, Ordering::SeqCst);
-        }).ok();
+        })
+        .ok();
 
         self.print_docs_header();
 
@@ -749,7 +970,14 @@ impl Backburner {
         println!("Started: {}", now);
         println!("Working dir: {}", self.work_dir.display());
         println!("Model: {}", self.model);
-        println!("API Key: {}", if self.api_key.is_some() { "configured" } else { "missing" });
+        println!(
+            "API Key: {}",
+            if self.api_key.is_some() {
+                "configured"
+            } else {
+                "missing"
+            }
+        );
         println!("{}", "-".repeat(60));
         println!("Press Ctrl-C to stop\n");
     }
@@ -759,7 +987,13 @@ impl Backburner {
         println!("[{}] Scanning codebase for documentation needs...", now);
 
         // Find key files
-        let patterns = ["README.md", "Cargo.toml", "package.json", "src/**/*.rs", "**/*.md"];
+        let patterns = [
+            "README.md",
+            "Cargo.toml",
+            "package.json",
+            "src/**/*.rs",
+            "**/*.md",
+        ];
         let mut found_files = Vec::new();
 
         for pattern in patterns {
@@ -814,8 +1048,14 @@ impl Backburner {
         let has_api = content.to_lowercase().contains("api") || content.contains("##");
 
         println!("  Lines: {}", lines);
-        println!("  Has install section: {}", if has_install { "yes" } else { "no" });
-        println!("  Has usage section: {}", if has_usage { "yes" } else { "no" });
+        println!(
+            "  Has install section: {}",
+            if has_install { "yes" } else { "no" }
+        );
+        println!(
+            "  Has usage section: {}",
+            if has_usage { "yes" } else { "no" }
+        );
         println!("  Has API/sections: {}", if has_api { "yes" } else { "no" });
 
         // Use LLM to analyze if we have a key
@@ -838,7 +1078,10 @@ impl Backburner {
                     for line in response.lines().take(10) {
                         println!("    {}", line);
                     }
-                    self.observe(format!("README analyzed: {}", response.lines().next().unwrap_or("")));
+                    self.observe(format!(
+                        "README analyzed: {}",
+                        response.lines().next().unwrap_or("")
+                    ));
                 }
                 Err(e) => {
                     println!("  LLM error: {}", e);
@@ -936,12 +1179,8 @@ impl Backburner {
         }
 
         // Compare timestamps
-        let readme_modified = std::fs::metadata(&readme)
-            .and_then(|m| m.modified())
-            .ok();
-        let cargo_modified = std::fs::metadata(&cargo)
-            .and_then(|m| m.modified())
-            .ok();
+        let readme_modified = std::fs::metadata(&readme).and_then(|m| m.modified()).ok();
+        let cargo_modified = std::fs::metadata(&cargo).and_then(|m| m.modified()).ok();
 
         match (readme_modified, cargo_modified) {
             (Some(r), Some(c)) if c > r => {
@@ -996,8 +1235,11 @@ impl Backburner {
                     token_count += 1;
                     // Show spinner every 5 tokens
                     if token_count % 5 == 0 {
-                        print!("\r  {} generating... ({} tokens)",
-                               spinner[token_count % spinner.len()], token_count);
+                        print!(
+                            "\r  {} generating... ({} tokens)",
+                            spinner[token_count % spinner.len()],
+                            token_count
+                        );
                         let _ = std::io::stdout().flush();
                     }
                 }

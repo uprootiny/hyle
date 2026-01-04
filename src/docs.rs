@@ -5,9 +5,9 @@
 
 #![allow(dead_code)]
 
-use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 /// A documentation file being watched
 #[derive(Debug, Clone)]
@@ -22,7 +22,7 @@ pub struct DocFile {
 #[derive(Debug, Clone)]
 pub struct DocSection {
     pub heading: String,
-    pub level: u8,  // 1=h1, 2=h2, etc.
+    pub level: u8, // 1=h1, 2=h2, etc.
     pub content: String,
     pub line_start: usize,
     pub line_end: usize,
@@ -58,9 +58,9 @@ pub struct DocSuggestion {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Priority {
-    High,    // Breaking change, needs immediate doc update
-    Medium,  // New feature, should document soon
-    Low,     // Minor change, optional doc update
+    High,   // Breaking change, needs immediate doc update
+    Medium, // New feature, should document soon
+    Low,    // Minor change, optional doc update
 }
 
 /// Documentation watcher state
@@ -215,7 +215,7 @@ impl DocsWatcher {
                 changes.push(CodeChange {
                     file: path,
                     change_type,
-                    summary: String::new(),  // Will be filled by LLM
+                    summary: String::new(), // Will be filled by LLM
                     timestamp: Utc::now(),
                 });
             }
@@ -227,9 +227,8 @@ impl DocsWatcher {
 
     /// Generate prompt for LLM to analyze changes and suggest doc updates
     pub fn analysis_prompt(&self) -> String {
-        let mut prompt = String::from(
-            "Analyze these code changes and suggest documentation updates.\n\n"
-        );
+        let mut prompt =
+            String::from("Analyze these code changes and suggest documentation updates.\n\n");
 
         prompt.push_str("## Recent Changes\n\n");
         for change in &self.changes {
@@ -247,12 +246,18 @@ impl DocsWatcher {
             prompt.push_str(&format!("### {}\n", path.display()));
             prompt.push_str("Sections:\n");
             for section in &doc.sections {
-                prompt.push_str(&format!("- {} ({})\n", section.heading, section.content.len()));
+                prompt.push_str(&format!(
+                    "- {} ({})\n",
+                    section.heading,
+                    section.content.len()
+                ));
             }
         }
 
         prompt.push_str("\n## Task\n\n");
-        prompt.push_str("For each significant code change, suggest specific documentation updates.\n");
+        prompt.push_str(
+            "For each significant code change, suggest specific documentation updates.\n",
+        );
         prompt.push_str("Focus on:\n");
         prompt.push_str("- New features that need documentation\n");
         prompt.push_str("- Changed APIs or behaviors\n");
@@ -280,7 +285,12 @@ impl DocsWatcher {
                 Priority::Medium => "[MEDIUM]",
                 Priority::Low => "[LOW]",
             };
-            out.push_str(&format!("{}. {} {}\n", i + 1, priority, s.doc_file.display()));
+            out.push_str(&format!(
+                "{}. {} {}\n",
+                i + 1,
+                priority,
+                s.doc_file.display()
+            ));
             if let Some(ref section) = s.section {
                 out.push_str(&format!("   Section: {}\n", section));
             }

@@ -40,13 +40,13 @@ use uuid::Uuid;
 /// Default free models sorted by context length and coding capability
 /// Verified against OpenRouter API 2025-12-29
 const DEFAULT_MODELS: &[&str] = &[
-    "google/gemini-2.0-flash-exp:free",      // 1M ctx - best for large projects
-    "qwen/qwen3-coder:free",                 // 262K ctx - coding-optimized
-    "mistralai/devstral-2512:free",          // 262K ctx - dev-focused
-    "kwaipilot/kat-coder-pro:free",          // 256K ctx - coding-specific
+    "google/gemini-2.0-flash-exp:free", // 1M ctx - best for large projects
+    "qwen/qwen3-coder:free",            // 262K ctx - coding-optimized
+    "mistralai/devstral-2512:free",     // 262K ctx - dev-focused
+    "kwaipilot/kat-coder-pro:free",     // 256K ctx - coding-specific
     "meta-llama/llama-3.3-70b-instruct:free", // 131K ctx - large model
-    "google/gemma-3-27b-it:free",            // 131K ctx - good quality
-    "deepseek/deepseek-r1-0528:free",        // 164K ctx - reasoning model
+    "google/gemma-3-27b-it:free",       // 131K ctx - good quality
+    "deepseek/deepseek-r1-0528:free",   // 164K ctx - reasoning model
     "mistralai/mistral-small-3.1-24b-instruct:free", // 128K ctx
 ];
 
@@ -161,7 +161,10 @@ async fn submit_sketch(
 ) -> Result<Json<SubmitResponse>, (StatusCode, String)> {
     let sketch = req.sketch.trim();
     if sketch.len() < 20 {
-        return Err((StatusCode::BAD_REQUEST, "Sketch too short (min 20 chars)".into()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Sketch too short (min 20 chars)".into(),
+        ));
     }
 
     if state.api_key.is_none() {
@@ -227,14 +230,23 @@ async fn get_job(
             models_tried: job.models_tried.clone(),
         })),
         None => {
-            eprintln!("[{}] Job not found (may have completed and expired)", job_id);
-            Err((StatusCode::NOT_FOUND, Json(JobResponse {
-                status: "not_found".into(),
-                url: None,
-                error: Some(format!("Job {} not found - may have completed or expired", job_id)),
-                model_used: None,
-                models_tried: vec![],
-            })))
+            eprintln!(
+                "[{}] Job not found (may have completed and expired)",
+                job_id
+            );
+            Err((
+                StatusCode::NOT_FOUND,
+                Json(JobResponse {
+                    status: "not_found".into(),
+                    url: None,
+                    error: Some(format!(
+                        "Job {} not found - may have completed or expired",
+                        job_id
+                    )),
+                    model_used: None,
+                    models_tried: vec![],
+                }),
+            ))
         }
     }
 }
@@ -278,7 +290,10 @@ async fn run_build_with_fallback(state: Arc<AppState>, job_id: String) {
     let (sketch, project_name) = {
         let jobs = state.jobs.read().await;
         match jobs.get(&job_id) {
-            Some(job) => (job.sketch.clone(), job.project_name.clone().unwrap_or_default()),
+            Some(job) => (
+                job.sketch.clone(),
+                job.project_name.clone().unwrap_or_default(),
+            ),
             None => return,
         }
     };
@@ -409,15 +424,12 @@ Make it something people want to share. Make it memorable."#,
     let result = timeout(
         Duration::from_secs(MODEL_TIMEOUT_SECS),
         Command::new(&state.hyle_binary)
-            .arg("--task")  // Headless mode - no TTY required
+            .arg("--task") // Headless mode - no TTY required
             .arg(&task_prompt)
             .arg("--trust")
             .current_dir(project_dir)
             .env("HYLE_MODEL", model)
-            .env(
-                "OPENROUTER_API_KEY",
-                state.api_key.as_deref().unwrap_or(""),
-            )
+            .env("OPENROUTER_API_KEY", state.api_key.as_deref().unwrap_or(""))
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output(),
@@ -470,7 +482,10 @@ async fn main() -> anyhow::Result<()> {
     eprintln!("  Port: {}", port);
     eprintln!("  Projects dir: {}", projects_dir.display());
     eprintln!("  Hyle binary: {}", hyle_binary.display());
-    eprintln!("  API key: {}", if api_key.is_some() { "set" } else { "NOT SET" });
+    eprintln!(
+        "  API key: {}",
+        if api_key.is_some() { "set" } else { "NOT SET" }
+    );
     eprintln!("  Models ({}): {:?}", models.len(), models);
 
     let state = Arc::new(AppState {

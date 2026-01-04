@@ -8,12 +8,15 @@
 #![allow(dead_code)] // Tool infrastructure for self-bootstrapping
 
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use similar::TextDiff;
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 use std::time::{Duration, Instant};
-use serde::{Serialize, Deserialize};
 
 // ═══════════════════════════════════════════════════════════════
 // TOOL CALL INFRASTRUCTURE
@@ -59,9 +62,8 @@ impl ToolCall {
 
     /// Get elapsed time since start
     pub fn elapsed(&self) -> Option<Duration> {
-        self.started_at.map(|s| {
-            self.finished_at.unwrap_or_else(Instant::now) - s
-        })
+        self.started_at
+            .map(|s| self.finished_at.unwrap_or_else(Instant::now) - s)
     }
 
     /// Format status for display
@@ -163,7 +165,10 @@ impl ToolCall {
 
     /// Is this tool finished (done, failed, or killed)?
     pub fn is_finished(&self) -> bool {
-        matches!(self.status, ToolCallStatus::Done | ToolCallStatus::Failed | ToolCallStatus::Killed)
+        matches!(
+            self.status,
+            ToolCallStatus::Done | ToolCallStatus::Failed | ToolCallStatus::Killed
+        )
     }
 }
 
@@ -222,7 +227,9 @@ impl<'a> ToolCallDisplay<'a> {
             ToolCallStatus::Killed => "◌",
         };
 
-        let elapsed = self.call.elapsed()
+        let elapsed = self
+            .call
+            .elapsed()
             .map(|d| {
                 if d.as_secs() >= 60 {
                     format!("{}m{}s", d.as_secs() / 60, d.as_secs() % 60)
@@ -324,12 +331,16 @@ impl ToolCallTracker {
     fn prune(&mut self) {
         if self.calls.len() > self.max_history {
             // Keep running calls and most recent finished
-            let mut running: Vec<_> = self.calls.iter()
+            let mut running: Vec<_> = self
+                .calls
+                .iter()
                 .filter(|c| c.is_running())
                 .cloned()
                 .collect();
 
-            let finished: Vec<_> = self.calls.iter()
+            let finished: Vec<_> = self
+                .calls
+                .iter()
                 .filter(|c| c.is_finished())
                 .cloned()
                 .collect();
@@ -426,7 +437,9 @@ impl ToolExecutor {
     }
 
     fn exec_read(&self, call: &mut ToolCall) -> Result<()> {
-        let path = call.args.get("path")
+        let path = call
+            .args
+            .get("path")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("read: missing 'path' argument"))?;
 
@@ -436,11 +449,15 @@ impl ToolExecutor {
     }
 
     fn exec_write(&self, call: &mut ToolCall) -> Result<()> {
-        let path = call.args.get("path")
+        let path = call
+            .args
+            .get("path")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("write: missing 'path' argument"))?;
 
-        let content = call.args.get("content")
+        let content = call
+            .args
+            .get("content")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("write: missing 'content' argument"))?;
 
@@ -453,15 +470,20 @@ impl ToolExecutor {
             call.append_output(&format!("Backed up to {}\n", backup.display()));
         }
 
-        fs::write(path, content)
-            .with_context(|| format!("Failed to write {}", path.display()))?;
+        fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
 
-        call.append_output(&format!("Wrote {} bytes to {}\n", content.len(), path.display()));
+        call.append_output(&format!(
+            "Wrote {} bytes to {}\n",
+            content.len(),
+            path.display()
+        ));
         Ok(())
     }
 
     fn exec_glob(&self, call: &mut ToolCall) -> Result<()> {
-        let pattern = call.args.get("pattern")
+        let pattern = call
+            .args
+            .get("pattern")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("glob: missing 'pattern' argument"))?;
 
@@ -475,11 +497,15 @@ impl ToolExecutor {
     }
 
     fn exec_grep(&self, call: &mut ToolCall) -> Result<()> {
-        let pattern = call.args.get("pattern")
+        let pattern = call
+            .args
+            .get("pattern")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("grep: missing 'pattern' argument"))?;
 
-        let path = call.args.get("path")
+        let path = call
+            .args
+            .get("path")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("grep: missing 'path' argument"))?;
 
@@ -495,11 +521,15 @@ impl ToolExecutor {
     }
 
     fn exec_patch(&self, call: &mut ToolCall) -> Result<()> {
-        let path = call.args.get("path")
+        let path = call
+            .args
+            .get("path")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("patch: missing 'path' argument"))?;
 
-        let diff = call.args.get("diff")
+        let diff = call
+            .args
+            .get("diff")
             .or_else(|| call.args.get("patch"))
             .or_else(|| call.args.get("content"))
             .and_then(|v| v.as_str())
@@ -532,15 +562,20 @@ impl ToolExecutor {
         }
 
         // Write patched content
-        fs::write(path, &patched)
-            .with_context(|| format!("Failed to write {}", path.display()))?;
+        fs::write(path, &patched).with_context(|| format!("Failed to write {}", path.display()))?;
 
-        call.append_output(&format!("Patched {} ({} bytes)\n", path.display(), patched.len()));
+        call.append_output(&format!(
+            "Patched {} ({} bytes)\n",
+            path.display(),
+            patched.len()
+        ));
         Ok(())
     }
 
     fn exec_bash(&self, call: &mut ToolCall, kill: Arc<AtomicBool>) -> Result<()> {
-        let command = call.args.get("command")
+        let command = call
+            .args
+            .get("command")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("bash: missing 'command' argument"))?;
 
@@ -555,21 +590,21 @@ impl ToolExecutor {
             "rm -R ",
             "rm --recursive",
             "rmdir",
-            "> /dev/sd",      // Overwrite disk
-            "mkfs",           // Format filesystem
-            "dd if=",         // Raw disk write
-            ":(){:|:&};:",    // Fork bomb
-            "chmod -R 777",   // Insecure permissions
-            "chmod 777 /",    // Root permissions
-            "wget|sh",        // Remote code execution
-            "curl|sh",        // Remote code execution
-            "wget|bash",      // Remote code execution
-            "curl|bash",      // Remote code execution
-            "; rm ",          // Chained rm
-            "&& rm ",         // Chained rm
-            "|| rm ",         // Chained rm
-            "$(rm ",          // Subshell rm
-            "`rm ",           // Backtick rm
+            "> /dev/sd",    // Overwrite disk
+            "mkfs",         // Format filesystem
+            "dd if=",       // Raw disk write
+            ":(){:|:&};:",  // Fork bomb
+            "chmod -R 777", // Insecure permissions
+            "chmod 777 /",  // Root permissions
+            "wget|sh",      // Remote code execution
+            "curl|sh",      // Remote code execution
+            "wget|bash",    // Remote code execution
+            "curl|bash",    // Remote code execution
+            "; rm ",        // Chained rm
+            "&& rm ",       // Chained rm
+            "|| rm ",       // Chained rm
+            "$(rm ",        // Subshell rm
+            "`rm ",         // Backtick rm
         ];
 
         let cmd_lower = command.to_lowercase();
@@ -584,7 +619,9 @@ impl ToolExecutor {
             }
         }
 
-        let timeout_ms = call.args.get("timeout")
+        let timeout_ms = call
+            .args
+            .get("timeout")
             .and_then(|v| v.as_u64())
             .unwrap_or(60000);
 
@@ -638,8 +675,8 @@ impl ToolExecutor {
 
 /// Read a file with line numbers
 pub fn read_file(path: &Path) -> Result<String> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
     let mut output = String::new();
     for (i, line) in content.lines().enumerate() {
@@ -748,10 +785,7 @@ pub fn parse_unified_diff(patch: &str) -> Vec<DiffHunk> {
 /// Parse range like "1,4" or "1" into (start, count)
 fn parse_range(s: &str) -> (usize, usize) {
     if let Some((start, count)) = s.split_once(',') {
-        (
-            start.parse().unwrap_or(1),
-            count.parse().unwrap_or(1),
-        )
+        (start.parse().unwrap_or(1), count.parse().unwrap_or(1))
     } else {
         (s.parse().unwrap_or(1), 1)
     }
@@ -822,8 +856,8 @@ pub fn apply_patch(original: &str, patch: &str) -> Result<String> {
 
 /// Apply multiple patches to a file, with validation
 pub fn apply_patches_to_file(path: &Path, patches: &[String]) -> Result<()> {
-    let original = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let original =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
     let mut content = original.clone();
     for patch in patches {
@@ -836,8 +870,7 @@ pub fn apply_patches_to_file(path: &Path, patches: &[String]) -> Result<()> {
         .with_context(|| format!("Failed to backup to {}", backup.display()))?;
 
     // Write patched content
-    fs::write(path, &content)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
+    fs::write(path, &content).with_context(|| format!("Failed to write {}", path.display()))?;
 
     Ok(())
 }
@@ -1009,7 +1042,10 @@ mod tests {
 @@ -0,0 +1 @@
 +new content
 "#;
-        assert_eq!(extract_diff_target(patch), Some("src/new_file.rs".to_string()));
+        assert_eq!(
+            extract_diff_target(patch),
+            Some("src/new_file.rs".to_string())
+        );
     }
 
     #[test]
@@ -1102,9 +1138,12 @@ mod tests {
         std::fs::write(&tmp, "test content\n").unwrap();
 
         let mut executor = ToolExecutor::new();
-        let mut call = ToolCall::new("read", serde_json::json!({
-            "path": tmp.to_string_lossy()
-        }));
+        let mut call = ToolCall::new(
+            "read",
+            serde_json::json!({
+                "path": tmp.to_string_lossy()
+            }),
+        );
 
         let result = executor.execute(&mut call);
         assert!(result.is_ok());
@@ -1117,9 +1156,12 @@ mod tests {
     #[test]
     fn test_executor_bash() {
         let mut executor = ToolExecutor::new();
-        let mut call = ToolCall::new("bash", serde_json::json!({
-            "command": "echo hello"
-        }));
+        let mut call = ToolCall::new(
+            "bash",
+            serde_json::json!({
+                "command": "echo hello"
+            }),
+        );
 
         let result = executor.execute(&mut call);
         assert!(result.is_ok());
@@ -1130,10 +1172,13 @@ mod tests {
     #[test]
     fn test_executor_bash_timeout() {
         let mut executor = ToolExecutor::new();
-        let mut call = ToolCall::new("bash", serde_json::json!({
-            "command": "sleep 10",
-            "timeout": 100  // 100ms timeout
-        }));
+        let mut call = ToolCall::new(
+            "bash",
+            serde_json::json!({
+                "command": "sleep 10",
+                "timeout": 100  // 100ms timeout
+            }),
+        );
 
         let result = executor.execute(&mut call);
         assert!(result.is_err());
@@ -1162,15 +1207,21 @@ mod tests {
         ];
 
         for cmd in &dangerous_commands {
-            let mut call = ToolCall::new("bash", serde_json::json!({
-                "command": cmd
-            }));
+            let mut call = ToolCall::new(
+                "bash",
+                serde_json::json!({
+                    "command": cmd
+                }),
+            );
 
             let result = executor.execute(&mut call);
             assert!(result.is_err(), "Command should be blocked: {}", cmd);
             assert_eq!(call.status, ToolCallStatus::Failed);
-            assert!(call.error.as_ref().unwrap().contains("BLOCKED"),
-                "Error should mention BLOCKED for: {}", cmd);
+            assert!(
+                call.error.as_ref().unwrap().contains("BLOCKED"),
+                "Error should mention BLOCKED for: {}",
+                cmd
+            );
         }
     }
 
@@ -1187,21 +1238,27 @@ mod tests {
             "cargo build",
             "git status",
             "echo hello world",
-            "rm file.txt",  // Single file rm is allowed
+            "rm file.txt", // Single file rm is allowed
         ];
 
         for cmd in &safe_commands {
-            let mut call = ToolCall::new("bash", serde_json::json!({
-                "command": cmd,
-                "timeout": 100  // Short timeout since we just want to check blocking
-            }));
+            let mut call = ToolCall::new(
+                "bash",
+                serde_json::json!({
+                    "command": cmd,
+                    "timeout": 100  // Short timeout since we just want to check blocking
+                }),
+            );
 
             let result = executor.execute(&mut call);
             // Command might fail for other reasons (file not found, etc.)
             // but it should NOT be blocked
             if result.is_err() {
-                assert!(!call.error.as_ref().unwrap().contains("BLOCKED"),
-                    "Safe command should not be blocked: {}", cmd);
+                assert!(
+                    !call.error.as_ref().unwrap().contains("BLOCKED"),
+                    "Safe command should not be blocked: {}",
+                    cmd
+                );
             }
         }
     }
@@ -1219,9 +1276,12 @@ mod tests {
     #[test]
     fn test_executor_glob() {
         let mut executor = ToolExecutor::new();
-        let mut call = ToolCall::new("glob", serde_json::json!({
-            "pattern": "src/*.rs"
-        }));
+        let mut call = ToolCall::new(
+            "glob",
+            serde_json::json!({
+                "pattern": "src/*.rs"
+            }),
+        );
 
         let result = executor.execute(&mut call);
         assert!(result.is_ok());
@@ -1275,26 +1335,35 @@ mod tests {
 
     #[test]
     fn test_args_summary_path() {
-        let call = ToolCall::new("read", serde_json::json!({
-            "path": "/home/user/project/src/main.rs"
-        }));
+        let call = ToolCall::new(
+            "read",
+            serde_json::json!({
+                "path": "/home/user/project/src/main.rs"
+            }),
+        );
         assert_eq!(call.args_summary(), "/home/user/project/src/main.rs");
     }
 
     #[test]
     fn test_args_summary_command() {
-        let call = ToolCall::new("bash", serde_json::json!({
-            "command": "echo hello"
-        }));
+        let call = ToolCall::new(
+            "bash",
+            serde_json::json!({
+                "command": "echo hello"
+            }),
+        );
         assert_eq!(call.args_summary(), "echo hello");
     }
 
     #[test]
     fn test_args_summary_long_command() {
         let long_cmd = "this is a very long command that should be truncated because it's too long to display nicely";
-        let call = ToolCall::new("bash", serde_json::json!({
-            "command": long_cmd
-        }));
+        let call = ToolCall::new(
+            "bash",
+            serde_json::json!({
+                "command": long_cmd
+            }),
+        );
         let summary = call.args_summary();
         assert!(summary.len() <= 43); // 40 + "..."
         assert!(summary.ends_with("..."));
@@ -1318,9 +1387,12 @@ mod tests {
 
     #[test]
     fn test_display_header_pending() {
-        let call = ToolCall::new("read", serde_json::json!({
-            "path": "test.txt"
-        }));
+        let call = ToolCall::new(
+            "read",
+            serde_json::json!({
+                "path": "test.txt"
+            }),
+        );
 
         let display = ToolCallDisplay::new(&call);
         let header = display.header();
@@ -1332,9 +1404,12 @@ mod tests {
 
     #[test]
     fn test_display_header_running() {
-        let mut call = ToolCall::new("bash", serde_json::json!({
-            "command": "sleep 1"
-        }));
+        let mut call = ToolCall::new(
+            "bash",
+            serde_json::json!({
+                "command": "sleep 1"
+            }),
+        );
         call.start();
 
         let display = ToolCallDisplay::new(&call).with_tick(0);
@@ -1450,9 +1525,12 @@ mod tests {
     fn test_tracker_status_summary_one() {
         let mut tracker = ToolCallTracker::new();
 
-        let mut call = ToolCall::new("read", serde_json::json!({
-            "path": "file.txt"
-        }));
+        let mut call = ToolCall::new(
+            "read",
+            serde_json::json!({
+                "path": "file.txt"
+            }),
+        );
         call.start();
         tracker.add(call);
 
@@ -1480,9 +1558,12 @@ mod tests {
     fn test_tracker_render_running() {
         let mut tracker = ToolCallTracker::new();
 
-        let mut call = ToolCall::new("bash", serde_json::json!({
-            "command": "echo hi"
-        }));
+        let mut call = ToolCall::new(
+            "bash",
+            serde_json::json!({
+                "command": "echo hi"
+            }),
+        );
         call.start();
         call.append_output("hi\n");
         tracker.add(call);

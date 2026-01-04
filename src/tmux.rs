@@ -138,10 +138,7 @@ pub fn init_window(work_dir: &std::path::Path) {
         return;
     }
 
-    let project = work_dir
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("~");
+    let project = work_dir.file_name().and_then(|n| n.to_str()).unwrap_or("~");
 
     set_window_title(Some(project), None);
 }
@@ -180,11 +177,7 @@ pub fn notify_briefly(message: &str, duration_ms: u32) {
     }
 
     let _ = Command::new("tmux")
-        .args([
-            "display-message",
-            "-d", &duration_ms.to_string(),
-            message,
-        ])
+        .args(["display-message", "-d", &duration_ms.to_string(), message])
         .output();
 }
 
@@ -277,10 +270,14 @@ pub fn popup(title: &str, command: &str, width: u8, height: u8) -> bool {
     Command::new("tmux")
         .args([
             "display-popup",
-            "-T", title,
-            "-w", &w,
-            "-h", &h,
-            "-E", command,
+            "-T",
+            title,
+            "-w",
+            &w,
+            "-h",
+            &h,
+            "-E",
+            command,
         ])
         .output()
         .map(|o| o.status.success())
@@ -349,10 +346,7 @@ pub fn pane_count() -> usize {
         .ok()
         .and_then(|o| {
             if o.status.success() {
-                String::from_utf8_lossy(&o.stdout)
-                    .trim()
-                    .parse()
-                    .ok()
+                String::from_utf8_lossy(&o.stdout).trim().parse().ok()
             } else {
                 None
             }
@@ -391,9 +385,7 @@ pub fn get_env(key: &str) -> Option<String> {
             if o.status.success() {
                 let output = String::from_utf8_lossy(&o.stdout);
                 // Output is "KEY=value", extract value
-                output.trim()
-                    .split_once('=')
-                    .map(|(_, v)| v.to_string())
+                output.trim().split_once('=').map(|(_, v)| v.to_string())
             } else {
                 None
             }
@@ -476,7 +468,10 @@ mod tests {
     fn test_truncate_path() {
         assert_eq!(truncate_path("project"), "project");
         assert_eq!(truncate_path("/home/user/project"), "project");
-        assert_eq!(truncate_path("a_very_long_project_name_here"), "a_very_long_project…");
+        assert_eq!(
+            truncate_path("a_very_long_project_name_here"),
+            "a_very_long_project…"
+        );
     }
 
     #[test]

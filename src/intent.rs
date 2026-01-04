@@ -8,9 +8,9 @@
 
 #![allow(dead_code)] // Forward-looking module for context management
 
-use std::collections::VecDeque;
-use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 // ═══════════════════════════════════════════════════════════════
 // INTENT HIERARCHY
@@ -31,10 +31,10 @@ pub struct Intent {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum IntentKind {
-    Primary,    // Main development goal
-    Subtask,    // Part of primary
-    Aside,      // Tangent/exploration
-    Fix,        // Bug fix during development
+    Primary, // Main development goal
+    Subtask, // Part of primary
+    Aside,   // Tangent/exploration
+    Fix,     // Bug fix during development
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -165,8 +165,7 @@ impl IntentStack {
         }
 
         // Find parent and make it active
-        let parent_id = self.get(&current_id)
-            .and_then(|i| i.parent_id.clone());
+        let parent_id = self.get(&current_id).and_then(|i| i.parent_id.clone());
 
         if let Some(ref pid) = parent_id {
             if let Some(parent) = self.get_mut(pid) {
@@ -188,8 +187,7 @@ impl IntentStack {
             current.status = IntentStatus::Abandoned;
         }
 
-        let parent_id = self.get(&current_id)
-            .and_then(|i| i.parent_id.clone());
+        let parent_id = self.get(&current_id).and_then(|i| i.parent_id.clone());
 
         if let Some(ref pid) = parent_id {
             if let Some(parent) = self.get_mut(pid) {
@@ -238,8 +236,7 @@ impl IntentStack {
 
         while let Some(intent) = current {
             path.push(intent);
-            current = intent.parent_id.as_ref()
-                .and_then(|pid| self.get(pid));
+            current = intent.parent_id.as_ref().and_then(|pid| self.get(pid));
         }
 
         path.reverse();
@@ -253,7 +250,8 @@ impl IntentStack {
             return "No active intent".to_string();
         }
 
-        crumbs.iter()
+        crumbs
+            .iter()
             .map(|i| {
                 let icon = match i.kind {
                     IntentKind::Primary => "◉",
@@ -269,7 +267,8 @@ impl IntentStack {
 
     /// Count asides in current path
     pub fn aside_depth(&self) -> usize {
-        self.breadcrumb().iter()
+        self.breadcrumb()
+            .iter()
             .filter(|i| i.kind == IntentKind::Aside)
             .count()
     }
@@ -344,10 +343,10 @@ pub struct ContextSegment {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum SegmentKind {
-    Main,      // Main development flow
-    Tangent,   // Exploration/aside
-    Fix,       // Bug fix
-    Research,  // Information gathering
+    Main,     // Main development flow
+    Tangent,  // Exploration/aside
+    Fix,      // Bug fix
+    Research, // Information gathering
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -496,7 +495,11 @@ impl ContextManager {
     /// Total tokens across all segments
     pub fn total_tokens(&self) -> usize {
         let archived: usize = self.segments.iter().map(|s| s.token_count).sum();
-        let current = self.current_segment.as_ref().map(|s| s.token_count).unwrap_or(0);
+        let current = self
+            .current_segment
+            .as_ref()
+            .map(|s| s.token_count)
+            .unwrap_or(0);
         archived + current
     }
 
@@ -510,7 +513,8 @@ impl ContextManager {
                 segment.set_summary(&format!(
                     "{} messages about {}",
                     msg_count,
-                    self.intents.get(&segment.intent_id)
+                    self.intents
+                        .get(&segment.intent_id)
                         .map(|i| i.description.as_str())
                         .unwrap_or("tangent")
                 ));
@@ -555,30 +559,35 @@ pub struct Constraint {
     pub level: ConstraintLevel,
     pub kind: ConstraintKind,
     pub description: String,
-    pub source: String,  // Where this came from
+    pub source: String, // Where this came from
     pub active: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConstraintLevel {
-    Project,    // Applies to entire project (from CLAUDE.md, conventions)
-    Session,    // Applies to this session
-    Task,       // Applies to current task
-    Immediate,  // Applies to current action
+    Project,   // Applies to entire project (from CLAUDE.md, conventions)
+    Session,   // Applies to this session
+    Task,      // Applies to current task
+    Immediate, // Applies to current action
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConstraintKind {
-    MustDo,       // Required action/behavior
-    MustNotDo,    // Prohibited action/behavior
-    Prefer,       // Preference if possible
-    Avoid,        // Avoid if possible
-    Style,        // Code style constraint
-    Safety,       // Safety-related constraint
+    MustDo,    // Required action/behavior
+    MustNotDo, // Prohibited action/behavior
+    Prefer,    // Preference if possible
+    Avoid,     // Avoid if possible
+    Style,     // Code style constraint
+    Safety,    // Safety-related constraint
 }
 
 impl Constraint {
-    pub fn new(level: ConstraintLevel, kind: ConstraintKind, description: &str, source: &str) -> Self {
+    pub fn new(
+        level: ConstraintLevel,
+        kind: ConstraintKind,
+        description: &str,
+        source: &str,
+    ) -> Self {
         Self {
             level,
             kind,
@@ -589,11 +598,21 @@ impl Constraint {
     }
 
     pub fn project(description: &str, source: &str) -> Self {
-        Self::new(ConstraintLevel::Project, ConstraintKind::MustDo, description, source)
+        Self::new(
+            ConstraintLevel::Project,
+            ConstraintKind::MustDo,
+            description,
+            source,
+        )
     }
 
     pub fn safety(description: &str) -> Self {
-        Self::new(ConstraintLevel::Project, ConstraintKind::Safety, description, "system")
+        Self::new(
+            ConstraintLevel::Project,
+            ConstraintKind::Safety,
+            description,
+            "system",
+        )
     }
 }
 
@@ -605,7 +624,9 @@ pub struct ConstraintSet {
 
 impl ConstraintSet {
     pub fn new() -> Self {
-        Self { constraints: Vec::new() }
+        Self {
+            constraints: Vec::new(),
+        }
     }
 
     pub fn add(&mut self, constraint: Constraint) {
@@ -613,19 +634,22 @@ impl ConstraintSet {
     }
 
     pub fn at_level(&self, level: ConstraintLevel) -> Vec<&Constraint> {
-        self.constraints.iter()
+        self.constraints
+            .iter()
             .filter(|c| c.level == level && c.active)
             .collect()
     }
 
     pub fn must_do(&self) -> Vec<&Constraint> {
-        self.constraints.iter()
+        self.constraints
+            .iter()
             .filter(|c| c.kind == ConstraintKind::MustDo && c.active)
             .collect()
     }
 
     pub fn must_not(&self) -> Vec<&Constraint> {
-        self.constraints.iter()
+        self.constraints
+            .iter()
             .filter(|c| c.kind == ConstraintKind::MustNotDo && c.active)
             .collect()
     }
@@ -635,8 +659,12 @@ impl ConstraintSet {
         let mut out = String::new();
 
         // Group by level
-        for level in [ConstraintLevel::Project, ConstraintLevel::Session,
-                      ConstraintLevel::Task, ConstraintLevel::Immediate] {
+        for level in [
+            ConstraintLevel::Project,
+            ConstraintLevel::Session,
+            ConstraintLevel::Task,
+            ConstraintLevel::Immediate,
+        ] {
             let at_level = self.at_level(level);
             if !at_level.is_empty() {
                 out.push_str(&format!("\n{:?} Constraints:\n", level));
@@ -681,27 +709,33 @@ pub struct IntentView {
 impl IntentView {
     /// Build from IntentStack
     pub fn from_stack(stack: &IntentStack) -> Self {
-        let primary = stack.primary()
+        let primary = stack
+            .primary()
             .map(|i| i.description.clone())
             .unwrap_or_else(|| "No primary goal set".into());
 
-        let mid_level: Vec<String> = stack.breadcrumb()
+        let mid_level: Vec<String> = stack
+            .breadcrumb()
             .iter()
-            .skip(1)  // Skip primary
+            .skip(1) // Skip primary
             .filter(|i| i.kind == IntentKind::Subtask)
             .map(|i| i.description.clone())
             .collect();
 
-        let low_level = stack.active()
-            .map(|i| format!("{}: {}",
-                match i.kind {
-                    IntentKind::Primary => "Main",
-                    IntentKind::Subtask => "Subtask",
-                    IntentKind::Aside => "Aside",
-                    IntentKind::Fix => "Fix",
-                },
-                i.description
-            ))
+        let low_level = stack
+            .active()
+            .map(|i| {
+                format!(
+                    "{}: {}",
+                    match i.kind {
+                        IntentKind::Primary => "Main",
+                        IntentKind::Subtask => "Subtask",
+                        IntentKind::Aside => "Aside",
+                        IntentKind::Fix => "Fix",
+                    },
+                    i.description
+                )
+            })
             .unwrap_or_else(|| "No active task".into());
 
         Self {
@@ -766,9 +800,9 @@ impl Default for IntentView {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Verbosity {
-    Minimal,  // One line
-    Normal,   // Few lines
-    Full,     // Complete with constraints
+    Minimal, // One line
+    Normal,  // Few lines
+    Full,    // Complete with constraints
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -777,18 +811,22 @@ pub enum Verbosity {
 
 /// Prompt for a free LLM to extract/update high-level goal
 pub fn goal_extraction_prompt(conversation: &str) -> String {
-    format!(r#"Extract the user's high-level goal from this conversation.
+    format!(
+        r#"Extract the user's high-level goal from this conversation.
 Respond with a single sentence describing what they ultimately want to achieve.
 
 Conversation:
 {}
 
-Goal:"#, conversation)
+Goal:"#,
+        conversation
+    )
 }
 
 /// Prompt to identify current subtasks
 pub fn subtask_extraction_prompt(goal: &str, recent_context: &str) -> String {
-    format!(r#"Given this goal and recent context, list the current subtasks.
+    format!(
+        r#"Given this goal and recent context, list the current subtasks.
 Respond with a bullet list of 2-5 subtasks.
 
 Goal: {}
@@ -796,12 +834,15 @@ Goal: {}
 Recent context:
 {}
 
-Subtasks:"#, goal, recent_context)
+Subtasks:"#,
+        goal, recent_context
+    )
 }
 
 /// Prompt to extract constraints from user messages
 pub fn constraint_extraction_prompt(user_messages: &str) -> String {
-    format!(r#"Extract any constraints or requirements from these user messages.
+    format!(
+        r#"Extract any constraints or requirements from these user messages.
 Look for: style preferences, things to avoid, required behaviors, safety concerns.
 
 Messages:
@@ -811,7 +852,9 @@ Respond in this format:
 MUST: [things that must be done]
 MUST_NOT: [things to avoid]
 PREFER: [preferences]
-STYLE: [style requirements]"#, user_messages)
+STYLE: [style requirements]"#,
+        user_messages
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -831,7 +874,7 @@ fn truncate(s: &str, max: usize) -> String {
     if s.len() <= max {
         s.to_string()
     } else {
-        format!("{}...", &s[..max-3])
+        format!("{}...", &s[..max - 3])
     }
 }
 

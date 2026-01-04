@@ -56,8 +56,8 @@ pub fn load_cache() -> Result<Option<ModelsCache>> {
         return Ok(None);
     }
 
-    let content = fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
 
     let cache: ModelsCache = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse {}", path.display()))?;
@@ -82,8 +82,7 @@ pub fn save_cache(models: &[Model]) -> Result<()> {
     };
 
     let content = serde_json::to_string_pretty(&cache)?;
-    fs::write(&path, &content)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
+    fs::write(&path, &content).with_context(|| format!("Failed to write {}", path.display()))?;
 
     Ok(())
 }
@@ -125,8 +124,8 @@ pub fn get_model_pricing(model_id: &str) -> (f64, f64) {
 pub fn calculate_cost(model_id: &str, prompt_tokens: u32, completion_tokens: u32) -> f64 {
     let (prompt_price, completion_price) = get_model_pricing(model_id);
     // Prices are typically per 1M tokens
-    (prompt_tokens as f64 * prompt_price / 1_000_000.0) +
-    (completion_tokens as f64 * completion_price / 1_000_000.0)
+    (prompt_tokens as f64 * prompt_price / 1_000_000.0)
+        + (completion_tokens as f64 * completion_price / 1_000_000.0)
 }
 
 /// Get context window for a model (from cache or default)
