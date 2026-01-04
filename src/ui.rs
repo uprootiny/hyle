@@ -1973,6 +1973,64 @@ async fn run_tui_loop(
                                 state.session_selected += 1;
                             }
                         }
+                        KeyCode::Enter => {
+                            // Restore selected session
+                            if let Some(session) = state.detected_sessions.get(state.session_selected).cloned() {
+                                match session.tool.as_str() {
+                                    "hyle" => {
+                                        // Restore hyle session by loading and displaying its contents
+                                        match crate::session::Session::load(&session.id) {
+                                            Ok(loaded) => {
+                                                // Add session messages to output display
+                                                state.output.push(format!("\n─── Restored session {} ───", session.id));
+                                                for msg in &loaded.messages {
+                                                    let prefix = if msg.role == "user" { "You" } else { "AI" };
+                                                    state.output.push(format!("[{}] {}", prefix, msg.content));
+                                                }
+                                                state.output.push("─── End of restored session ───\n".into());
+                                                state.output_dirty = true;
+                                                state.log(format!("Restored {} messages from session {}", loaded.messages.len(), session.id));
+                                                state.tab = View::Chat;
+                                            }
+                                            Err(e) => {
+                                                state.log(format!("Failed to load session: {}", e));
+                                            }
+                                        }
+                                    }
+                                    "claude-code" => {
+                                        // Import Claude Code context from current directory
+                                        let cwd = std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default();
+                                        match crate::session::import_claude_context(&cwd, 10) {
+                                            Ok(msgs) if !msgs.is_empty() => {
+                                                state.output.push(format!("\n─── Imported {} Claude Code prompts ───", msgs.len()));
+                                                for msg in &msgs {
+                                                    state.output.push(format!("[Claude] {}", msg.content));
+                                                }
+                                                state.output.push("─── End of import ───\n".into());
+                                                state.output_dirty = true;
+                                                state.log(format!("Imported {} prompts from Claude Code", msgs.len()));
+                                                state.tab = View::Chat;
+                                            }
+                                            _ => {
+                                                state.log("No context found in Claude Code session");
+                                            }
+                                        }
+                                    }
+                                    _ => {
+                                        state.log(format!("Cannot restore {} session (read-only)", session.tool));
+                                    }
+                                }
+                            }
+                        }
+                        KeyCode::Char('v') => {
+                            // View session details
+                            if let Some(session) = state.detected_sessions.get(state.session_selected) {
+                                state.log(format!(
+                                    "Session: {} | Tool: {} | {} msgs | {} tokens",
+                                    session.id, session.tool, session.messages, session.tokens
+                                ));
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -2330,7 +2388,7 @@ fn render_log(f: &mut Frame, state: &TuiState, area: Rect) {
 
 fn render_sessions(f: &mut Frame, state: &TuiState, area: Rect) {
     let mut lines = vec![
-        "Sessions (↑↓:select Enter:resume/view r:refresh)".into(),
+        "Sessions (↑↓:select Enter:restore r:refresh v:details)".into(),
         "".into(),
     ];
 
@@ -2340,21 +2398,25 @@ fn render_sessions(f: &mut Frame, state: &TuiState, area: Rect) {
         lines.push("Sessions from other tools will appear here:".into());
         lines.push("  - claude-code, aider, codex, gemini".into());
     } else {
-        // Group by status
-        let active: Vec<_> = state.detected_sessions.iter()
-            .filter(|s| matches!(s.status, SessionStatus::Active | SessionStatus::Backburner))
+        // Group by status for display, but use original indices for selection
+        let active_indices: Vec<_> = state.detected_sessions.iter().enumerate()
+            .filter(|(_, s)| matches!(s.status, SessionStatus::Active | SessionStatus::Backburner))
+            .map(|(i, _)| i)
             .collect();
-        let cold: Vec<_> = state.detected_sessions.iter()
-            .filter(|s| matches!(s.status, SessionStatus::Cold))
+        let cold_indices: Vec<_> = state.detected_sessions.iter().enumerate()
+            .filter(|(_, s)| matches!(s.status, SessionStatus::Cold))
+            .map(|(i, _)| i)
             .collect();
-        let foreign: Vec<_> = state.detected_sessions.iter()
-            .filter(|s| matches!(s.status, SessionStatus::Foreign))
+        let foreign_indices: Vec<_> = state.detected_sessions.iter().enumerate()
+            .filter(|(_, s)| matches!(s.status, SessionStatus::Foreign))
+            .map(|(i, _)| i)
             .collect();
 
-        if !active.is_empty() {
+        if !active_indices.is_empty() {
             lines.push("── Active/Backburner ──".into());
-            for (i, s) in active.iter().enumerate() {
-                let marker = if i == state.session_selected { ">" } else { " " };
+            for idx in &active_indices {
+                let s = &state.detected_sessions[*idx];
+                let marker = if *idx == state.session_selected { "▶" } else { " " };
                 let status_icon = match s.status {
                     SessionStatus::Active => "●",
                     SessionStatus::Backburner => "◐",
@@ -2372,19 +2434,23 @@ fn render_sessions(f: &mut Frame, state: &TuiState, area: Rect) {
             lines.push("".into());
         }
 
-        if !cold.is_empty() {
+        if !cold_indices.is_empty() {
             lines.push("── Cold (can revive) ──".into());
-            for s in cold.iter().take(5) {
-                lines.push(format!("  ○ {} {} | {}msg {}tok | {}",
-                    s.tool, s.id, s.messages, s.tokens, s.age));
+            for idx in cold_indices.iter().take(5) {
+                let s = &state.detected_sessions[*idx];
+                let marker = if *idx == state.session_selected { "▶" } else { " " };
+                lines.push(format!("{} ○ {} {} | {}msg {}tok | {}",
+                    marker, s.tool, s.id, s.messages, s.tokens, s.age));
             }
             lines.push("".into());
         }
 
-        if !foreign.is_empty() {
+        if !foreign_indices.is_empty() {
             lines.push("── Foreign Tools (read-only) ──".into());
-            for s in foreign.iter().take(5) {
-                lines.push(format!("  ◇ {} {}", s.tool, s.id));
+            for idx in foreign_indices.iter().take(5) {
+                let s = &state.detected_sessions[*idx];
+                let marker = if *idx == state.session_selected { "▶" } else { " " };
+                lines.push(format!("{} ◇ {} {}", marker, s.tool, s.id));
             }
         }
     }
