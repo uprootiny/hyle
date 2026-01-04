@@ -375,6 +375,9 @@ struct TuiState {
     // Agent mode - autonomous tool chaining like Claude Code
     agent_mode: bool,
     agent_running: bool,
+
+    // Pending prompt queue - allows typing while generating
+    pending_prompts: std::collections::VecDeque<String>,
 }
 
 /// An artifact (file, diff, etc.)
@@ -518,6 +521,8 @@ impl TuiState {
             // Agent mode
             agent_mode: true, // Enable by default - this is what makes hyle like Claude Code
             agent_running: false,
+            // Pending prompt queue
+            pending_prompts: std::collections::VecDeque::new(),
         }
     }
 
@@ -1611,11 +1616,10 @@ async fn run_tui_loop(
         // Handle input
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
-                // Handle paste events (multiline text)
+                // Handle paste events (multiline text) - works during generation
                 Event::Paste(pasted) => {
-                    if state.tab == View::Chat && !state.is_generating {
+                    if state.tab == View::Chat {
                         // Replace newlines with spaces for single-line input
-                        // Or could support multiline - for now, join with space
                         let cleaned: String = pasted.lines()
                             .collect::<Vec<_>>()
                             .join(" ");
@@ -1741,29 +1745,35 @@ async fn run_tui_loop(
                     _ => {}
                 }
 
-                // Tab-specific input
-                if state.tab == Tab::Chat && !state.is_generating {
+                // Chat view - scrolling always works
+                if state.tab == Tab::Chat {
                     match key.code {
-                        KeyCode::Up => {
-                            state.history_up();
-                        }
-                        KeyCode::Down => {
-                            state.history_down();
-                        }
                         KeyCode::PageUp => {
-                            // Scroll chat up
                             state.scroll_offset = state.scroll_offset.saturating_sub(10);
                             state.auto_scroll = false;
                         }
                         KeyCode::PageDown => {
-                            // Scroll chat down
                             state.scroll_offset = state.scroll_offset.saturating_add(10);
                         }
                         KeyCode::End => {
-                            // Jump to bottom, enable auto-scroll
                             state.auto_scroll = true;
                         }
-                        KeyCode::Enter => {
+                        _ => {}
+                    }
+                }
+
+                // Chat view input - typing always works, Enter blocked during generation
+                if state.tab == Tab::Chat {
+                    match key.code {
+                        // History navigation - only when not generating
+                        KeyCode::Up if !state.is_generating => {
+                            state.history_up();
+                        }
+                        KeyCode::Down if !state.is_generating => {
+                            state.history_down();
+                        }
+                        // Enter - only when not generating
+                        KeyCode::Enter if !state.is_generating => {
                             if !state.input.is_empty() {
                                 let prompt = state.input.clone();
                                 state.add_to_history(&prompt);
