@@ -11,7 +11,7 @@
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind},
+    event::{self, Event, KeyCode, KeyEventKind, EnableBracketedPaste, DisableBracketedPaste},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -1610,7 +1610,24 @@ async fn run_tui_loop(
 
         // Handle input
         if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
+            match event::read()? {
+                // Handle paste events (multiline text)
+                Event::Paste(pasted) => {
+                    if state.tab == View::Chat && !state.is_generating {
+                        // Replace newlines with spaces for single-line input
+                        // Or could support multiline - for now, join with space
+                        let cleaned: String = pasted.lines()
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        for c in cleaned.chars() {
+                            state.input.insert(state.cursor_pos, c);
+                            state.cursor_pos += 1;
+                        }
+                        state.log(format!("Pasted {} chars", cleaned.len()));
+                    }
+                    continue;
+                }
+                Event::Key(key) => {
                 if key.kind != KeyEventKind::Press {
                     continue;
                 }
@@ -2034,6 +2051,8 @@ async fn run_tui_loop(
                         _ => {}
                     }
                 }
+                }  // end Event::Key
+                _ => {}  // ignore other events (resize, focus, etc.)
             }
         }
     }
@@ -2569,14 +2588,14 @@ fn spinner_char(tick: usize) -> char {
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, EnableBracketedPaste)?;
     let backend = CrosstermBackend::new(stdout);
     Ok(Terminal::new(backend)?)
 }
 
 fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(terminal.backend_mut(), DisableBracketedPaste, LeaveAlternateScreen)?;
     terminal.show_cursor()?;
     Ok(())
 }
