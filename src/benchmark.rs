@@ -806,6 +806,144 @@ commit stu901: final fix (hopefully)
 // TESTS
 // ═══════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════
+// BENCHMARK RUNNER - Execute benchmarks against LLM APIs
+// ═══════════════════════════════════════════════════════════════
+
+use std::path::Path;
+
+/// Runner for executing benchmarks against a model
+pub struct BenchmarkRunner<'a> {
+    api_key: &'a str,
+    model: &'a str,
+    work_dir: &'a Path,
+    config: BenchmarkConfig,
+}
+
+impl<'a> BenchmarkRunner<'a> {
+    pub fn new(api_key: &'a str, model: &'a str, work_dir: &'a Path) -> Self {
+        Self {
+            api_key,
+            model,
+            work_dir,
+            config: BenchmarkConfig::default(),
+        }
+    }
+
+    pub fn with_config(mut self, config: BenchmarkConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    /// Run the full benchmark suite and return a profile
+    pub async fn run_full_suite(&mut self) -> anyhow::Result<ModelProfileWithMeta> {
+        let prompts = PromptSet::default();
+        let mut scores = Vec::new();
+
+        println!("Running {} prompts across {} categories...",
+            prompts.prompts.len(), self.config.categories.len());
+
+        for prompt in &prompts.prompts {
+            if !self.config.categories.contains(&prompt.category) {
+                continue;
+            }
+
+            print!("  {} ({:?})... ", prompt.id, prompt.category);
+
+            let start = std::time::Instant::now();
+            match self.run_single_prompt(prompt).await {
+                Ok(response) => {
+                    let elapsed = start.elapsed();
+                    let tokens = estimate_tokens(&response);
+                    let score = ResponseScore::compute(
+                        prompt,
+                        self.model,
+                        &response,
+                        elapsed,
+                        tokens,
+                    );
+                    println!("score: {:.2}", score.weighted_score);
+                    scores.push(score);
+                }
+                Err(e) => {
+                    println!("error: {}", e);
+                }
+            }
+        }
+
+        let profile = ModelProfile::from_scores(self.model, scores);
+        Ok(ModelProfileWithMeta {
+            model: profile.model,
+            scores: profile.scores,
+            category_scores: profile.category_scores,
+            total_score: profile.total_score,
+            avg_latency_ms: profile.avg_latency_ms,
+            total_tokens: profile.total_tokens,
+            cost_estimate: profile.cost_estimate,
+            total_prompt_tokens: 0, // TODO: track separately
+            total_completion_tokens: 0,
+            total_time_secs: 0.0,
+        })
+    }
+
+    async fn run_single_prompt(&self, prompt: &BenchmarkPrompt) -> anyhow::Result<String> {
+        use crate::client;
+
+        let full_prompt = if let Some(ctx) = &prompt.context {
+            format!("You are a code assistant helping with housekeeping tasks. \
+                     Be concise and specific.\n\n{}\n\nContext:\n{}", prompt.prompt, ctx)
+        } else {
+            format!("You are a code assistant helping with housekeeping tasks. \
+                     Be concise and specific.\n\n{}", prompt.prompt)
+        };
+
+        let response = client::chat_completion_simple(
+            self.api_key,
+            self.model,
+            &full_prompt,
+            prompt.max_tokens as u32,
+        ).await?;
+
+        Ok(response)
+    }
+}
+
+/// Extended profile with metadata about the run
+pub struct ModelProfileWithMeta {
+    pub model: String,
+    pub scores: Vec<ResponseScore>,
+    pub category_scores: HashMap<TaskCategory, f64>,
+    pub total_score: f64,
+    pub avg_latency_ms: u64,
+    pub total_tokens: u32,
+    pub cost_estimate: f64,
+    pub total_prompt_tokens: u32,
+    pub total_completion_tokens: u32,
+    pub total_time_secs: f64,
+}
+
+impl ModelProfileWithMeta {
+    pub fn grade(&self) -> &'static str {
+        let avg = self.total_score / self.scores.len().max(1) as f64;
+        match avg {
+            x if x >= 2.5 => "A+",
+            x if x >= 2.0 => "A",
+            x if x >= 1.7 => "B+",
+            x if x >= 1.4 => "B",
+            x if x >= 1.1 => "C+",
+            x if x >= 0.8 => "C",
+            x if x >= 0.5 => "D",
+            _ => "F",
+        }
+    }
+}
+
+/// Estimate token count from text (rough approximation)
+fn estimate_tokens(text: &str) -> u32 {
+    // Rough estimate: ~4 chars per token for English
+    (text.len() as f64 / 4.0).ceil() as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

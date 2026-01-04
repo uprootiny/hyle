@@ -42,6 +42,7 @@ mod server;
 mod orchestrator;
 mod orchestrator_server;
 mod intake;
+mod benchmark;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -54,9 +55,14 @@ use std::path::PathBuf;
 enum Command {
     Interactive {
         free_only: bool,
+        nonfree_only: bool,
         model: Option<String>,
         paths: Vec<PathBuf>,
         resume: bool,
+        handoff: bool,
+    },
+    Benchmark {
+        model: Option<String>,
     },
     Task {
         task: String,
@@ -95,9 +101,11 @@ fn parse_args() -> Command {
     if args.is_empty() {
         return Command::Interactive {
             free_only: false,
+            nonfree_only: false,
             model: None,
             paths: vec![],
             resume: true, // Default: resume last session
+            handoff: false,
         };
     }
 
@@ -120,6 +128,15 @@ fn parse_args() -> Command {
             list: args.iter().any(|a| a == "--list" || a == "-l"),
             clean: args.iter().any(|a| a == "--clean"),
         };
+    }
+
+    // Check for benchmark command
+    if args.first().map(|s| s.as_str()) == Some("benchmark") {
+        let model = args.iter()
+            .position(|a| a == "--model" || a == "-m")
+            .and_then(|i| args.get(i + 1))
+            .cloned();
+        return Command::Benchmark { model };
     }
 
     if args.first().map(|s| s.as_str()) == Some("config")
@@ -179,20 +196,24 @@ fn parse_args() -> Command {
 
     // Parse flags and paths
     let mut free_only = false;
+    let mut nonfree_only = false;
     let mut model = None;
     let mut task = None;
     let mut paths = Vec::new();
     let mut resume = true;
     let mut trust_mode = false;
     let mut ask_mode = false;
+    let mut handoff = false;
     let mut i = 0;
 
     while i < args.len() {
         match args[i].as_str() {
             "--free" | "-f" => free_only = true,
+            "--nonfree" | "--paid" => nonfree_only = true,
             "--new" | "-n" => resume = false,
             "--trust" | "-y" => trust_mode = true,
             "--ask" | "-a" => ask_mode = true,
+            "--handoff" => handoff = true,
             "--model" | "-m" => {
                 i += 1;
                 model = args.get(i).cloned();
@@ -226,7 +247,7 @@ fn parse_args() -> Command {
     if let Some(task_str) = task {
         Command::Task { task: task_str, paths }
     } else {
-        Command::Interactive { free_only, model, paths, resume }
+        Command::Interactive { free_only, nonfree_only, model, paths, resume, handoff }
     }
 }
 
@@ -236,12 +257,15 @@ fn print_help() {
 USAGE:
     hyle                          # resume last session (or start new)
     hyle --free [PATHS...]        # choose free model, interactive loop
+    hyle --nonfree [PATHS...]     # only paid models (no free tier)
     hyle --new                    # start fresh session
+    hyle --handoff                # import Claude Code context
     hyle --model <id> [PATHS...]  # use specific model
     hyle --task "..." [PATHS...]  # autonomous agent mode (no TUI)
     hyle --backburner [PATHS...]  # background maintenance daemon
     hyle --serve [PORT]           # HTTP API server (default: 8420)
     hyle orchestrate              # project orchestrator (default: 8421)
+    hyle benchmark [--model <id>] # profile LLM for housekeeping tasks
     hyle doctor                   # check config, key, network
     hyle models --refresh         # refresh models cache
     hyle sessions --list          # list saved sessions
@@ -250,11 +274,14 @@ USAGE:
 
 FLAGS:
     -f, --free              Only show free models in picker
+    --nonfree, --paid       Only show paid models (excludes free tier)
     -n, --new               Start new session (don't resume)
+    --handoff               Import context from Claude Code session
     -m, --model <id>        Use specific model ID
     -t, --task <text>       One-shot task mode
     -b, --backburner        Run background maintenance daemon
     -s, --serve [port]      HTTP API server mode
+    benchmark               Profile LLM on housekeeping tasks
     orchestrate             Project orchestrator mode
         -p, --port <port>   Orchestrator port (default: 8421)
         -r, --root <path>   Projects root directory
@@ -348,8 +375,12 @@ async fn run_command() -> Result<()> {
             tmux::set_status("orch");
             orchestrator_server::run_orchestrator(port, projects_root, domain).await
         }
-        Command::Interactive { free_only, model, paths, resume } => {
-            run_interactive(free_only, model, paths, resume).await
+        Command::Benchmark { model } => {
+            tmux::set_status("bench");
+            run_benchmark(model.as_deref()).await
+        }
+        Command::Interactive { free_only, nonfree_only, model, paths, resume, handoff } => {
+            run_interactive(free_only, nonfree_only, model, paths, resume, handoff).await
         }
     }
 }
@@ -590,7 +621,14 @@ async fn run_task(task: &str, paths: &[PathBuf]) -> Result<()> {
     Ok(())
 }
 
-async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<PathBuf>, resume: bool) -> Result<()> {
+async fn run_interactive(
+    free_only: bool,
+    nonfree_only: bool,
+    model: Option<String>,
+    paths: Vec<PathBuf>,
+    resume: bool,
+    handoff: bool,
+) -> Result<()> {
     // Ensure we have an API key
     let api_key = match config::get_api_key() {
         Ok(key) => key,
@@ -614,8 +652,42 @@ async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<Path
         println!("Project: {} ({:?}, {} files)", p.name, p.project_type, p.files.len());
     }
 
-    // Check for recent Claude Code session in this directory
-    let claude_context = if session::has_recent_claude_session(&cwd_str, 24).unwrap_or(false) {
+    // Check for Claude Code session context
+    // --handoff: explicitly import context (checks parent dirs too)
+    // Default: auto-import if recent session in this directory
+    let claude_context = if handoff {
+        // Try current directory first, then parent
+        let session_dir = if session::has_recent_claude_session(&cwd_str, 24).unwrap_or(false) {
+            Some(cwd_str.clone())
+        } else if let Some(parent) = cwd.parent() {
+            let parent_str = parent.display().to_string();
+            if session::has_recent_claude_session(&parent_str, 24).unwrap_or(false) {
+                println!("Found Claude Code session in parent directory");
+                Some(parent_str)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some(dir) = session_dir {
+            println!("Handoff: Importing Claude Code context");
+            match session::import_claude_context(&dir, 10) {
+                Ok(msgs) if !msgs.is_empty() => {
+                    println!("  → Imported {} recent prompts", msgs.len());
+                    Some(msgs)
+                }
+                _ => {
+                    println!("  → No context found");
+                    None
+                }
+            }
+        } else {
+            println!("Handoff: No Claude Code session found");
+            None
+        }
+    } else if session::has_recent_claude_session(&cwd_str, 24).unwrap_or(false) {
         println!("Detected recent Claude Code session in this directory");
         match session::import_claude_context(&cwd_str, 10) {
             Ok(msgs) if !msgs.is_empty() => {
@@ -631,18 +703,26 @@ async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<Path
     // Load or fetch models
     let models = models::load_or_fetch(&api_key).await?;
 
-    // Select model
+    // Select model with filtering
     let selected_model = if let Some(m) = model {
         m
     } else {
         let available: Vec<_> = if free_only {
             models.iter().filter(|m| m.is_free()).cloned().collect()
+        } else if nonfree_only {
+            models.iter().filter(|m| !m.is_free()).cloned().collect()
         } else {
             models.clone()
         };
 
         if available.is_empty() {
-            anyhow::bail!("No models available");
+            if nonfree_only {
+                anyhow::bail!("No paid models available");
+            } else if free_only {
+                anyhow::bail!("No free models available");
+            } else {
+                anyhow::bail!("No models available");
+            }
         }
 
         ui::pick_model(&available)?
@@ -652,6 +732,48 @@ async fn run_interactive(free_only: bool, model: Option<String>, paths: Vec<Path
 
     // Run TUI with session, project context, and optional Claude import
     ui::run_tui(&api_key, &selected_model, paths, resume, project, claude_context).await
+}
+
+async fn run_benchmark(model: Option<&str>) -> Result<()> {
+    let api_key = config::get_api_key()?;
+    let work_dir = std::env::current_dir()?;
+
+    // Use provided model or default to a capable free model
+    let model_id = model.unwrap_or("meta-llama/llama-3.2-3b-instruct:free");
+
+    println!("Benchmarking model: {}", model_id);
+    println!("Work directory: {}", work_dir.display());
+    println!();
+
+    // Run benchmark suite
+    let mut runner = benchmark::BenchmarkRunner::new(&api_key, model_id, &work_dir);
+    let profile = runner.run_full_suite().await?;
+
+    // Display results
+    println!("\n{}", "═".repeat(60));
+    println!("BENCHMARK RESULTS: {}", model_id);
+    println!("{}", "═".repeat(60));
+    println!();
+    println!("Overall Score: {:.1} (Grade: {})", profile.total_score, profile.grade());
+    println!();
+    println!("Detailed Scores:");
+    for score in &profile.scores {
+        println!("  {:30} {:.2}  (rel:{:.0}% prec:{:.0}% comp:{:.0}% eff:{:.0}%)",
+            score.prompt_id,
+            score.weighted_score,
+            score.relevance * 100.0,
+            score.precision * 100.0,
+            score.completeness * 100.0,
+            score.efficiency * 100.0,
+        );
+    }
+    println!();
+    println!("Tokens used: {}", profile.total_tokens);
+    println!("Avg latency: {}ms", profile.avg_latency_ms);
+    println!("Cost estimate: ${:.4}", profile.cost_estimate);
+    println!();
+
+    Ok(())
 }
 
 async fn run_backburner(paths: &[PathBuf], watch_docs: bool) -> Result<()> {

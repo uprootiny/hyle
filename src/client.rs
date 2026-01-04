@@ -45,6 +45,27 @@ pub enum StreamEvent {
     Error(String),
 }
 
+/// Simple non-streaming chat completion (for benchmarks)
+pub async fn chat_completion_simple(
+    api_key: &str,
+    model: &str,
+    prompt: &str,
+    max_tokens: u32,
+) -> Result<String> {
+    let mut rx = stream_completion(api_key, model, prompt).await?;
+    let mut response = String::new();
+
+    while let Some(event) = rx.recv().await {
+        match event {
+            StreamEvent::Token(t) => response.push_str(&t),
+            StreamEvent::Done(_) => break,
+            StreamEvent::Error(e) => anyhow::bail!("API error: {}", e),
+        }
+    }
+
+    Ok(response)
+}
+
 /// Check connectivity to OpenRouter
 pub async fn check_connectivity() -> Result<()> {
     let client = reqwest::Client::new();
