@@ -901,7 +901,7 @@ impl<'a> BenchmarkRunner<'a> {
             self.api_key,
             self.model,
             &full_prompt,
-            prompt.max_tokens as u32,
+            prompt.max_tokens,
         ).await?;
 
         Ok(response)

@@ -436,7 +436,7 @@ const FREE_MODEL_FALLBACKS: &[&str] = &[
 impl TuiState {
     fn new(context_window: u32, project: Option<Project>, model: &str, api_key: &str) -> Self {
         // Build welcome message with helpful tips
-        let model_short = model.split('/').last().unwrap_or(model);
+        let model_short = model.split('/').next_back().unwrap_or(model);
         let mut welcome_lines = Vec::new();
 
         if let Some(ref p) = project {
@@ -2222,7 +2222,7 @@ fn render_tui(f: &mut Frame, state: &TuiState) {
 
     // Build generation status with model name
     let gen_status = if state.is_generating {
-        let model_short = state.current_model.split('/').last().unwrap_or(&state.current_model);
+        let model_short = state.current_model.split('/').next_back().unwrap_or(&state.current_model);
         let model_short = if model_short.len() > 20 { &model_short[..20] } else { model_short };
         let elapsed = state.request_start.elapsed().as_secs();
         format!("{} {}..{}s", spinner_char(state.tick), model_short, elapsed)
