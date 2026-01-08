@@ -1,0 +1,47 @@
+name: Build Artifact
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  artifact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: ${{ hashFiles('package.json') != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Build (Node)
+        if: ${{ hashFiles('package.json') != '' }}
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+          npm run build --if-present
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p artifact
+          for dir in dist build public docs resources/public target/site; do
+            if [ -d "$dir" ]; then
+              mkdir -p "artifact/$dir"
+              cp -R "$dir"/. "artifact/$dir"/
+            fi
+          done
+          if [ -z "$(ls -A artifact 2>/dev/null)" ]; then
+            echo "No artifact directories found." > artifact/EMPTY.txt
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact
+          path: artifact

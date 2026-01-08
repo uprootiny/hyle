@@ -15,6 +15,87 @@ use std::path::PathBuf;
 
 use crate::config;
 
+// ═══════════════════════════════════════════════════════════════
+// TYPE-SAFE ENUMS
+// ═══════════════════════════════════════════════════════════════
+
+/// Message role (type-safe alternative to string)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    User,
+    Assistant,
+    System,
+}
+
+impl Role {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Role::User => "user",
+            Role::Assistant => "assistant",
+            Role::System => "system",
+        }
+    }
+}
+
+impl From<&str> for Role {
+    fn from(s: &str) -> Self {
+        match s {
+            "assistant" => Role::Assistant,
+            "system" => Role::System,
+            _ => Role::User,
+        }
+    }
+}
+
+impl std::fmt::Display for Role {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Log entry kind (type-safe alternative to string)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogKind {
+    Request,
+    Response,
+    Tool,
+    Error,
+}
+
+impl LogKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LogKind::Request => "request",
+            LogKind::Response => "response",
+            LogKind::Tool => "tool",
+            LogKind::Error => "error",
+        }
+    }
+}
+
+impl From<&str> for LogKind {
+    fn from(s: &str) -> Self {
+        match s {
+            "response" => LogKind::Response,
+            "tool" => LogKind::Tool,
+            "error" => LogKind::Error,
+            _ => LogKind::Request,
+        }
+    }
+}
+
+impl std::fmt::Display for LogKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SESSION TYPES
+// ═══════════════════════════════════════════════════════════════
+
 /// Session metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMeta {
@@ -473,5 +554,47 @@ mod tests {
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains("user"));
         assert!(json.contains("Hello"));
+    }
+
+    #[test]
+    fn test_role_enum() {
+        // From string
+        assert_eq!(Role::from("user"), Role::User);
+        assert_eq!(Role::from("assistant"), Role::Assistant);
+        assert_eq!(Role::from("system"), Role::System);
+        assert_eq!(Role::from("unknown"), Role::User); // defaults to User
+
+        // To string
+        assert_eq!(Role::User.as_str(), "user");
+        assert_eq!(Role::Assistant.as_str(), "assistant");
+        assert_eq!(Role::System.as_str(), "system");
+
+        // Display
+        assert_eq!(format!("{}", Role::User), "user");
+    }
+
+    #[test]
+    fn test_log_kind_enum() {
+        // From string
+        assert_eq!(LogKind::from("request"), LogKind::Request);
+        assert_eq!(LogKind::from("response"), LogKind::Response);
+        assert_eq!(LogKind::from("tool"), LogKind::Tool);
+        assert_eq!(LogKind::from("error"), LogKind::Error);
+        assert_eq!(LogKind::from("unknown"), LogKind::Request); // defaults to Request
+
+        // To string
+        assert_eq!(LogKind::Tool.as_str(), "tool");
+        assert_eq!(LogKind::Error.as_str(), "error");
+    }
+
+    #[test]
+    fn test_role_serde() {
+        // Serialize
+        let json = serde_json::to_string(&Role::Assistant).unwrap();
+        assert_eq!(json, "\"assistant\"");
+
+        // Deserialize
+        let role: Role = serde_json::from_str("\"system\"").unwrap();
+        assert_eq!(role, Role::System);
     }
 }
