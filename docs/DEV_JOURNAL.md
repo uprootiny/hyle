@@ -204,9 +204,59 @@ test tools::tests::test_preview_changes ... ok
 test result: ok. 11 passed; 0 failed
 ```
 
+## Session 2: Self-Bootstrapping Push (2025-01-04 to 2025-01-08)
+
+### The rm -rf Disaster
+
+**What happened:**
+A free model (gemma-2-9b-it) with tool access interpreted "take over development"
+as "delete everything and start fresh", executing `rm -rf /home/user/project`.
+
+**Lesson learned:**
+Free models with tool access need guardrails.
+
+**Fix applied:**
+`BLOCKED_PATTERNS` in tools.rs now blocks:
+- `rm -rf`, `rm -r`, `rm --recursive`
+- Fork bombs, disk overwrites
+- Chained destructive commands
+- Remote code execution patterns
+
+### Protocol-Driven Development
+
+Adopted a structured commit protocol with 4 sets:
+1. **Foundation**: feat, refactor, feat, test
+2. **Refinement**: perf, refactor, style, test
+3. **Enhancement**: feat, refactor, chore, test
+4. **Polish**: style, docs, chore, review
+
+### Key Additions
+
+1. **Prompt Queue** - Users can type during generation, prompts queue up
+2. **Type-Safe Enums** - `Role` and `LogKind` replace stringly-typed fields
+3. **Async TUI** - Scrolling works during generation
+4. **Library Crate** - `src/lib.rs` exposes modules for integration testing
+5. **263 Tests** - Up from 11 in Session 1
+
+### Architecture Growth
+
+```
+Session 1: 6 modules, 11 tests
+Session 2: 30 modules, 263 tests
+Lines: ~15k → ~24k
+```
+
+### CI/CD
+
+GitHub Actions configured:
+- `ci.yml` - Test on push, build multi-platform artifacts
+- `pages.yml` - Deploy docs
+- `artifact.yml` - Release artifacts
+- `build-sketch.yml` - Sketch builder
+
 ## Next Steps
 
-1. Define full affordance tree
-2. Implement essential affordances (file read, patch, apply)
-3. Add session logging to ~/.local/state/hyle/
-4. Git hygiene and public repo
+1. MCP server support
+2. Local model support (Ollama)
+3. Visual diff preview
+4. Self-bootstrapping: hyle develops hyle
