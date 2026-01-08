@@ -246,20 +246,19 @@ The bootstrap system supports:
 
 ## Status & Statistics
 
-**Current Build**: 233 tests passing
+**Current Build**: 263 tests passing
 
 | Metric | Value |
 |--------|-------|
-| Test Coverage | 233 tests |
-| Modules | 26 source files |
-| Lines of Code | ~15,000 |
+| Test Coverage | 263 tests |
+| Modules | 30 source files |
+| Lines of Code | ~24,000 |
 | Free Models | 35+ available |
 | Slash Commands | 20+ |
 
 ### Known Issues
 
 - Multiline input joins lines with spaces (single-line input model)
-- Session history navigation blocked during generation
 - Context window estimation is approximate
 
 ### Safety Features
