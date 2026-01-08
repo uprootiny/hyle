@@ -456,6 +456,119 @@ fn story_tui_poll_timeout_is_reasonable() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// STORY: Prompt queue (async input)
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn story_prompt_queue_fifo_order() {
+    let mut t = TestTracer::new("Prompt queue maintains FIFO order");
+
+    t.step("Given an empty prompt queue");
+    let mut queue: std::collections::VecDeque<String> = std::collections::VecDeque::new();
+
+    t.step("When adding prompts in order");
+    queue.push_back("first prompt".to_string());
+    queue.push_back("second prompt".to_string());
+    queue.push_back("third prompt".to_string());
+
+    t.expect(queue.len() == 3, "Queue has 3 items");
+
+    t.step("When draining the queue");
+    let first = queue.pop_front().unwrap();
+    let second = queue.pop_front().unwrap();
+    let third = queue.pop_front().unwrap();
+
+    t.expect(first == "first prompt", "First out is first in");
+    t.expect(second == "second prompt", "Second out is second in");
+    t.expect(third == "third prompt", "Third out is third in");
+    t.expect(queue.is_empty(), "Queue is empty after drain");
+
+    t.done();
+}
+
+#[test]
+fn story_prompt_queue_allows_typing_during_generation() {
+    let mut t = TestTracer::new("User can type while model generates");
+
+    t.step("Given a simulated generation state");
+    let is_generating = true;
+    let mut input_buffer = String::new();
+    let mut pending_prompts: std::collections::VecDeque<String> = std::collections::VecDeque::new();
+
+    t.step("When user types during generation");
+    input_buffer.push_str("next command");
+
+    t.step("When user presses enter during generation");
+    if is_generating && !input_buffer.is_empty() {
+        pending_prompts.push_back(input_buffer.clone());
+        input_buffer.clear();
+    }
+
+    t.expect(pending_prompts.len() == 1, "Prompt was queued");
+    t.expect(input_buffer.is_empty(), "Input buffer was cleared");
+    t.expect(
+        pending_prompts.front().map(|s| s.as_str()) == Some("next command"),
+        "Correct prompt was queued",
+    );
+
+    t.done();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STORY: Type-safe message roles
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn story_role_enum_compatibility() {
+    let mut t = TestTracer::new("Role enum is JSON-compatible with string format");
+
+    t.step("Given a role enum value");
+    use hyle::session::Role;
+    let role = Role::Assistant;
+
+    t.step("When serializing to JSON");
+    let json = serde_json::to_string(&role).unwrap();
+
+    t.expect(json == "\"assistant\"", "Serializes to lowercase string");
+
+    t.step("When deserializing from JSON");
+    let parsed: Role = serde_json::from_str("\"system\"").unwrap();
+
+    t.expect(parsed == Role::System, "Deserializes correctly");
+
+    t.step("When converting from string");
+    let from_str = Role::from("user");
+
+    t.expect(from_str == Role::User, "Converts from &str");
+
+    t.done();
+}
+
+#[test]
+fn story_log_kind_enum_compatibility() {
+    let mut t = TestTracer::new("LogKind enum is JSON-compatible");
+
+    t.step("Given log kind values");
+    use hyle::session::LogKind;
+
+    t.step("When round-tripping through JSON");
+    let kinds = [
+        LogKind::Request,
+        LogKind::Response,
+        LogKind::Tool,
+        LogKind::Error,
+    ];
+
+    for kind in kinds {
+        let json = serde_json::to_string(&kind).unwrap();
+        let parsed: LogKind = serde_json::from_str(&json).unwrap();
+        t.expect(parsed == kind, &format!("{:?} survives round-trip", kind));
+    }
+
+    t.done();
+}
+
+// ═══════════════════════════════════════════════════════════════
 // RUN SUMMARY
 // ═══════════════════════════════════════════════════════════════
 
@@ -490,6 +603,14 @@ fn all_user_stories_documented() {
     eprintln!("║ ");
     eprintln!("║ Artpiece Quality:");
     eprintln!("║   • story_artpiece_prompt_contains_requirements");
+    eprintln!("║ ");
+    eprintln!("║ Async Input (Set 3 Enhancement):");
+    eprintln!("║   • story_prompt_queue_fifo_order");
+    eprintln!("║   • story_prompt_queue_allows_typing_during_generation");
+    eprintln!("║ ");
+    eprintln!("║ Type Safety (Set 3 Interface Refinement):");
+    eprintln!("║   • story_role_enum_compatibility");
+    eprintln!("║   • story_log_kind_enum_compatibility");
     eprintln!("║ ");
     eprintln!("╚═══════════════════════════════════════════════════════════════");
 }

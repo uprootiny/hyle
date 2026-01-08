@@ -5,6 +5,10 @@ edition = "2021"
 description = "Rust-native code assistant - OpenRouter powered, no JS runtime"
 license = "MIT"
 
+[lib]
+name = "hyle"
+path = "src/lib.rs"
+
 [[bin]]
 name = "hyle"
 path = "src/main.rs"
