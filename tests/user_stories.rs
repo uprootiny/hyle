@@ -569,6 +569,70 @@ fn story_log_kind_enum_compatibility() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// STORY: Claude Code Handoff
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn story_handoff_path_matching() {
+    let mut t = TestTracer::new("Handoff matches parent/child directories");
+
+    t.step("Given Claude Code stores project at parent directory");
+    let claude_project = "/home/user/project";
+    let hyle_cwd = "/home/user/project/subdir";
+
+    t.step("When checking path relationship");
+    // Test the relationship logic (mirrors paths_related in session.rs)
+    let p1 = claude_project.trim_end_matches('/');
+    let p2 = hyle_cwd.trim_end_matches('/');
+    let is_parent = p2.starts_with(p1) && p2.chars().nth(p1.len()) == Some('/');
+
+    t.expect(is_parent, "Parent directory correctly identified");
+
+    t.step("Given hyle runs from project root, Claude stored at same path");
+    let claude_project = "/home/user/project";
+    let hyle_cwd = "/home/user/project";
+    let p1 = claude_project.trim_end_matches('/');
+    let p2 = hyle_cwd.trim_end_matches('/');
+    let is_same = p1 == p2;
+
+    t.expect(is_same, "Same directory correctly identified");
+
+    t.step("Given unrelated directories");
+    let claude_project = "/home/user/other";
+    let hyle_cwd = "/home/user/project";
+    let p1 = claude_project.trim_end_matches('/');
+    let p2 = hyle_cwd.trim_end_matches('/');
+    let unrelated =
+        p1 != p2 && !p2.starts_with(&format!("{}/", p1)) && !p1.starts_with(&format!("{}/", p2));
+
+    t.expect(unrelated, "Unrelated directories correctly identified");
+
+    t.done();
+}
+
+#[test]
+fn story_handoff_avoids_false_matches() {
+    let mut t = TestTracer::new("Handoff avoids false prefix matches");
+
+    t.step("Given project vs project2 directories");
+    let claude_project = "/home/user/project";
+    let hyle_cwd = "/home/user/project2";
+
+    t.step("When checking path relationship");
+    let p1 = claude_project.trim_end_matches('/');
+    let p2 = hyle_cwd.trim_end_matches('/');
+
+    // project2 starts with "project" but is NOT a subdirectory
+    let starts_with = p2.starts_with(p1);
+    let is_subdir = p2.starts_with(p1) && p2.chars().nth(p1.len()) == Some('/');
+
+    t.expect(starts_with, "project2 starts with project (string prefix)");
+    t.expect(!is_subdir, "project2 is NOT a subdirectory of project");
+
+    t.done();
+}
+
+// ═══════════════════════════════════════════════════════════════
 // RUN SUMMARY
 // ═══════════════════════════════════════════════════════════════
 
@@ -611,6 +675,10 @@ fn all_user_stories_documented() {
     eprintln!("║ Type Safety (Set 3 Interface Refinement):");
     eprintln!("║   • story_role_enum_compatibility");
     eprintln!("║   • story_log_kind_enum_compatibility");
+    eprintln!("║ ");
+    eprintln!("║ Claude Code Handoff:");
+    eprintln!("║   • story_handoff_path_matching");
+    eprintln!("║   • story_handoff_avoids_false_matches");
     eprintln!("║ ");
     eprintln!("╚═══════════════════════════════════════════════════════════════");
 }

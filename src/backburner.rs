@@ -126,10 +126,50 @@ impl Backburner {
             work_dir,
             features: Self::default_features(),
             api_key: config::get_api_key().ok(),
-            model: "meta-llama/llama-3.2-3b-instruct:free".to_string(),
+            model: Self::select_best_free_model(),
             running: Arc::new(AtomicBool::new(true)),
             cycle: 0,
             observations: Vec::new(),
+        }
+    }
+
+    /// Select the best available free model for backburner tasks
+    fn select_best_free_model() -> String {
+        // Prefer models good at code analysis, in order of preference
+        let preferred = [
+            "google/gemini-2.0-flash-exp:free",
+            "qwen/qwen3-coder:free",
+            "mistralai/devstral-2512:free",
+            "deepseek/deepseek-r1-0528:free",
+            "meta-llama/llama-3.2-3b-instruct:free",
+        ];
+
+        // For now, just use the first preferred model
+        // In the future, could check model cache for availability
+        preferred[0].to_string()
+    }
+
+    /// Import context from Claude Code if available
+    pub fn import_handoff_context(&mut self) {
+        let cwd = self.work_dir.display().to_string();
+        if session::has_recent_claude_session(&cwd, 24).unwrap_or(false) {
+            if let Ok(msgs) = session::import_claude_context(&cwd, 5) {
+                if !msgs.is_empty() {
+                    self.observe(format!(
+                        "Imported {} prompts from Claude Code session",
+                        msgs.len()
+                    ));
+                    // Add context to observations
+                    for msg in msgs.iter().take(3) {
+                        let preview = if msg.content.len() > 60 {
+                            format!("{}...", &msg.content[..60])
+                        } else {
+                            msg.content.clone()
+                        };
+                        self.observe(format!("Claude context: {}", preview));
+                    }
+                }
+            }
         }
     }
 
@@ -322,6 +362,9 @@ impl Backburner {
         .ok();
 
         self.print_header();
+
+        // Import any available handoff context from Claude Code
+        self.import_handoff_context();
 
         while self.running.load(Ordering::SeqCst) {
             self.cycle += 1;

@@ -434,7 +434,7 @@ struct ClaudeHistoryEntry {
 }
 
 /// Import context from Claude Code session history
-/// Returns recent prompts from the same project directory
+/// Returns recent prompts from the same project directory or related directories
 pub fn import_claude_context(project_dir: &str, limit: usize) -> Result<Vec<Message>> {
     let claude_history = dirs::home_dir()
         .ok_or_else(|| anyhow::anyhow!("No home directory"))?
@@ -448,12 +448,17 @@ pub fn import_claude_context(project_dir: &str, limit: usize) -> Result<Vec<Mess
     let file = File::open(&claude_history)?;
     let reader = BufReader::new(file);
 
-    // Parse all entries for this project
+    // Parse all entries for this project or related directories
     let mut entries: Vec<ClaudeHistoryEntry> = reader
         .lines()
         .map_while(|line| line.ok())
         .filter_map(|line| serde_json::from_str(&line).ok())
-        .filter(|e: &ClaudeHistoryEntry| e.project.as_deref() == Some(project_dir))
+        .filter(|e: &ClaudeHistoryEntry| {
+            e.project
+                .as_deref()
+                .map(|p| paths_related(p, project_dir))
+                .unwrap_or(false)
+        })
         .collect();
 
     // Sort by timestamp (newest first) and take recent ones
@@ -478,7 +483,32 @@ pub fn import_claude_context(project_dir: &str, limit: usize) -> Result<Vec<Mess
     Ok(messages)
 }
 
-/// Detect if there's recent Claude Code activity in this directory
+/// Check if two paths are related (one is parent/child of the other or same)
+fn paths_related(path1: &str, path2: &str) -> bool {
+    // Normalize paths by removing trailing slashes
+    let p1 = path1.trim_end_matches('/');
+    let p2 = path2.trim_end_matches('/');
+
+    // Exact match
+    if p1 == p2 {
+        return true;
+    }
+
+    // Check if one is a parent of the other
+    // p1 is parent of p2: /home/user/project is parent of /home/user/project/subdir
+    if p2.starts_with(p1) && p2.chars().nth(p1.len()) == Some('/') {
+        return true;
+    }
+
+    // p2 is parent of p1
+    if p1.starts_with(p2) && p1.chars().nth(p2.len()) == Some('/') {
+        return true;
+    }
+
+    false
+}
+
+/// Detect if there's recent Claude Code activity in this directory or related directories
 pub fn has_recent_claude_session(project_dir: &str, max_age_hours: i64) -> Result<bool> {
     let claude_history = dirs::home_dir()
         .ok_or_else(|| anyhow::anyhow!("No home directory"))?
@@ -494,12 +524,18 @@ pub fn has_recent_claude_session(project_dir: &str, max_age_hours: i64) -> Resul
     let now = Utc::now().timestamp_millis();
     let max_age_ms = max_age_hours * 3600 * 1000;
 
-    // Look for recent entries in this project
+    // Look for recent entries in this project or parent/child directories
     let has_recent = reader
         .lines()
         .map_while(|line| line.ok())
         .filter_map(|line| serde_json::from_str::<ClaudeHistoryEntry>(&line).ok())
-        .any(|e| e.project.as_deref() == Some(project_dir) && (now - e.timestamp) < max_age_ms);
+        .any(|e| {
+            if let Some(proj) = e.project.as_deref() {
+                paths_related(proj, project_dir) && (now - e.timestamp) < max_age_ms
+            } else {
+                false
+            }
+        });
 
     Ok(has_recent)
 }
@@ -596,5 +632,42 @@ mod tests {
         // Deserialize
         let role: Role = serde_json::from_str("\"system\"").unwrap();
         assert_eq!(role, Role::System);
+    }
+
+    #[test]
+    fn test_paths_related() {
+        // Exact match
+        assert!(paths_related("/home/user/project", "/home/user/project"));
+
+        // Trailing slash handling
+        assert!(paths_related("/home/user/project/", "/home/user/project"));
+        assert!(paths_related("/home/user/project", "/home/user/project/"));
+
+        // Parent is related to child
+        assert!(paths_related(
+            "/home/user/project",
+            "/home/user/project/subdir"
+        ));
+        assert!(paths_related(
+            "/home/user/project",
+            "/home/user/project/sub/deep"
+        ));
+
+        // Child is related to parent
+        assert!(paths_related(
+            "/home/user/project/subdir",
+            "/home/user/project"
+        ));
+
+        // Unrelated paths
+        assert!(!paths_related("/home/user/project", "/home/user/other"));
+        assert!(!paths_related("/home/user/project", "/home/user/project2"));
+        assert!(!paths_related("/home/user/project", "/home/other/project"));
+
+        // Prefix that isn't a parent (project vs project2)
+        assert!(!paths_related(
+            "/home/user/project",
+            "/home/user/project2/sub"
+        ));
     }
 }
