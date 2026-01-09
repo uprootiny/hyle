@@ -386,8 +386,16 @@ impl ToolCallTracker {
 // ═══════════════════════════════════════════════════════════════
 
 /// Tool executor with kill support
+use crate::contracts::{Contract, ContractState, Invariant, InvariantCondition, Obligation, Requirement};
+
 pub struct ToolExecutor {
     kill_signals: std::collections::HashMap<String, Arc<AtomicBool>>,
+    /// Active contract governing execution (optional)
+    active_contract: Option<Contract>,
+    /// Files read in this session (for read-before-write tracking)
+    files_read: std::collections::HashSet<String>,
+    /// File snapshots for rollback
+    file_snapshots: std::collections::HashMap<String, Vec<u8>>,
 }
 
 impl Default for ToolExecutor {
@@ -400,13 +408,184 @@ impl ToolExecutor {
     pub fn new() -> Self {
         Self {
             kill_signals: std::collections::HashMap::new(),
+            active_contract: None,
+            files_read: std::collections::HashSet::new(),
+            file_snapshots: std::collections::HashMap::new(),
         }
     }
 
-    /// Execute a tool call
+    /// Set an active contract to govern tool execution
+    pub fn with_contract(mut self, contract: Contract) -> Self {
+        self.active_contract = Some(contract);
+        self
+    }
+
+    /// Set contract after creation
+    pub fn set_contract(&mut self, contract: Contract) {
+        self.active_contract = Some(contract);
+    }
+
+    /// Get the active contract (if any)
+    pub fn contract(&self) -> Option<&Contract> {
+        self.active_contract.as_ref()
+    }
+
+    /// Get mutable reference to active contract
+    pub fn contract_mut(&mut self) -> Option<&mut Contract> {
+        self.active_contract.as_mut()
+    }
+
+    /// Check if a file was read before (for read-before-write obligation)
+    pub fn was_file_read(&self, path: &str) -> bool {
+        self.files_read.contains(path)
+    }
+
+    /// Record that a file was read
+    fn record_file_read(&mut self, path: &str) {
+        self.files_read.insert(path.to_string());
+    }
+
+    /// Snapshot a file for potential rollback
+    fn snapshot_file(&mut self, path: &str) -> Result<()> {
+        if let Ok(content) = fs::read(path) {
+            self.file_snapshots.insert(path.to_string(), content);
+        }
+        Ok(())
+    }
+
+    /// Rollback a file to its snapshot
+    pub fn rollback_file(&self, path: &str) -> Result<bool> {
+        if let Some(content) = self.file_snapshots.get(path) {
+            fs::write(path, content)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Rollback all snapshotted files
+    pub fn rollback_all(&self) -> Result<usize> {
+        let mut count = 0;
+        for (path, content) in &self.file_snapshots {
+            if fs::write(path, content).is_ok() {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
+    /// Check pre-conditions before tool execution
+    fn check_preconditions(&mut self, call: &ToolCall) -> Result<()> {
+        // Check read-before-write for write/patch operations
+        if call.name == "write" || call.name == "patch" {
+            if let Some(path) = call.args.get("path").and_then(|v| v.as_str()) {
+                // Only enforce if file exists (new files are OK)
+                if Path::new(path).exists() && !self.was_file_read(path) {
+                    // Check if contract has read-before-write obligation
+                    if let Some(contract) = &self.active_contract {
+                        for obligation in &contract.intent.preconditions {
+                            if let Requirement::ReadBeforeWrite(p) = &obligation.requirement {
+                                if p == path && !obligation.fulfilled {
+                                    return Err(anyhow::anyhow!(
+                                        "Contract violation: must read {} before writing",
+                                        path
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Check invariants after tool execution
+    fn check_invariants(&self, call: &ToolCall) -> Result<()> {
+        if let Some(contract) = &self.active_contract {
+            for invariant in &contract.intent.invariants {
+                if invariant.violated {
+                    continue; // Already violated, skip
+                }
+
+                match &invariant.condition {
+                    InvariantCondition::NoDestructiveCommands => {
+                        if call.name == "bash" {
+                            if let Some(cmd) = call.args.get("command").and_then(|v| v.as_str()) {
+                                // The BLOCKED_PATTERNS check already happened in exec_bash
+                                // This is a secondary check at contract level
+                                if cmd.contains("rm -rf") || cmd.contains("rm -r ") {
+                                    return Err(anyhow::anyhow!(
+                                        "Invariant violation: destructive command blocked"
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    InvariantCondition::FileExists(path) => {
+                        if !Path::new(path).exists() {
+                            return Err(anyhow::anyhow!(
+                                "Invariant violation: required file {} was deleted",
+                                path
+                            ));
+                        }
+                    }
+                    _ => {} // Other invariants checked elsewhere
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Update contract state based on tool execution
+    fn update_contract_state(&mut self, call: &ToolCall) {
+        // Track file reads
+        if call.name == "read" {
+            if let Some(path) = call.args.get("path").and_then(|v| v.as_str()) {
+                self.record_file_read(path);
+
+                // Mark read-before-write obligations as fulfilled
+                if let Some(contract) = &mut self.active_contract {
+                    for obligation in &mut contract.intent.preconditions {
+                        if let Requirement::ReadBeforeWrite(p) = &obligation.requirement {
+                            if p == path {
+                                obligation.fulfilled = true;
+                                obligation.fulfilled_at = Some(Instant::now());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Track files touched for rollback
+        if call.name == "write" || call.name == "patch" {
+            if let Some(path) = call.args.get("path").and_then(|v| v.as_str()) {
+                if let Some(contract) = &mut self.active_contract {
+                    contract.touch_file(path);
+                }
+            }
+        }
+    }
+
+    /// Execute a tool call with contract enforcement
     pub fn execute(&mut self, call: &mut ToolCall) -> Result<()> {
         let kill = Arc::new(AtomicBool::new(false));
         self.kill_signals.insert(call.id.clone(), kill.clone());
+
+        // Pre-execution: check preconditions
+        if let Err(e) = self.check_preconditions(call) {
+            call.fail(&format!("Precondition failed: {}", e));
+            self.kill_signals.remove(&call.id);
+            return Err(e);
+        }
+
+        // Snapshot file before write/patch for rollback
+        if call.name == "write" || call.name == "patch" {
+            if let Some(path) = call.args.get("path").and_then(|v| v.as_str()) {
+                let _ = self.snapshot_file(path);
+            }
+        }
 
         call.start();
 
@@ -419,6 +598,20 @@ impl ToolExecutor {
             "patch" | "diff" => self.exec_patch(call),
             _ => Err(anyhow::anyhow!("Unknown tool: {}", call.name)),
         };
+
+        // Update contract state based on execution
+        if result.is_ok() {
+            self.update_contract_state(call);
+        }
+
+        // Post-execution: check invariants
+        if result.is_ok() {
+            if let Err(e) = self.check_invariants(call) {
+                call.fail(&format!("Invariant violated: {}", e));
+                self.kill_signals.remove(&call.id);
+                return Err(e);
+            }
+        }
 
         match &result {
             Ok(()) => call.complete(),
@@ -2002,6 +2195,181 @@ mod tests {
             let name = entry.file_name().to_string_lossy().to_string();
             if name.starts_with(&file_stem) && (name.ends_with(".bak") || name.ends_with(".tmp")) {
                 let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CONTRACT ENFORCEMENT TESTS
+    // ═══════════════════════════════════════════════════════════════
+
+    use crate::contracts::{ContractBuilder, IntentLevel};
+
+    #[test]
+    fn test_executor_tracks_file_reads() {
+        let tmp_dir = std::env::temp_dir();
+        let test_file = tmp_dir.join(format!("hyle_contract_read_{}.txt", std::process::id()));
+
+        // Create test file
+        std::fs::write(&test_file, "test content\n").unwrap();
+
+        let mut executor = ToolExecutor::new();
+        assert!(!executor.was_file_read(&test_file.to_string_lossy()));
+
+        let mut call = ToolCall::new(
+            "read",
+            serde_json::json!({
+                "path": test_file.to_string_lossy()
+            }),
+        );
+
+        executor.execute(&mut call).unwrap();
+        assert!(executor.was_file_read(&test_file.to_string_lossy()));
+
+        // Clean up
+        let _ = std::fs::remove_file(&test_file);
+    }
+
+    #[test]
+    fn test_executor_snapshots_before_write() {
+        let tmp_dir = std::env::temp_dir();
+        let test_file = tmp_dir.join(format!("hyle_contract_snap_{}.txt", std::process::id()));
+
+        // Create test file with original content
+        std::fs::write(&test_file, "original\n").unwrap();
+
+        let mut executor = ToolExecutor::new();
+
+        // Write new content
+        let mut call = ToolCall::new(
+            "write",
+            serde_json::json!({
+                "path": test_file.to_string_lossy(),
+                "content": "modified\n"
+            }),
+        );
+
+        executor.execute(&mut call).unwrap();
+
+        // Verify snapshot exists
+        assert!(executor.file_snapshots.contains_key(&test_file.to_string_lossy().to_string()));
+
+        // Rollback
+        let rolled_back = executor.rollback_file(&test_file.to_string_lossy()).unwrap();
+        assert!(rolled_back);
+
+        // Verify content restored
+        let content = std::fs::read_to_string(&test_file).unwrap();
+        assert_eq!(content, "original\n");
+
+        // Clean up
+        let _ = std::fs::remove_file(&test_file);
+    }
+
+    #[test]
+    fn test_executor_with_contract() {
+        let tmp_dir = std::env::temp_dir();
+        let test_file = tmp_dir.join(format!("hyle_contract_full_{}.txt", std::process::id()));
+
+        // Create test file
+        std::fs::write(&test_file, "initial\n").unwrap();
+
+        // Create contract with read-before-write obligation
+        let contract = ContractBuilder::new("Test task")
+            .level(IntentLevel::Task)
+            .precondition(crate::contracts::Obligation::read_before_write(
+                test_file.to_string_lossy().to_string(),
+            ))
+            .build();
+
+        let mut executor = ToolExecutor::new();
+        executor.set_contract(contract);
+
+        // First, read the file (fulfills obligation)
+        let mut read_call = ToolCall::new(
+            "read",
+            serde_json::json!({
+                "path": test_file.to_string_lossy()
+            }),
+        );
+        executor.execute(&mut read_call).unwrap();
+
+        // Now write should succeed
+        let mut write_call = ToolCall::new(
+            "write",
+            serde_json::json!({
+                "path": test_file.to_string_lossy(),
+                "content": "modified\n"
+            }),
+        );
+        let result = executor.execute(&mut write_call);
+        assert!(result.is_ok());
+
+        // Verify contract updated
+        let contract = executor.contract().unwrap();
+        assert!(contract.touched_files.contains(&test_file.to_string_lossy().to_string()));
+
+        // Clean up
+        let _ = std::fs::remove_file(&test_file);
+        // Clean backups
+        let parent = test_file.parent().unwrap();
+        let stem = test_file.file_name().unwrap().to_string_lossy();
+        for entry in std::fs::read_dir(parent).unwrap().filter_map(|e| e.ok()) {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&*stem) && name.ends_with(".bak") {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
+    #[test]
+    fn test_rollback_all_files() {
+        let tmp_dir = std::env::temp_dir();
+        let file1 = tmp_dir.join(format!("hyle_rollback1_{}.txt", std::process::id()));
+        let file2 = tmp_dir.join(format!("hyle_rollback2_{}.txt", std::process::id()));
+
+        // Create original files
+        std::fs::write(&file1, "orig1\n").unwrap();
+        std::fs::write(&file2, "orig2\n").unwrap();
+
+        let mut executor = ToolExecutor::new();
+
+        // Write to both files
+        for (file, content) in [(&file1, "mod1\n"), (&file2, "mod2\n")] {
+            let mut call = ToolCall::new(
+                "write",
+                serde_json::json!({
+                    "path": file.to_string_lossy(),
+                    "content": content
+                }),
+            );
+            executor.execute(&mut call).unwrap();
+        }
+
+        // Verify modifications
+        assert_eq!(std::fs::read_to_string(&file1).unwrap(), "mod1\n");
+        assert_eq!(std::fs::read_to_string(&file2).unwrap(), "mod2\n");
+
+        // Rollback all
+        let count = executor.rollback_all().unwrap();
+        assert_eq!(count, 2);
+
+        // Verify restored
+        assert_eq!(std::fs::read_to_string(&file1).unwrap(), "orig1\n");
+        assert_eq!(std::fs::read_to_string(&file2).unwrap(), "orig2\n");
+
+        // Clean up
+        let _ = std::fs::remove_file(&file1);
+        let _ = std::fs::remove_file(&file2);
+        // Clean backups
+        for file in [&file1, &file2] {
+            let parent = file.parent().unwrap();
+            let stem = file.file_name().unwrap().to_string_lossy();
+            for entry in std::fs::read_dir(parent).unwrap().filter_map(|e| e.ok()) {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with(&*stem) && name.ends_with(".bak") {
+                    let _ = std::fs::remove_file(entry.path());
+                }
             }
         }
     }
