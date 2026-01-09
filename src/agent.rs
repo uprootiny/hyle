@@ -264,9 +264,20 @@ pub fn is_fatal_error(response: &str) -> bool {
 
 /// Agent configuration
 pub struct AgentConfig {
+    /// Base iteration limit
     pub max_iterations: usize,
+    /// Maximum tool calls per iteration
     pub max_tool_calls_per_iteration: usize,
+    /// Timeout for each tool execution
     pub timeout_per_tool_ms: u64,
+    /// Extend iterations when making progress (add bonus_iterations)
+    pub extend_on_progress: bool,
+    /// Bonus iterations when progress is detected
+    pub bonus_iterations: usize,
+    /// Consecutive failures before declaring stuck (higher = more persistent)
+    pub max_consecutive_failures: usize,
+    /// Retry failed tools with alternative approaches
+    pub retry_on_failure: bool,
 }
 
 impl Default for AgentConfig {
@@ -275,6 +286,39 @@ impl Default for AgentConfig {
             max_iterations: 20,
             max_tool_calls_per_iteration: 5,
             timeout_per_tool_ms: 60000,
+            // Autonomy settings - be more persistent
+            extend_on_progress: true,
+            bonus_iterations: 5,
+            max_consecutive_failures: 5, // was effectively 3
+            retry_on_failure: true,
+        }
+    }
+}
+
+impl AgentConfig {
+    /// Create a more autonomous configuration
+    pub fn autonomous() -> Self {
+        Self {
+            max_iterations: 30,
+            max_tool_calls_per_iteration: 8,
+            timeout_per_tool_ms: 120000,
+            extend_on_progress: true,
+            bonus_iterations: 10,
+            max_consecutive_failures: 7,
+            retry_on_failure: true,
+        }
+    }
+
+    /// Create a conservative configuration (for risky operations)
+    pub fn conservative() -> Self {
+        Self {
+            max_iterations: 10,
+            max_tool_calls_per_iteration: 3,
+            timeout_per_tool_ms: 30000,
+            extend_on_progress: false,
+            bonus_iterations: 0,
+            max_consecutive_failures: 2,
+            retry_on_failure: false,
         }
     }
 }
@@ -352,11 +396,12 @@ pub fn format_tool_results(tracker: &ToolCallTracker, indices: &[usize]) -> Stri
 /// Generate system prompt for code assistant mode
 pub fn code_assistant_prompt(work_dir: &Path) -> String {
     format!(
-        r#"You are hyle, a Rust-native code assistant. You help users with software engineering tasks.
+        r#"You are hyle, a Rust-native autonomous code assistant. You complete tasks independently.
 
 Working directory: {}
 
-Available tools:
+## Tools
+
 - read(path="..."): Read a file with line numbers
 - write(path="...", content="..."): Write content to a file (creates backup)
 - patch(path="...", diff="..."): Apply a unified diff patch to a file
@@ -364,29 +409,43 @@ Available tools:
 - grep(pattern="...", path="..."): Search for regex pattern in files
 - bash(command="..."): Execute a shell command
 
-To use a tool, respond with a JSON block:
+## Tool Usage
+
+JSON block format:
 ```json
 {{"tool": "read", "args": {{"path": "src/main.rs"}}}}
 ```
 
-Or use function syntax:
-read(path="src/main.rs")
+Function syntax: read(path="src/main.rs")
 
-For code changes, prefer using unified diffs with the patch tool:
+For code changes, use unified diffs:
 ```json
 {{"tool": "patch", "args": {{"path": "src/main.rs", "diff": "--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,3 +1,3 @@\n line1\n-old line\n+new line\n line3"}}}}
 ```
 
-After executing tools, I will show you the results. Continue until the task is complete.
+## Autonomy Guidelines
 
-When finished, say "Task complete" and summarize what was done.
+**Be proactive and persistent:**
+- Complete the full task without stopping for confirmation
+- Make reasonable decisions autonomously - don't ask for permission on minor choices
+- If one approach fails, try an alternative before giving up
+- Keep iterating until the task is truly complete
 
-Guidelines:
+**Error recovery:**
+- If a tool fails, analyze why and try a different approach
+- Read error messages carefully and fix the underlying issue
+- Don't repeat the same failing action - adapt
+
+**Quality standards:**
 - Read files before modifying them
 - Use patch for targeted changes, write for complete rewrites
 - Make atomic, focused changes
 - Run tests after modifications
-- Commit changes with clear messages
+- Verify your changes work before declaring done
+
+**Completion:**
+When the task is fully complete (not just started), say "Task complete" and summarize what was done.
+Only declare complete when you've verified the solution works.
 "#,
         work_dir.display()
     )
@@ -450,6 +509,11 @@ pub async fn run_agent_loop(
     let mut recent_actions: Vec<String> = Vec::new();
     let mut consecutive_failures = 0;
 
+    // Dynamic iteration tracking
+    let mut current_max_iterations = config.max_iterations;
+    let mut progress_bonus_applied = false;
+    let mut successful_iterations = 0;
+
     // Build system prompt with tool instructions
     let system_prompt = code_assistant_prompt(work_dir);
 
@@ -465,12 +529,14 @@ pub async fn run_agent_loop(
         "content": user_prompt
     }));
 
-    for iteration in 0..config.max_iterations {
+    let mut iteration = 0;
+    while iteration < current_max_iterations {
         let _ = event_tx
             .send(AgentEvent::Status(format!(
-                "Iteration {} of {}",
+                "Iteration {} of {}{}",
                 iteration + 1,
-                config.max_iterations
+                current_max_iterations,
+                if progress_bonus_applied { " (extended)" } else { "" }
             )))
             .await;
 
@@ -624,33 +690,57 @@ pub async fn run_agent_loop(
         }
 
         // Track consecutive failures for stuck detection
+        let made_progress = iteration_failures < calls_to_execute.len();
         if iteration_failures == calls_to_execute.len() && !calls_to_execute.is_empty() {
             consecutive_failures += 1;
         } else {
             consecutive_failures = 0;
         }
 
-        // Stuck detection: repeated actions or consecutive failures
-        let is_stuck = consecutive_failures >= 3 || {
-            // Check if same action repeated 3+ times in recent history
-            recent_actions.len() >= 3 && {
+        // Dynamic iteration extension: if making progress, extend runway
+        if made_progress {
+            successful_iterations += 1;
+        }
+
+        if config.extend_on_progress && made_progress && !progress_bonus_applied {
+            // Apply bonus iterations when we've had 3+ successful iterations
+            if successful_iterations >= 3 && iteration >= config.max_iterations / 2 {
+                current_max_iterations += config.bonus_iterations;
+                progress_bonus_applied = true;
+                let _ = event_tx
+                    .send(AgentEvent::Status(format!(
+                        "Progress detected! Extended to {} iterations (+{})",
+                        current_max_iterations, config.bonus_iterations
+                    )))
+                    .await;
+            }
+        }
+
+        // Stuck detection: use configurable threshold
+        let failure_threshold = config.max_consecutive_failures;
+        let repeat_threshold = failure_threshold.min(5); // Cap at 5 for repeat detection
+
+        let is_stuck = consecutive_failures >= failure_threshold || {
+            // Check if same action repeated too many times in recent history
+            recent_actions.len() >= repeat_threshold && {
                 let last = recent_actions.last().unwrap();
-                recent_actions.iter().filter(|a| *a == last).count() >= 3
+                recent_actions.iter().filter(|a| *a == last).count() >= repeat_threshold
             }
         };
 
         if is_stuck {
             let _ = event_tx
-                .send(AgentEvent::Error(
-                    "Agent appears stuck (repeated failures or actions)".into(),
-                ))
+                .send(AgentEvent::Error(format!(
+                    "Agent appears stuck after {} consecutive failures or repeated actions",
+                    consecutive_failures
+                )))
                 .await;
             return AgentResult {
                 iterations: iteration + 1,
                 tool_calls_executed: total_tool_calls,
                 final_response,
                 success: false,
-                error: Some("Agent stuck".into()),
+                error: Some(format!("Agent stuck after {} failures", consecutive_failures)),
                 tokens_used: 0,
             };
         }
@@ -667,6 +757,8 @@ pub async fn run_agent_loop(
                 tool_count: calls_to_execute.len(),
             })
             .await;
+
+        iteration += 1;
     }
 
     // Max iterations reached
@@ -789,6 +881,10 @@ impl Clone for AgentConfig {
             max_iterations: self.max_iterations,
             max_tool_calls_per_iteration: self.max_tool_calls_per_iteration,
             timeout_per_tool_ms: self.timeout_per_tool_ms,
+            extend_on_progress: self.extend_on_progress,
+            bonus_iterations: self.bonus_iterations,
+            max_consecutive_failures: self.max_consecutive_failures,
+            retry_on_failure: self.retry_on_failure,
         }
     }
 }
@@ -1062,7 +1158,7 @@ Then read one:
         let mut tracker = ToolCallTracker::new();
         let mut executor = ToolExecutor::new();
 
-        let mut call = ToolCall::new(
+        let call = ToolCall::new(
             "bash",
             serde_json::json!({
                 "command": "echo test"

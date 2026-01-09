@@ -355,6 +355,12 @@ struct TuiState {
     output_cache: String,     // Cached joined output for rendering
     output_dirty: bool,       // Flag to rebuild cache
 
+    // Search state
+    search_mode: bool,        // Currently entering search query
+    search_query: String,     // Current search pattern
+    search_matches: Vec<usize>, // Line numbers with matches
+    search_current: usize,    // Current match index
+
     // Prompt history (separate from conversation)
     prompt_history: Vec<String>,
     history_index: Option<usize>,
@@ -531,6 +537,10 @@ impl TuiState {
             output_line_count: 1,
             output_cache: String::new(),
             output_dirty: true,
+            search_mode: false,
+            search_query: String::new(),
+            search_matches: Vec::new(),
+            search_current: 0,
             prompt_history: Vec::new(),
             history_index: None,
             saved_input: String::new(),
@@ -988,6 +998,71 @@ impl TuiState {
             self.scroll_offset = total - visible_height;
         } else {
             self.scroll_offset = 0;
+        }
+    }
+
+    /// Start search mode
+    fn start_search(&mut self) {
+        self.search_mode = true;
+        self.search_query.clear();
+        self.search_matches.clear();
+        self.search_current = 0;
+        self.auto_scroll = false;
+    }
+
+    /// Exit search mode
+    fn exit_search(&mut self) {
+        self.search_mode = false;
+    }
+
+    /// Update search results based on current query
+    fn update_search(&mut self) {
+        self.search_matches.clear();
+        if self.search_query.is_empty() {
+            return;
+        }
+
+        let query_lower = self.search_query.to_lowercase();
+        for (i, line) in self.output_cache.lines().enumerate() {
+            if line.to_lowercase().contains(&query_lower) {
+                self.search_matches.push(i);
+            }
+        }
+
+        // Jump to first match
+        if !self.search_matches.is_empty() {
+            self.search_current = 0;
+            self.jump_to_current_match();
+        }
+    }
+
+    /// Jump to next search match
+    fn next_match(&mut self) {
+        if self.search_matches.is_empty() {
+            return;
+        }
+        self.search_current = (self.search_current + 1) % self.search_matches.len();
+        self.jump_to_current_match();
+    }
+
+    /// Jump to previous search match
+    fn prev_match(&mut self) {
+        if self.search_matches.is_empty() {
+            return;
+        }
+        if self.search_current == 0 {
+            self.search_current = self.search_matches.len() - 1;
+        } else {
+            self.search_current -= 1;
+        }
+        self.jump_to_current_match();
+    }
+
+    /// Jump scroll to show current match
+    fn jump_to_current_match(&mut self) {
+        if let Some(&line) = self.search_matches.get(self.search_current) {
+            // Center the match in view
+            self.scroll_offset = line.saturating_sub(5) as u16;
         }
     }
 
@@ -2005,20 +2080,54 @@ async fn run_tui_loop(
                         _ => {}
                     }
 
-                    // Chat view - scrolling always works
+                    // Chat view - scrolling and search
                     if state.tab == Tab::Chat {
-                        match key.code {
-                            KeyCode::PageUp => {
-                                state.scroll_offset = state.scroll_offset.saturating_sub(10);
-                                state.auto_scroll = false;
+                        // Search mode input handling
+                        if state.search_mode {
+                            match key.code {
+                                KeyCode::Esc => {
+                                    state.exit_search();
+                                }
+                                KeyCode::Enter => {
+                                    state.exit_search();
+                                }
+                                KeyCode::Backspace => {
+                                    state.search_query.pop();
+                                    state.update_search();
+                                }
+                                KeyCode::Char(c) => {
+                                    state.search_query.push(c);
+                                    state.update_search();
+                                }
+                                _ => {}
                             }
-                            KeyCode::PageDown => {
-                                state.scroll_offset = state.scroll_offset.saturating_add(10);
+                        } else {
+                            // Normal scrolling
+                            match key.code {
+                                KeyCode::PageUp => {
+                                    state.scroll_offset = state.scroll_offset.saturating_sub(10);
+                                    state.auto_scroll = false;
+                                }
+                                KeyCode::PageDown => {
+                                    state.scroll_offset = state.scroll_offset.saturating_add(10);
+                                }
+                                KeyCode::End => {
+                                    state.auto_scroll = true;
+                                }
+                                // '/' to start search
+                                KeyCode::Char('/') if !state.is_generating => {
+                                    state.start_search();
+                                }
+                                // n for next match
+                                KeyCode::Char('n') if !state.search_query.is_empty() => {
+                                    state.next_match();
+                                }
+                                // N for previous match
+                                KeyCode::Char('N') if !state.search_query.is_empty() => {
+                                    state.prev_match();
+                                }
+                                _ => {}
                             }
-                            KeyCode::End => {
-                                state.auto_scroll = true;
-                            }
-                            _ => {}
                         }
                     }
 
@@ -2722,7 +2831,25 @@ fn render_chat(f: &mut Frame, state: &TuiState, area: Rect) {
         String::new()
     };
 
-    let title = format!("Chat{}{}", history_indicator, scroll_indicator);
+    // Search indicator
+    let search_indicator = if state.search_mode {
+        format!(" /{}█", state.search_query)
+    } else if !state.search_query.is_empty() {
+        if state.search_matches.is_empty() {
+            format!(" [/{}: no matches]", state.search_query)
+        } else {
+            format!(
+                " [/{}: {}/{} n/N]",
+                state.search_query,
+                state.search_current + 1,
+                state.search_matches.len()
+            )
+        }
+    } else {
+        String::new()
+    };
+
+    let title = format!("Chat{}{}{}", history_indicator, search_indicator, scroll_indicator);
 
     // Use cached output - rebuilt only when dirty
     let para = Paragraph::new(state.output_cache.as_str())

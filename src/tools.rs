@@ -449,34 +449,26 @@ impl ToolExecutor {
     }
 
     fn exec_write(&self, call: &mut ToolCall) -> Result<()> {
-        let path = call
+        // Clone args to avoid borrow issues with call
+        let path_str = call
             .args
             .get("path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("write: missing 'path' argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("write: missing 'path' argument"))?
+            .to_string();
 
         let content = call
             .args
             .get("content")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("write: missing 'content' argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("write: missing 'content' argument"))?
+            .to_string();
 
-        // Backup existing file
-        let path = Path::new(path);
-        if path.exists() {
-            let backup = path.with_extension("bak");
-            fs::copy(path, &backup)
-                .with_context(|| format!("Failed to backup {}", path.display()))?;
-            call.append_output(&format!("Backed up to {}\n", backup.display()));
-        }
+        let path = Path::new(&path_str);
 
-        fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
+        // Use atomic write for reliability
+        atomic_write_file(path, &content, call)?;
 
-        call.append_output(&format!(
-            "Wrote {} bytes to {}\n",
-            content.len(),
-            path.display()
-        ));
         Ok(())
     }
 
@@ -521,11 +513,13 @@ impl ToolExecutor {
     }
 
     fn exec_patch(&self, call: &mut ToolCall) -> Result<()> {
-        let path = call
+        // Clone args to avoid borrow issues with call
+        let path_str = call
             .args
             .get("path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("patch: missing 'path' argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("patch: missing 'path' argument"))?
+            .to_string();
 
         let diff = call
             .args
@@ -533,9 +527,10 @@ impl ToolExecutor {
             .or_else(|| call.args.get("patch"))
             .or_else(|| call.args.get("content"))
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("patch: missing 'diff' or 'patch' argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("patch: missing 'diff' or 'patch' argument"))?
+            .to_string();
 
-        let path = Path::new(path);
+        let path = Path::new(&path_str);
 
         // Read original content
         let original = if path.exists() {
@@ -547,28 +542,21 @@ impl ToolExecutor {
         };
 
         // Apply the patch
-        let patched = apply_patch(&original, diff)?;
+        let patched = apply_patch(&original, &diff)?;
+
+        // Warn if diff was treated as full replacement (non-unified format)
+        let is_unified = diff.contains("@@");
+        if !is_unified && !original.is_empty() {
+            call.append_output("⚠ Warning: Input treated as full file replacement (not a unified diff)\n");
+        }
 
         // Preview the change
         let preview = preview_changes(&original, &patched, &path.display().to_string());
         call.append_output(&format!("Preview:\n{}\n", preview));
 
-        // Create backup if file exists
-        if path.exists() {
-            let backup = path.with_extension("bak");
-            fs::copy(path, &backup)
-                .with_context(|| format!("Failed to backup {}", path.display()))?;
-            call.append_output(&format!("Backed up to: {}\n", backup.display()));
-        }
+        // Use atomic write for reliability (handles backup, sync, verify)
+        atomic_write_file(path, &patched, call)?;
 
-        // Write patched content
-        fs::write(path, &patched).with_context(|| format!("Failed to write {}", path.display()))?;
-
-        call.append_output(&format!(
-            "Patched {} ({} bytes)\n",
-            path.display(),
-            patched.len()
-        ));
         Ok(())
     }
 
@@ -667,6 +655,149 @@ impl ToolExecutor {
             }
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ATOMIC FILE OPERATIONS
+// ═══════════════════════════════════════════════════════════════
+
+/// Maximum file size for write operations (10MB)
+const MAX_WRITE_SIZE: usize = 10 * 1024 * 1024;
+
+/// Maximum number of backups to keep per file
+const MAX_BACKUPS: usize = 3;
+
+/// Atomic file write with backup rotation and verification
+///
+/// This function ensures reliable file writes by:
+/// 1. Creating a timestamped backup of existing file
+/// 2. Writing to a temporary file first
+/// 3. Syncing to disk (fsync)
+/// 4. Atomically renaming temp file to target
+/// 5. Verifying the write by reading back
+///
+/// If any step fails, the original file is preserved.
+fn atomic_write_file(path: &Path, content: &str, call: &mut ToolCall) -> Result<()> {
+    use std::io::Write;
+
+    // Safety check: prevent unreasonably large writes
+    if content.len() > MAX_WRITE_SIZE {
+        return Err(anyhow::anyhow!(
+            "Content too large: {} bytes exceeds {} byte limit",
+            content.len(),
+            MAX_WRITE_SIZE
+        ));
+    }
+
+    // Ensure parent directory exists
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create directory {}", parent.display()))?;
+            call.append_output(&format!("Created directory: {}\n", parent.display()));
+        }
+    }
+
+    // Backup existing file with timestamp rotation
+    if path.exists() {
+        let backup_path = create_timestamped_backup(path)?;
+        call.append_output(&format!("Backed up to: {}\n", backup_path.display()));
+        prune_old_backups(path, MAX_BACKUPS)?;
+    }
+
+    // Write to temporary file first (same directory for atomic rename)
+    let temp_path = path.with_extension(format!(
+        "{}.tmp",
+        path.extension()
+            .map(|e| e.to_string_lossy().to_string())
+            .unwrap_or_default()
+    ));
+
+    // Write and sync
+    {
+        let mut file = fs::File::create(&temp_path)
+            .with_context(|| format!("Failed to create temp file {}", temp_path.display()))?;
+        file.write_all(content.as_bytes())
+            .with_context(|| format!("Failed to write to temp file {}", temp_path.display()))?;
+        file.sync_all()
+            .with_context(|| format!("Failed to sync temp file {}", temp_path.display()))?;
+    }
+
+    // Atomic rename
+    fs::rename(&temp_path, path).with_context(|| {
+        // Clean up temp file on rename failure
+        let _ = fs::remove_file(&temp_path);
+        format!("Failed to rename {} to {}", temp_path.display(), path.display())
+    })?;
+
+    // Verify by reading back
+    let readback = fs::read_to_string(path)
+        .with_context(|| format!("Failed to verify {}", path.display()))?;
+
+    if readback != content {
+        return Err(anyhow::anyhow!(
+            "Write verification failed: content mismatch after write to {}",
+            path.display()
+        ));
+    }
+
+    call.append_output(&format!(
+        "Wrote {} bytes to {} (verified)\n",
+        content.len(),
+        path.display()
+    ));
+
+    Ok(())
+}
+
+/// Create a timestamped backup of a file
+fn create_timestamped_backup(path: &Path) -> Result<std::path::PathBuf> {
+    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let backup_name = format!(
+        "{}.{}.bak",
+        path.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "file".to_string()),
+        timestamp
+    );
+    let backup_path = path.with_file_name(backup_name);
+
+    fs::copy(path, &backup_path)
+        .with_context(|| format!("Failed to backup {} to {}", path.display(), backup_path.display()))?;
+
+    Ok(backup_path)
+}
+
+/// Remove old backups, keeping only the most recent N
+fn prune_old_backups(path: &Path, keep: usize) -> Result<()> {
+    let parent = path.parent().unwrap_or(Path::new("."));
+    let file_stem = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    // Find all backups for this file
+    let mut backups: Vec<_> = fs::read_dir(parent)?
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            name.starts_with(&file_stem) && name.ends_with(".bak")
+        })
+        .collect();
+
+    // Sort by modification time (newest first)
+    backups.sort_by(|a, b| {
+        let time_a = a.metadata().and_then(|m| m.modified()).ok();
+        let time_b = b.metadata().and_then(|m| m.modified()).ok();
+        time_b.cmp(&time_a)
+    });
+
+    // Remove old backups
+    for backup in backups.into_iter().skip(keep) {
+        let _ = fs::remove_file(backup.path());
+    }
+
+    Ok(())
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -855,7 +986,11 @@ pub fn apply_patch(original: &str, patch: &str) -> Result<String> {
 }
 
 /// Apply multiple patches to a file, with validation
+///
+/// Uses atomic writes for reliability: temp file, sync, rename, verify.
 pub fn apply_patches_to_file(path: &Path, patches: &[String]) -> Result<()> {
+    use std::io::Write;
+
     let original =
         fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
@@ -864,13 +999,46 @@ pub fn apply_patches_to_file(path: &Path, patches: &[String]) -> Result<()> {
         content = apply_patch(&content, patch)?;
     }
 
-    // Create backup
-    let backup = path.with_extension("bak");
-    fs::write(&backup, &original)
-        .with_context(|| format!("Failed to backup to {}", backup.display()))?;
+    // Safety check: prevent unreasonably large writes
+    if content.len() > MAX_WRITE_SIZE {
+        return Err(anyhow::anyhow!(
+            "Patched content too large: {} bytes exceeds {} byte limit",
+            content.len(),
+            MAX_WRITE_SIZE
+        ));
+    }
 
-    // Write patched content
-    fs::write(path, &content).with_context(|| format!("Failed to write {}", path.display()))?;
+    // Create timestamped backup
+    let _backup_path = create_timestamped_backup(path)?;
+    prune_old_backups(path, MAX_BACKUPS)?;
+
+    // Write to temp file first
+    let temp_path = path.with_extension("tmp");
+    {
+        let mut file = fs::File::create(&temp_path)
+            .with_context(|| format!("Failed to create temp file {}", temp_path.display()))?;
+        file.write_all(content.as_bytes())
+            .with_context(|| format!("Failed to write to temp file {}", temp_path.display()))?;
+        file.sync_all()
+            .with_context(|| format!("Failed to sync temp file {}", temp_path.display()))?;
+    }
+
+    // Atomic rename
+    fs::rename(&temp_path, path).with_context(|| {
+        let _ = fs::remove_file(&temp_path);
+        format!("Failed to rename {} to {}", temp_path.display(), path.display())
+    })?;
+
+    // Verify write
+    let readback = fs::read_to_string(path)
+        .with_context(|| format!("Failed to verify {}", path.display()))?;
+
+    if readback != content {
+        return Err(anyhow::anyhow!(
+            "Write verification failed: content mismatch after patching {}",
+            path.display()
+        ));
+    }
 
     Ok(())
 }
@@ -1612,5 +1780,229 @@ mod tests {
         let header = display.header();
 
         assert!(header.contains("[100b]"));
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ATOMIC WRITE TESTS
+    // ═══════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_atomic_write_creates_file() {
+        let tmp_dir = std::env::temp_dir();
+        let test_file = tmp_dir.join(format!("hyle_test_atomic_{}.txt", std::process::id()));
+
+        // Clean up any existing file
+        let _ = std::fs::remove_file(&test_file);
+
+        let mut executor = ToolExecutor::new();
+        let mut call = ToolCall::new(
+            "write",
+            serde_json::json!({
+                "path": test_file.to_string_lossy(),
+                "content": "test content\n"
+            }),
+        );
+
+        let result = executor.execute(&mut call);
+        assert!(result.is_ok(), "Write should succeed: {:?}", result);
+        assert_eq!(call.status, ToolCallStatus::Done);
+
+        // Verify content
+        let content = std::fs::read_to_string(&test_file).unwrap();
+        assert_eq!(content, "test content\n");
+        assert!(call.get_output().contains("verified"));
+
+        // Clean up
+        let _ = std::fs::remove_file(&test_file);
+    }
+
+    #[test]
+    fn test_atomic_write_creates_backup() {
+        let tmp_dir = std::env::temp_dir();
+        let test_file = tmp_dir.join(format!("hyle_test_backup_{}.txt", std::process::id()));
+
+        // Create initial file
+        std::fs::write(&test_file, "original content\n").unwrap();
+
+        let mut executor = ToolExecutor::new();
+        let mut call = ToolCall::new(
+            "write",
+            serde_json::json!({
+                "path": test_file.to_string_lossy(),
+                "content": "new content\n"
+            }),
+        );
+
+        let result = executor.execute(&mut call);
+        assert!(result.is_ok());
+
+        // Verify new content
+        let content = std::fs::read_to_string(&test_file).unwrap();
+        assert_eq!(content, "new content\n");
+
+        // Verify backup was created
+        assert!(call.get_output().contains("Backed up to"));
+
+        // Find and verify backup file
+        let parent = test_file.parent().unwrap();
+        let stem = test_file.file_name().unwrap().to_string_lossy();
+        let has_backup = std::fs::read_dir(parent)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .any(|e| {
+                let name = e.file_name().to_string_lossy().to_string();
+                name.starts_with(&*stem) && name.ends_with(".bak")
+            });
+        assert!(has_backup, "Backup file should exist");
+
+        // Clean up test and backup files
+        let _ = std::fs::remove_file(&test_file);
+        for entry in std::fs::read_dir(parent).unwrap().filter_map(|e| e.ok()) {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&*stem) && name.ends_with(".bak") {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
+    #[test]
+    fn test_atomic_write_rejects_oversized_content() {
+        let tmp_dir = std::env::temp_dir();
+        let test_file = tmp_dir.join(format!("hyle_test_size_{}.txt", std::process::id()));
+
+        // Create content larger than MAX_WRITE_SIZE (10MB)
+        let large_content = "x".repeat(MAX_WRITE_SIZE + 1);
+
+        let mut executor = ToolExecutor::new();
+        let mut call = ToolCall::new(
+            "write",
+            serde_json::json!({
+                "path": test_file.to_string_lossy(),
+                "content": large_content
+            }),
+        );
+
+        let result = executor.execute(&mut call);
+        assert!(result.is_err());
+        assert!(call.error.as_ref().unwrap().contains("too large"));
+    }
+
+    #[test]
+    fn test_atomic_write_creates_parent_directory() {
+        let tmp_dir = std::env::temp_dir();
+        let nested_dir = tmp_dir.join(format!("hyle_test_nested_{}", std::process::id()));
+        let test_file = nested_dir.join("subdir").join("test.txt");
+
+        // Ensure parent doesn't exist
+        let _ = std::fs::remove_dir_all(&nested_dir);
+
+        let mut executor = ToolExecutor::new();
+        let mut call = ToolCall::new(
+            "write",
+            serde_json::json!({
+                "path": test_file.to_string_lossy(),
+                "content": "nested content\n"
+            }),
+        );
+
+        let result = executor.execute(&mut call);
+        assert!(result.is_ok(), "Write to nested path should succeed");
+
+        // Verify file exists
+        assert!(test_file.exists());
+        let content = std::fs::read_to_string(&test_file).unwrap();
+        assert_eq!(content, "nested content\n");
+
+        // Clean up
+        let _ = std::fs::remove_dir_all(&nested_dir);
+    }
+
+    #[test]
+    fn test_patch_warns_on_non_unified_diff() {
+        let tmp_dir = std::env::temp_dir();
+        let test_file = tmp_dir.join(format!("hyle_test_patch_warn_{}.txt", std::process::id()));
+
+        // Create initial file
+        std::fs::write(&test_file, "original content\n").unwrap();
+
+        let mut executor = ToolExecutor::new();
+        let mut call = ToolCall::new(
+            "patch",
+            serde_json::json!({
+                "path": test_file.to_string_lossy(),
+                "diff": "not a unified diff, just replacement text"
+            }),
+        );
+
+        let result = executor.execute(&mut call);
+        assert!(result.is_ok());
+
+        // Should contain warning about non-unified diff
+        assert!(call.get_output().contains("Warning") || call.get_output().contains("⚠"));
+
+        // Clean up
+        let _ = std::fs::remove_file(&test_file);
+        // Clean up backups
+        let parent = test_file.parent().unwrap();
+        let stem = test_file.file_name().unwrap().to_string_lossy();
+        for entry in std::fs::read_dir(parent).unwrap().filter_map(|e| e.ok()) {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&*stem) && name.ends_with(".bak") {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
+    #[test]
+    fn test_backup_rotation_limits_count() {
+        let tmp_dir = std::env::temp_dir();
+        let test_file = tmp_dir.join(format!("hyle_test_rotation_{}.txt", std::process::id()));
+        let file_stem = test_file.file_name().unwrap().to_string_lossy().to_string();
+
+        // Create initial file
+        std::fs::write(&test_file, "v0\n").unwrap();
+
+        let mut executor = ToolExecutor::new();
+
+        // Do more writes than MAX_BACKUPS to trigger rotation
+        for i in 1..=5 {
+            let mut call = ToolCall::new(
+                "write",
+                serde_json::json!({
+                    "path": test_file.to_string_lossy(),
+                    "content": format!("v{}\n", i)
+                }),
+            );
+            executor.execute(&mut call).unwrap();
+            // Small delay to ensure different timestamps
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        // Count backups
+        let parent = test_file.parent().unwrap();
+        let backup_count = std::fs::read_dir(parent)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let name = e.file_name().to_string_lossy().to_string();
+                name.starts_with(&file_stem) && name.ends_with(".bak")
+            })
+            .count();
+
+        assert!(
+            backup_count <= MAX_BACKUPS,
+            "Should have at most {} backups, found {}",
+            MAX_BACKUPS,
+            backup_count
+        );
+
+        // Clean up
+        let _ = std::fs::remove_file(&test_file);
+        for entry in std::fs::read_dir(parent).unwrap().filter_map(|e| e.ok()) {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&file_stem) && (name.ends_with(".bak") || name.ends_with(".tmp")) {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
     }
 }

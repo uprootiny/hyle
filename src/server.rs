@@ -674,11 +674,8 @@ async fn handle_prompt(state: &Arc<RwLock<ServerState>>, body: &str) -> Result<S
     }
 
     // Run agent
-    let agent = AgentCore::new(&api_key, &model, &work_dir).with_config(AgentConfig {
-        max_iterations: 10,
-        max_tool_calls_per_iteration: 5,
-        timeout_per_tool_ms: 30000,
-    });
+    // Use conservative config for server (shorter timeouts, lower risk)
+    let agent = AgentCore::new(&api_key, &model, &work_dir).with_config(AgentConfig::conservative());
 
     let mut last_response = String::new();
     let result = agent

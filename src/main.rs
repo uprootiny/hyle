@@ -43,6 +43,8 @@ mod tmux;
 mod tools;
 mod traces;
 mod ui;
+mod ux_metrics;
+mod contracts;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;

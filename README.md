@@ -116,12 +116,13 @@ Claude Code-style commands executed locally without LLM:
 | Ctrl-P | Prompt palette |
 | PageUp/PageDown | Scroll conversation |
 | End | Jump to bottom (auto-scroll) |
+| / | Search in conversation |
+| n/N | Next/previous search match |
 | Tab | Switch tabs (Chat/Telemetry/Log) |
 | k | Kill current operation |
 | t | Throttle mode |
 | f | Full speed mode |
-| n | Normal mode |
-| Esc | Zoom out / Quit |
+| Esc | Exit search / Zoom out / Quit |
 
 ## Config
 
@@ -246,13 +247,13 @@ The bootstrap system supports:
 
 ## Status & Statistics
 
-**Current Build**: 267 tests passing
+**Current Build**: 278 tests passing (v0.3.0)
 
 | Metric | Value |
 |--------|-------|
-| Test Coverage | 267 tests |
-| Modules | 30 source files |
-| Lines of Code | ~24,000 |
+| Test Coverage | 278 tests |
+| Modules | 31 source files |
+| Lines of Code | ~26,000 |
 | Free Models | 35+ available |
 | Slash Commands | 20+ |
 
@@ -268,6 +269,9 @@ hyle includes guardrails learned from production incidents:
 | Guard | Protection |
 |-------|------------|
 | `rm -rf` blocker | Blocks destructive bash patterns |
+| Atomic file writes | Write to temp, sync, rename (no corruption) |
+| Write verification | Read-back check after every write |
+| Backup rotation | Timestamped backups, keeps last 3 |
 | Rate limit detection | Auto-switches to fallback models |
 | Session auto-save | Preserves work on Ctrl-C |
 | Tool timeout | 60s default, configurable |
@@ -332,11 +336,19 @@ hyle will:
 
 ## Roadmap
 
+### Completed (v0.3.0)
+- [x] Atomic file writes with verification
+- [x] Timestamped backup rotation
+- [x] Dynamic iteration limits (extend on progress)
+- [x] Autonomy-focused system prompts
+- [x] UX metrics framework
+- [x] Partial async TUI with prompt queuing
+- [x] Scrollback with search (`/`, `n`/`N`)
+
 ### Near-term
-- [ ] Full async TUI with prompt queuing
-- [ ] Better scrollback with search
 - [ ] MCP server support
 - [ ] Local model support (Ollama)
+- [ ] Integrate UX metrics into status bar
 
 ### Medium-term
 - [ ] Visual diff preview before apply

@@ -254,9 +254,63 @@ GitHub Actions configured:
 - `artifact.yml` - Release artifacts
 - `build-sketch.yml` - Sketch builder
 
+## Session 3: Reliability & Autonomy (2025-01-09)
+
+### Focus: Making hyle trustworthy
+
+User feedback: "I still don't trust hyle the way I do trust Claude Code and even Codex."
+
+### Key Additions
+
+1. **Atomic File Writes** (tools.rs)
+   - Write to temp file, fsync, rename (POSIX atomic)
+   - Read-back verification after every write
+   - Timestamped backup rotation (keeps last 3)
+   - Maximum file size limit (10MB)
+
+2. **Agent Autonomy Improvements** (agent.rs)
+   - Dynamic iteration limits: extend runway when making progress
+   - Configurable stuck detection threshold (5 failures, up from 3)
+   - AgentConfig::autonomous() and AgentConfig::conservative() presets
+   - Progress-based bonus iterations
+
+3. **Autonomy-Focused System Prompt**
+   - Emphasizes completing tasks without stopping for confirmation
+   - Instructs to try alternatives before giving up
+   - Clear guidelines on error recovery
+
+4. **TUI Search** (ui.rs)
+   - `/` to search in conversation
+   - `n`/`N` for next/previous match
+   - Search indicator in title bar
+   - Jump-to-match navigation
+
+5. **UX Metrics Framework** (ux_metrics.rs)
+   - ResponsivenessTracker: input latency percentiles
+   - SmoothnessTracker: token streaming jitter
+   - AutonomyTracker: task completion rates
+   - UX quality score (0-100)
+
+### Architecture Growth
+
+```
+Session 1: 6 modules, 11 tests
+Session 2: 30 modules, 263 tests
+Session 3: 31 modules, 278 tests
+Lines: ~15k → ~24k → ~27k
+```
+
+### Test Results
+
+```
+running 278 tests
+test result: ok. 278 passed; 0 failed
+```
+
 ## Next Steps
 
-1. MCP server support
-2. Local model support (Ollama)
-3. Visual diff preview
-4. Self-bootstrapping: hyle develops hyle
+1. Integrate UX metrics into TUI status bar
+2. MCP server support
+3. Local model support (Ollama)
+4. Visual diff preview
+5. Self-bootstrapping: hyle develops hyle
