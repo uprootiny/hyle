@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>hyle ~</title>
+  <title>hyle ~ creative coding</title>
   <style>
     @keyframes drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
     @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-    @keyframes type { from { width: 0; } to { width: 100%; } }
+    @keyframes gradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 
     :root {
       --bg: #1a1625;
@@ -17,6 +17,7 @@
       --iris: #c4a7e7;
       --foam: #9ccfd8;
       --pine: #31748f;
+      --surface: #26233a;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -47,19 +48,19 @@
     main {
       position: relative;
       z-index: 1;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
       padding: 2rem;
-      text-align: center;
+      max-width: 1000px;
+      margin: 0 auto;
     }
 
+    .hero {
+      text-align: center;
+      padding: 4rem 0;
+    }
     h1 {
-      font-size: clamp(3rem, 12vw, 8rem);
+      font-size: clamp(2.5rem, 10vw, 5rem);
       font-weight: 400;
-      letter-spacing: 0.2em;
+      letter-spacing: 0.15em;
       margin-bottom: 1rem;
     }
     h1 span:nth-child(1) { color: var(--rose); }
@@ -68,74 +69,252 @@
     h1 span:nth-child(4) { color: var(--foam); }
 
     .tagline {
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       color: var(--pine);
-      margin-bottom: 3rem;
-      opacity: 0.8;
+      margin-bottom: 2rem;
     }
 
-    .prompt {
-      background: rgba(0,0,0,0.3);
-      border: 1px solid var(--pine);
-      border-radius: 12px;
-      padding: 2rem;
-      max-width: 500px;
+    /* Live canvas demo */
+    .demo-canvas {
       width: 100%;
-      text-align: left;
+      height: 200px;
+      background: var(--surface);
+      border-radius: 12px;
+      margin: 2rem 0;
+      cursor: crosshair;
     }
-    .prompt-line {
+
+    /* Project cards */
+    .projects {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin: 3rem 0;
+    }
+    .project {
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .project:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    }
+    .project-preview {
+      height: 140px;
+      background: linear-gradient(135deg, var(--rose), var(--iris));
+      background-size: 200% 200%;
+      animation: gradient 4s ease infinite;
       display: flex;
       align-items: center;
-      margin: 0.5rem 0;
+      justify-content: center;
+      font-size: 3rem;
     }
-    .prompt-char {
-      color: var(--rose);
-      margin-right: 0.5rem;
+    .project:nth-child(2) .project-preview { background: linear-gradient(135deg, var(--gold), var(--foam)); }
+    .project:nth-child(3) .project-preview { background: linear-gradient(135deg, var(--iris), var(--pine)); }
+    .project:nth-child(4) .project-preview { background: linear-gradient(135deg, var(--foam), var(--rose)); }
+    .project:nth-child(5) .project-preview { background: linear-gradient(135deg, var(--pine), var(--gold)); }
+    .project:nth-child(6) .project-preview { background: linear-gradient(135deg, var(--rose), var(--foam)); }
+
+    .project-info {
+      padding: 1rem;
     }
-    .prompt-text {
+    .project-title {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
       color: var(--fg);
     }
-    .prompt-comment {
+    .project-desc {
+      font-size: 0.8rem;
       color: var(--pine);
-      font-style: italic;
-      margin-top: 1rem;
-      font-size: 0.9rem;
+      margin-bottom: 0.75rem;
+    }
+    .project-prompt {
+      display: none;
+      background: var(--bg);
+      padding: 0.75rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      color: var(--foam);
+      margin-top: 0.75rem;
+    }
+    .project.expanded .project-prompt { display: block; }
+    .project-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .project-btn {
+      flex: 1;
+      padding: 0.5rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-copy { background: var(--pine); color: var(--fg); }
+    .btn-copy:hover { background: var(--foam); color: var(--bg); }
+    .btn-expand { background: transparent; border: 1px solid var(--pine); color: var(--pine); }
+    .btn-expand:hover { border-color: var(--iris); color: var(--iris); }
+
+    /* Terminal demo */
+    .terminal {
+      background: #0d0d0d;
+      border-radius: 12px;
+      margin: 3rem 0;
+      overflow: hidden;
+    }
+    .terminal-header {
+      background: #1a1a1a;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #666;
+    }
+    .terminal-body {
+      padding: 1rem;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      height: 300px;
+      overflow-y: auto;
+    }
+    .term-line { margin: 0.25rem 0; }
+    .term-prompt { color: var(--rose); }
+    .term-output { color: var(--pine); }
+    .term-file { color: var(--gold); }
+    .term-comment { color: #555; font-style: italic; }
+    .term-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 1em;
+      background: var(--fg);
+      animation: pulse 1s infinite;
     }
 
+    .terminal-controls {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: #1a1a1a;
+      border-top: 1px solid #333;
+    }
+    .term-btn {
+      padding: 0.4rem 1rem;
+      background: var(--surface);
+      border: none;
+      border-radius: 4px;
+      color: var(--fg);
+      font-family: inherit;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .term-btn:hover { background: var(--pine); }
+
+    /* Code preview */
+    .code-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      z-index: 1000;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+    .code-modal.open { display: flex; flex-direction: column; }
+    .code-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .code-modal-title { color: var(--gold); font-size: 1rem; }
+    .code-modal-close {
+      background: none;
+      border: none;
+      color: var(--fg);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+    .code-modal-body {
+      flex: 1;
+      background: #0d0d0d;
+      border-radius: 8px;
+      padding: 1rem;
+      overflow: auto;
+    }
+    .code-modal-body pre {
+      margin: 0;
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    .line-num { color: #555; margin-right: 1rem; user-select: none; }
+
+    /* Ideas section */
     .ideas {
+      text-align: center;
+      margin: 3rem 0;
+    }
+    .ideas h2 {
+      font-size: 1.2rem;
+      color: var(--iris);
+      margin-bottom: 1.5rem;
+      font-weight: normal;
+    }
+    .idea-tags {
       display: flex;
       flex-wrap: wrap;
-      gap: 1rem;
+      gap: 0.75rem;
       justify-content: center;
-      margin: 3rem 0;
-      max-width: 600px;
     }
-    .idea {
-      background: rgba(0,0,0,0.3);
-      border: 1px solid transparent;
-      border-radius: 20px;
+    .idea-tag {
       padding: 0.5rem 1rem;
+      background: transparent;
+      border: 1px solid;
+      border-radius: 20px;
       font-size: 0.85rem;
-      transition: all 0.3s;
-      cursor: default;
+      cursor: pointer;
+      transition: all 0.2s;
     }
-    .idea:nth-child(1) { border-color: var(--rose); color: var(--rose); }
-    .idea:nth-child(2) { border-color: var(--gold); color: var(--gold); }
-    .idea:nth-child(3) { border-color: var(--iris); color: var(--iris); }
-    .idea:nth-child(4) { border-color: var(--foam); color: var(--foam); }
-    .idea:nth-child(5) { border-color: var(--pine); color: var(--pine); }
-    .idea:nth-child(6) { border-color: var(--rose); color: var(--rose); }
-    .idea:hover {
-      transform: scale(1.05);
-      background: rgba(255,255,255,0.05);
+    .idea-tag:nth-child(1) { border-color: var(--rose); color: var(--rose); }
+    .idea-tag:nth-child(2) { border-color: var(--gold); color: var(--gold); }
+    .idea-tag:nth-child(3) { border-color: var(--iris); color: var(--iris); }
+    .idea-tag:nth-child(4) { border-color: var(--foam); color: var(--foam); }
+    .idea-tag:nth-child(5) { border-color: var(--pine); color: var(--pine); }
+    .idea-tag:nth-child(6) { border-color: var(--rose); color: var(--rose); }
+    .idea-tag:nth-child(7) { border-color: var(--gold); color: var(--gold); }
+    .idea-tag:nth-child(8) { border-color: var(--iris); color: var(--iris); }
+    .idea-tag:hover {
+      background: currentColor;
+      color: var(--bg);
     }
 
     .cta {
-      margin-top: 2rem;
+      text-align: center;
+      margin: 4rem 0 2rem;
     }
     .cta a {
       display: inline-block;
-      padding: 1rem 2rem;
+      padding: 1rem 2.5rem;
       background: transparent;
       border: 2px solid var(--iris);
       color: var(--iris);
@@ -150,16 +329,14 @@
     }
 
     footer {
-      position: fixed;
-      bottom: 1rem;
-      left: 1rem;
-      font-size: 0.75rem;
+      text-align: center;
+      padding: 2rem;
       color: var(--pine);
-      opacity: 0.6;
+      font-size: 0.8rem;
     }
     footer a { color: var(--pine); }
 
-    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; z-index: 100; }
     .switcher-toggle {
       width: 28px; height: 28px; border-radius: 50%;
       background: transparent; border: 1px solid var(--pine);
@@ -186,42 +363,153 @@
   <div class="canvas" id="canvas"></div>
 
   <main>
-    <h1><span>h</span><span>y</span><span>l</span><span>e</span></h1>
-    <p class="tagline">describe it. watch it emerge.</p>
+    <div class="hero">
+      <h1><span>h</span><span>y</span><span>l</span><span>e</span></h1>
+      <p class="tagline">describe it. watch it emerge.</p>
+    </div>
 
-    <div class="prompt">
-      <div class="prompt-line">
-        <span class="prompt-char">></span>
-        <span class="prompt-text">make me a particle system</span>
+    <canvas class="demo-canvas" id="demoCanvas"></canvas>
+
+    <div class="projects">
+      <div class="project" onclick="toggleProject(this)">
+        <div class="project-preview">~</div>
+        <div class="project-info">
+          <h3 class="project-title">Particle Flow Field</h3>
+          <p class="project-desc">Perlin noise driven particles with WebGL acceleration and color gradients based on velocity</p>
+          <div class="project-prompt">
+            <strong>Prompt:</strong> create a particle system with 10000 particles following a perlin noise flow field. use webgl for rendering. color particles by their velocity magnitude using a viridis colormap. add mouse interaction to push particles away.
+          </div>
+          <div class="project-actions">
+            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(0)">Copy prompt</button>
+            <button class="project-btn btn-expand">Show code</button>
+          </div>
+        </div>
       </div>
-      <div class="prompt-line">
-        <span class="prompt-char">></span>
-        <span class="prompt-text">that responds to sound</span>
+
+      <div class="project" onclick="toggleProject(this)">
+        <div class="project-preview">*</div>
+        <div class="project-info">
+          <h3 class="project-title">Audio Reactive Rings</h3>
+          <p class="project-desc">Concentric rings that pulse with FFT frequency bands, smooth interpolation between beats</p>
+          <div class="project-prompt">
+            <strong>Prompt:</strong> build an audio visualizer with concentric rings. use web audio api to get FFT data. map low frequencies to inner rings, highs to outer. smooth the values with exponential decay. add bloom effect using offscreen canvas.
+          </div>
+          <div class="project-actions">
+            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(1)">Copy prompt</button>
+            <button class="project-btn btn-expand">Show code</button>
+          </div>
+        </div>
       </div>
-      <div class="prompt-line">
-        <span class="prompt-char">></span>
-        <span class="prompt-text">with physics</span>
+
+      <div class="project" onclick="toggleProject(this)">
+        <div class="project-preview">#</div>
+        <div class="project-info">
+          <h3 class="project-title">Recursive Tree Generator</h3>
+          <p class="project-desc">L-system based fractal trees with wind simulation and seasonal color transitions</p>
+          <div class="project-prompt">
+            <strong>Prompt:</strong> implement an l-system tree generator. start with axiom "F" and rules F -> FF+[+F-F-F]-[-F+F+F]. add random angle variation for organic look. simulate wind with sinusoidal branch displacement. cycle colors through seasons.
+          </div>
+          <div class="project-actions">
+            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(2)">Copy prompt</button>
+            <button class="project-btn btn-expand">Show code</button>
+          </div>
+        </div>
       </div>
-      <p class="prompt-comment">// hyle reads, writes, iterates</p>
+
+      <div class="project" onclick="toggleProject(this)">
+        <div class="project-preview">@</div>
+        <div class="project-info">
+          <h3 class="project-title">Reaction Diffusion</h3>
+          <p class="project-desc">Gray-Scott model simulation with adjustable feed/kill rates and GPU compute shaders</p>
+          <div class="project-prompt">
+            <strong>Prompt:</strong> implement gray-scott reaction diffusion. use webgl compute shaders for the simulation. expose feed rate (0.055) and kill rate (0.062) as sliders. render chemical A as brightness. add click to inject chemical B.
+          </div>
+          <div class="project-actions">
+            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(3)">Copy prompt</button>
+            <button class="project-btn btn-expand">Show code</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="project" onclick="toggleProject(this)">
+        <div class="project-preview">%</div>
+        <div class="project-info">
+          <h3 class="project-title">Verlet Cloth Physics</h3>
+          <p class="project-desc">Soft body cloth simulation with point constraints, gravity, and wind forces</p>
+          <div class="project-prompt">
+            <strong>Prompt:</strong> create a cloth simulation using verlet integration. make a 30x30 grid of points connected by distance constraints. pin top row. add gravity and wind (oscillating horizontal force). solve constraints 3 times per frame. render as triangles.
+          </div>
+          <div class="project-actions">
+            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(4)">Copy prompt</button>
+            <button class="project-btn btn-expand">Show code</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="project" onclick="toggleProject(this)">
+        <div class="project-preview">&</div>
+        <div class="project-info">
+          <h3 class="project-title">Metaball Shader</h3>
+          <p class="project-desc">Isosurface rendering with marching squares, organic blob movement and glow effects</p>
+          <div class="project-prompt">
+            <strong>Prompt:</strong> implement 2d metaballs in a fragment shader. place 8 blobs with smooth movement using sin/cos. compute distance field as sum of (radius/distance). threshold at 1.0 for the surface. add inner glow using field gradient.
+          </div>
+          <div class="project-actions">
+            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(5)">Copy prompt</button>
+            <button class="project-btn btn-expand">Show code</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-header">
+        <span class="terminal-dot dot-red"></span>
+        <span class="terminal-dot dot-yellow"></span>
+        <span class="terminal-dot dot-green"></span>
+        <span class="terminal-title">hyle ~ generative</span>
+      </div>
+      <div class="terminal-body" id="terminalBody"></div>
+      <div class="terminal-controls">
+        <button class="term-btn" onclick="playDemo()">Play</button>
+        <button class="term-btn" onclick="pauseDemo()">Pause</button>
+        <button class="term-btn" onclick="restartDemo()">Restart</button>
+        <button class="term-btn" onclick="nextDemo()">Next</button>
+      </div>
     </div>
 
     <div class="ideas">
-      <span class="idea">generative art</span>
-      <span class="idea">shaders</span>
-      <span class="idea">interactive</span>
-      <span class="idea">procedural</span>
-      <span class="idea">audio reactive</span>
-      <span class="idea">experiments</span>
+      <h2>explore possibilities</h2>
+      <div class="idea-tags">
+        <span class="idea-tag" onclick="showIdea(this)">generative art</span>
+        <span class="idea-tag" onclick="showIdea(this)">shaders</span>
+        <span class="idea-tag" onclick="showIdea(this)">physics sims</span>
+        <span class="idea-tag" onclick="showIdea(this)">audio reactive</span>
+        <span class="idea-tag" onclick="showIdea(this)">fractals</span>
+        <span class="idea-tag" onclick="showIdea(this)">cellular automata</span>
+        <span class="idea-tag" onclick="showIdea(this)">procedural</span>
+        <span class="idea-tag" onclick="showIdea(this)">data viz</span>
+      </div>
     </div>
 
     <div class="cta">
-      <a href="https://github.com/uprootiny/hyle">explore</a>
+      <a href="https://github.com/uprootiny/hyle">start creating</a>
     </div>
+
+    <footer>
+      <a href="https://github.com/uprootiny/hyle">github</a> &middot; mit license &middot; built for makers
+    </footer>
   </main>
 
-  <footer>
-    <a href="https://github.com/uprootiny/hyle">github</a> &middot; mit license
-  </footer>
+  <div class="code-modal" id="codeModal">
+    <div class="code-modal-header">
+      <span class="code-modal-title" id="modalTitle">particle_flow.rs</span>
+      <button class="code-modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="code-modal-body">
+      <pre id="modalCode"></pre>
+    </div>
+  </div>
 
   <div class="variant-switcher">
     <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">*</div>
@@ -243,7 +531,7 @@
   </div>
 
   <script>
-    // Floating dots
+    // Floating background dots
     const canvas = document.getElementById('canvas');
     const colors = ['#eb6f92', '#f6c177', '#c4a7e7', '#9ccfd8', '#31748f'];
     for (let i = 0; i < 30; i++) {
@@ -255,6 +543,271 @@
       dot.style.animationDelay = Math.random() * 8 + 's';
       dot.style.opacity = 0.3 + Math.random() * 0.4;
       canvas.appendChild(dot);
+    }
+
+    // Interactive demo canvas
+    const demoCanvas = document.getElementById('demoCanvas');
+    const ctx = demoCanvas.getContext('2d');
+    let particles = [];
+    let mouse = { x: 0, y: 0 };
+
+    function resizeCanvas() {
+      demoCanvas.width = demoCanvas.offsetWidth;
+      demoCanvas.height = demoCanvas.offsetHeight;
+      initParticles();
+    }
+
+    function initParticles() {
+      particles = [];
+      for (let i = 0; i < 200; i++) {
+        particles.push({
+          x: Math.random() * demoCanvas.width,
+          y: Math.random() * demoCanvas.height,
+          vx: (Math.random() - 0.5) * 2,
+          vy: (Math.random() - 0.5) * 2,
+          radius: Math.random() * 3 + 1,
+          color: colors[Math.floor(Math.random() * colors.length)]
+        });
+      }
+    }
+
+    function animateParticles() {
+      ctx.fillStyle = 'rgba(26, 22, 37, 0.1)';
+      ctx.fillRect(0, 0, demoCanvas.width, demoCanvas.height);
+
+      particles.forEach(p => {
+        // Attract to mouse
+        const dx = mouse.x - p.x;
+        const dy = mouse.y - p.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 150 && dist > 0) {
+          p.vx += dx / dist * 0.5;
+          p.vy += dy / dist * 0.5;
+        }
+
+        // Damping
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+
+        // Update position
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // Wrap around
+        if (p.x < 0) p.x = demoCanvas.width;
+        if (p.x > demoCanvas.width) p.x = 0;
+        if (p.y < 0) p.y = demoCanvas.height;
+        if (p.y > demoCanvas.height) p.y = 0;
+
+        // Draw
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+      });
+
+      requestAnimationFrame(animateParticles);
+    }
+
+    demoCanvas.addEventListener('mousemove', e => {
+      const rect = demoCanvas.getBoundingClientRect();
+      mouse.x = e.clientX - rect.left;
+      mouse.y = e.clientY - rect.top;
+    });
+
+    resizeCanvas();
+    animateParticles();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Project prompts
+    const prompts = [
+      'create a particle system with 10000 particles following a perlin noise flow field. use webgl for rendering. color particles by their velocity magnitude using a viridis colormap. add mouse interaction to push particles away.',
+      'build an audio visualizer with concentric rings. use web audio api to get FFT data. map low frequencies to inner rings, highs to outer. smooth the values with exponential decay. add bloom effect using offscreen canvas.',
+      'implement an l-system tree generator. start with axiom "F" and rules F -> FF+[+F-F-F]-[-F+F+F]. add random angle variation for organic look. simulate wind with sinusoidal branch displacement. cycle colors through seasons.',
+      'implement gray-scott reaction diffusion. use webgl compute shaders for the simulation. expose feed rate (0.055) and kill rate (0.062) as sliders. render chemical A as brightness. add click to inject chemical B.',
+      'create a cloth simulation using verlet integration. make a 30x30 grid of points connected by distance constraints. pin top row. add gravity and wind (oscillating horizontal force). solve constraints 3 times per frame. render as triangles.',
+      'implement 2d metaballs in a fragment shader. place 8 blobs with smooth movement using sin/cos. compute distance field as sum of (radius/distance). threshold at 1.0 for the surface. add inner glow using field gradient.'
+    ];
+
+    function toggleProject(el) {
+      el.classList.toggle('expanded');
+    }
+
+    function copyPrompt(idx) {
+      navigator.clipboard.writeText(prompts[idx]);
+      const btn = event.target;
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy prompt', 1500);
+    }
+
+    // Terminal demo
+    const demos = [
+      {
+        lines: [
+          { type: 'prompt', text: '> create a particle system that responds to audio' },
+          { type: 'comment', text: '# hyle reads project structure...' },
+          { type: 'output', text: '[read] src/main.rs' },
+          { type: 'output', text: '[read] Cargo.toml' },
+          { type: 'comment', text: '# analyzing audio processing requirements...' },
+          { type: 'output', text: '[write] src/audio.rs' },
+          { type: 'file', text: 'use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};' },
+          { type: 'file', text: 'use rustfft::{FftPlanner, num_complex::Complex};' },
+          { type: 'file', text: '' },
+          { type: 'file', text: 'pub struct AudioAnalyzer {' },
+          { type: 'file', text: '    fft: Arc<dyn Fft<f32>>,' },
+          { type: 'file', text: '    buffer: Vec<Complex<f32>>,' },
+          { type: 'file', text: '    spectrum: Arc<Mutex<Vec<f32>>>,' },
+          { type: 'file', text: '}' },
+          { type: 'output', text: '[write] src/particles.rs' },
+          { type: 'file', text: 'impl Particle {' },
+          { type: 'file', text: '    pub fn update(&mut self, spectrum: &[f32]) {' },
+          { type: 'file', text: '        let bass = spectrum[0..10].iter().sum::<f32>() / 10.0;' },
+          { type: 'file', text: '        self.radius = self.base_radius * (1.0 + bass * 2.0);' },
+          { type: 'file', text: '        self.velocity *= 1.0 + bass * 0.5;' },
+          { type: 'file', text: '    }' },
+          { type: 'file', text: '}' },
+          { type: 'output', text: '[bash] cargo build --release' },
+          { type: 'output', text: 'Compiling audio_particles v0.1.0' },
+          { type: 'output', text: 'Finished release [optimized] target(s)' },
+          { type: 'comment', text: '# done in 12 seconds' }
+        ]
+      },
+      {
+        lines: [
+          { type: 'prompt', text: '> add mouse repulsion to the flow field' },
+          { type: 'output', text: '[read] src/flow_field.rs' },
+          { type: 'comment', text: '# adding force calculation...' },
+          { type: 'output', text: '[patch] src/flow_field.rs' },
+          { type: 'file', text: 'pub fn apply_forces(&mut self, mouse: Vec2) {' },
+          { type: 'file', text: '    for particle in &mut self.particles {' },
+          { type: 'file', text: '        let delta = particle.pos - mouse;' },
+          { type: 'file', text: '        let dist = delta.length();' },
+          { type: 'file', text: '        if dist < 100.0 && dist > 0.0 {' },
+          { type: 'file', text: '            let force = delta.normalize() * (100.0 - dist) * 0.1;' },
+          { type: 'file', text: '            particle.vel += force;' },
+          { type: 'file', text: '        }' },
+          { type: 'file', text: '    }' },
+          { type: 'file', text: '}' },
+          { type: 'output', text: '[bash] cargo test' },
+          { type: 'output', text: 'test flow_field::tests::repulsion_force ... ok' },
+          { type: 'comment', text: '# particles now flee the cursor' }
+        ]
+      },
+      {
+        lines: [
+          { type: 'prompt', text: '> make it export frames as png sequence' },
+          { type: 'output', text: '[read] src/renderer.rs' },
+          { type: 'output', text: '[write] src/export.rs' },
+          { type: 'file', text: 'use image::{ImageBuffer, Rgba};' },
+          { type: 'file', text: '' },
+          { type: 'file', text: 'pub struct FrameExporter {' },
+          { type: 'file', text: '    output_dir: PathBuf,' },
+          { type: 'file', text: '    frame_count: u32,' },
+          { type: 'file', text: '    width: u32,' },
+          { type: 'file', text: '    height: u32,' },
+          { type: 'file', text: '}' },
+          { type: 'file', text: '' },
+          { type: 'file', text: 'impl FrameExporter {' },
+          { type: 'file', text: '    pub fn export_frame(&mut self, pixels: &[u8]) {' },
+          { type: 'file', text: '        let path = self.output_dir.join(' },
+          { type: 'file', text: '            format!("frame_{:05}.png", self.frame_count)' },
+          { type: 'file', text: '        );' },
+          { type: 'file', text: '        let img = ImageBuffer::<Rgba<u8>, _>::from_raw(' },
+          { type: 'file', text: '            self.width, self.height, pixels.to_vec()' },
+          { type: 'file', text: '        ).unwrap();' },
+          { type: 'file', text: '        img.save(&path).unwrap();' },
+          { type: 'file', text: '        self.frame_count += 1;' },
+          { type: 'file', text: '    }' },
+          { type: 'file', text: '}' },
+          { type: 'output', text: '[bash] cargo run -- --export frames/' },
+          { type: 'output', text: 'Exported 360 frames to frames/' },
+          { type: 'comment', text: '# ready for ffmpeg' }
+        ]
+      }
+    ];
+
+    let currentDemo = 0;
+    let lineIndex = 0;
+    let isPlaying = false;
+    let playInterval = null;
+
+    function renderLine(line) {
+      const div = document.createElement('div');
+      div.className = 'term-line';
+      if (line.type === 'prompt') {
+        div.innerHTML = `<span class="term-prompt">${line.text}</span>`;
+      } else if (line.type === 'output') {
+        div.innerHTML = `<span class="term-output">${line.text}</span>`;
+      } else if (line.type === 'file') {
+        div.innerHTML = `<span class="term-file">${line.text}</span>`;
+      } else if (line.type === 'comment') {
+        div.innerHTML = `<span class="term-comment">${line.text}</span>`;
+      }
+      return div;
+    }
+
+    function playDemo() {
+      if (isPlaying) return;
+      isPlaying = true;
+      playInterval = setInterval(() => {
+        if (lineIndex >= demos[currentDemo].lines.length) {
+          pauseDemo();
+          return;
+        }
+        const termBody = document.getElementById('terminalBody');
+        termBody.appendChild(renderLine(demos[currentDemo].lines[lineIndex]));
+        termBody.scrollTop = termBody.scrollHeight;
+        lineIndex++;
+      }, 150);
+    }
+
+    function pauseDemo() {
+      isPlaying = false;
+      if (playInterval) clearInterval(playInterval);
+    }
+
+    function restartDemo() {
+      pauseDemo();
+      lineIndex = 0;
+      document.getElementById('terminalBody').innerHTML = '';
+      playDemo();
+    }
+
+    function nextDemo() {
+      pauseDemo();
+      currentDemo = (currentDemo + 1) % demos.length;
+      lineIndex = 0;
+      document.getElementById('terminalBody').innerHTML = '';
+      playDemo();
+    }
+
+    // Auto-start first demo
+    setTimeout(playDemo, 500);
+
+    // Idea tag click
+    function showIdea(el) {
+      const idea = el.textContent;
+      const prompts = {
+        'generative art': 'create a generative art piece using perlin noise and geometric shapes',
+        'shaders': 'write a fragment shader that creates a plasma effect with time-based animation',
+        'physics sims': 'build a 2d physics sandbox with rigid body collision detection',
+        'audio reactive': 'make a visualizer that maps audio frequencies to visual elements',
+        'fractals': 'render a mandelbrot set with smooth coloring and zoom controls',
+        'cellular automata': 'implement conways game of life with custom rulesets',
+        'procedural': 'generate a procedural dungeon using binary space partitioning',
+        'data viz': 'create an animated force-directed graph visualization'
+      };
+      navigator.clipboard.writeText(prompts[idea] || idea);
+      el.style.background = el.style.color;
+      el.style.color = '#1a1625';
+      setTimeout(() => {
+        el.style.background = 'transparent';
+        el.style.color = '';
+      }, 1000);
+    }
+
+    function closeModal() {
+      document.getElementById('codeModal').classList.remove('open');
     }
   </script>
 </body>
