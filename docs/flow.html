@@ -13,6 +13,7 @@
       --green: #a6e3a1;
       --peach: #fab387;
       --mauve: #cba6f7;
+      --red: #f38ba8;
       --dim: #6c7086;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -39,14 +40,285 @@
       color: var(--dim);
     }
 
-    .shortcuts {
-      margin-bottom: 4rem;
-    }
-    .shortcuts h2 {
+    h2 {
       font-size: 1.25rem;
       margin-bottom: 1.5rem;
       color: var(--mauve);
     }
+    section { margin-bottom: 4rem; }
+
+    /* Keyboard Trainer */
+    .keyboard-trainer {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .trainer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .trainer-header h3 { font-size: 1rem; color: var(--green); }
+    .trainer-score {
+      font-family: 'SF Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--dim);
+    }
+    .trainer-prompt {
+      text-align: center;
+      padding: 2rem;
+      background: var(--bg);
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+    .trainer-task {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      color: var(--fg);
+    }
+    .trainer-key-display {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .trainer-key {
+      background: var(--surface);
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-family: 'SF Mono', monospace;
+      font-size: 1.25rem;
+      border: 2px solid var(--dim);
+      min-width: 60px;
+      text-align: center;
+    }
+    .trainer-key.active { border-color: var(--accent); background: rgba(137, 180, 250, 0.1); }
+    .trainer-key.success { border-color: var(--green); background: rgba(166, 227, 161, 0.1); }
+    .trainer-hint { font-size: 0.85rem; color: var(--dim); }
+    .trainer-progress {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .progress-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--dim);
+    }
+    .progress-dot.done { background: var(--green); }
+    .progress-dot.current { background: var(--accent); }
+
+    /* Live Terminal */
+    .live-terminal {
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: rgba(0,0,0,0.2);
+    }
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .terminal-dot.red { background: #ff5f56; }
+    .terminal-dot.yellow { background: #ffbd2e; }
+    .terminal-dot.green { background: #27ca40; }
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--dim);
+    }
+    .terminal-body {
+      padding: 1rem;
+      font-family: 'SF Mono', monospace;
+      font-size: 0.85rem;
+      min-height: 250px;
+    }
+    .term-line { margin: 0.25rem 0; white-space: pre; }
+    .term-prompt { color: var(--green); }
+    .term-cmd { color: var(--fg); }
+    .term-output { color: var(--dim); }
+    .term-key {
+      display: inline-block;
+      background: var(--bg);
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      margin: 0 0.25rem;
+      border: 1px solid var(--dim);
+    }
+    .term-highlight { color: var(--accent); }
+    .term-success { color: var(--green); }
+    .term-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 16px;
+      background: var(--accent);
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Prompt Queue */
+    .prompt-queue {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .queue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .queue-header h3 { font-size: 0.9rem; color: var(--peach); }
+    .queue-status {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      background: var(--bg);
+    }
+    .queue-status.generating { color: var(--green); }
+    .queue-list { list-style: none; }
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem;
+      background: var(--bg);
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+    }
+    .queue-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      color: var(--dim);
+    }
+    .queue-item.active .queue-num { background: var(--accent); color: var(--bg); }
+    .queue-text { flex: 1; color: var(--dim); }
+    .queue-item.active .queue-text { color: var(--fg); }
+    .queue-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--dim);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .queue-input {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .queue-input input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--dim);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: var(--fg);
+      font-size: 0.85rem;
+    }
+    .queue-input input:focus { border-color: var(--accent); outline: none; }
+    .queue-input button {
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    /* Session Resume */
+    .session-demo {
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    .session-header {
+      padding: 1rem;
+      background: rgba(0,0,0,0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .session-header h3 { font-size: 0.9rem; }
+    .session-controls { display: flex; gap: 0.5rem; }
+    .session-controls button {
+      padding: 0.25rem 0.75rem;
+      background: var(--bg);
+      border: 1px solid var(--dim);
+      color: var(--dim);
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .session-controls button:hover { border-color: var(--accent); color: var(--accent); }
+    .session-list {
+      padding: 1rem;
+    }
+    .session-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem;
+      background: var(--bg);
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .session-item:hover { border-color: var(--dim); }
+    .session-item.active { border-color: var(--accent); background: rgba(137, 180, 250, 0.05); }
+    .session-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+    }
+    .session-info { flex: 1; }
+    .session-project { font-size: 0.9rem; font-weight: 500; }
+    .session-meta { font-size: 0.75rem; color: var(--dim); }
+    .session-resume {
+      padding: 0.25rem 0.75rem;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .session-item:hover .session-resume { opacity: 1; }
+
+    /* Shortcuts Grid */
+    .shortcuts h2 { color: var(--mauve); }
     .shortcut-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -59,7 +331,12 @@
       padding: 1rem;
       background: var(--surface);
       border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: border-color 0.2s;
     }
+    .shortcut:hover { border-color: var(--dim); }
+    .shortcut.trying { border-color: var(--accent); background: rgba(137, 180, 250, 0.05); }
     .key {
       background: var(--bg);
       padding: 0.5rem 0.75rem;
@@ -74,15 +351,20 @@
       font-size: 0.9rem;
       color: var(--dim);
     }
+    .shortcut-try {
+      margin-left: auto;
+      padding: 0.25rem 0.5rem;
+      background: transparent;
+      border: 1px solid var(--dim);
+      color: var(--dim);
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+    .shortcut-try:hover { border-color: var(--accent); color: var(--accent); }
 
-    .commands {
-      margin-bottom: 4rem;
-    }
-    .commands h2 {
-      font-size: 1.25rem;
-      margin-bottom: 1.5rem;
-      color: var(--green);
-    }
+    /* Commands */
+    .commands h2 { color: var(--green); }
     .command-list {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -95,23 +377,18 @@
       background: var(--surface);
       border-radius: 6px;
       font-size: 0.85rem;
+      cursor: pointer;
+      border: 1px solid transparent;
     }
+    .command:hover { border-color: var(--dim); }
     .command-name {
       font-family: 'SF Mono', monospace;
       color: var(--green);
     }
-    .command-desc {
-      color: var(--dim);
-    }
+    .command-desc { color: var(--dim); }
 
-    .workflow {
-      margin-bottom: 4rem;
-    }
-    .workflow h2 {
-      font-size: 1.25rem;
-      margin-bottom: 1.5rem;
-      color: var(--peach);
-    }
+    /* Workflow Demo */
+    .workflow h2 { color: var(--peach); }
     .workflow-demo {
       background: var(--surface);
       border-radius: 12px;
@@ -119,13 +396,12 @@
       font-family: 'SF Mono', monospace;
       font-size: 0.9rem;
     }
-    .workflow-line {
-      margin: 0.5rem 0;
-    }
+    .workflow-line { margin: 0.5rem 0; }
     .workflow-prompt { color: var(--green); }
     .workflow-output { color: var(--dim); }
     .workflow-comment { color: var(--mauve); font-style: italic; }
 
+    /* Features */
     .features {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -202,97 +478,243 @@
       <p class="tagline">Keyboard-driven. Session-persistent. Zero friction.</p>
     </div>
 
-    <div class="shortcuts">
+    <section>
+      <h2>Keyboard Trainer</h2>
+      <div class="keyboard-trainer">
+        <div class="trainer-header">
+          <h3>Practice hyle shortcuts</h3>
+          <span class="trainer-score" id="trainerScore">0 / 6 completed</span>
+        </div>
+        <div class="trainer-prompt">
+          <div class="trainer-task" id="trainerTask">Press Ctrl+K to kill to end of line</div>
+          <div class="trainer-key-display" id="keyDisplay">
+            <span class="trainer-key" id="key1">Ctrl</span>
+            <span class="trainer-key" id="key2">K</span>
+          </div>
+          <div class="trainer-hint" id="trainerHint">Try it now - works in any input field</div>
+        </div>
+        <div class="trainer-progress" id="trainerProgress">
+          <div class="progress-dot current"></div>
+          <div class="progress-dot"></div>
+          <div class="progress-dot"></div>
+          <div class="progress-dot"></div>
+          <div class="progress-dot"></div>
+          <div class="progress-dot"></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Live Terminal Demo</h2>
+      <div class="live-terminal">
+        <div class="terminal-header">
+          <div class="terminal-dot red"></div>
+          <div class="terminal-dot yellow"></div>
+          <div class="terminal-dot green"></div>
+          <span class="terminal-title">hyle - ~/projects/webapp</span>
+        </div>
+        <div class="terminal-body" id="terminalBody">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      <div style="display: flex; gap: 0.5rem; justify-content: center;">
+        <button onclick="playTerminal()" style="padding: 0.5rem 1rem; background: var(--surface); border: 1px solid var(--dim); color: var(--dim); border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Play Demo</button>
+        <button onclick="resetTerminal()" style="padding: 0.5rem 1rem; background: var(--surface); border: 1px solid var(--dim); color: var(--dim); border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Reset</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Prompt Queue</h2>
+      <p style="color: var(--dim); margin-bottom: 1rem; font-size: 0.9rem;">Type while generating. Your prompts queue up and execute in order.</p>
+      <div class="prompt-queue">
+        <div class="queue-header">
+          <h3>Queued Prompts</h3>
+          <span class="queue-status generating" id="queueStatus">Generating...</span>
+        </div>
+        <ul class="queue-list" id="queueList">
+          <li class="queue-item active">
+            <span class="queue-num">1</span>
+            <span class="queue-text">add authentication to the user routes</span>
+            <div class="queue-spinner"></div>
+          </li>
+          <li class="queue-item">
+            <span class="queue-num">2</span>
+            <span class="queue-text">write tests for auth middleware</span>
+          </li>
+          <li class="queue-item">
+            <span class="queue-num">3</span>
+            <span class="queue-text">update the README with API docs</span>
+          </li>
+        </ul>
+        <div class="queue-input">
+          <input type="text" id="queueInput" placeholder="Type your next prompt..." onkeypress="if(event.key==='Enter')addToQueue()">
+          <button onclick="addToQueue()">Queue</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Session Resume</h2>
+      <p style="color: var(--dim); margin-bottom: 1rem; font-size: 0.9rem;">Just type <code style="background: var(--surface); padding: 0.1rem 0.4rem; border-radius: 3px;">hyle</code> to continue where you left off.</p>
+      <div class="session-demo">
+        <div class="session-header">
+          <h3>Recent Sessions</h3>
+          <div class="session-controls">
+            <button onclick="sortSessions('recent')">Recent</button>
+            <button onclick="sortSessions('project')">By Project</button>
+          </div>
+        </div>
+        <div class="session-list" id="sessionList">
+          <div class="session-item active" onclick="selectSession(this)">
+            <div class="session-icon">W</div>
+            <div class="session-info">
+              <div class="session-project">webapp</div>
+              <div class="session-meta">2 min ago - 47 messages - auth feature</div>
+            </div>
+            <button class="session-resume" onclick="resumeSession(event)">Resume</button>
+          </div>
+          <div class="session-item" onclick="selectSession(this)">
+            <div class="session-icon">A</div>
+            <div class="session-info">
+              <div class="session-project">api-server</div>
+              <div class="session-meta">3 hours ago - 128 messages - rate limiting</div>
+            </div>
+            <button class="session-resume" onclick="resumeSession(event)">Resume</button>
+          </div>
+          <div class="session-item" onclick="selectSession(this)">
+            <div class="session-icon">C</div>
+            <div class="session-info">
+              <div class="session-project">cli-tool</div>
+              <div class="session-meta">Yesterday - 89 messages - parser rewrite</div>
+            </div>
+            <button class="session-resume" onclick="resumeSession(event)">Resume</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shortcuts">
       <h2>Keyboard Shortcuts</h2>
       <div class="shortcut-grid">
-        <div class="shortcut">
+        <div class="shortcut" onclick="tryShortcut(this, 'Enter')">
           <span class="key">Enter</span>
           <span class="shortcut-desc">Send prompt</span>
+          <button class="shortcut-try">Try</button>
         </div>
-        <div class="shortcut">
-          <span class="key">↑ ↓</span>
+        <div class="shortcut" onclick="tryShortcut(this, 'Up/Down')">
+          <span class="key">Up Down</span>
           <span class="shortcut-desc">Browse history</span>
+          <button class="shortcut-try">Try</button>
         </div>
-        <div class="shortcut">
-          <span class="key">Ctrl-A/E</span>
-          <span class="shortcut-desc">Line start/end</span>
+        <div class="shortcut" onclick="tryShortcut(this, 'Ctrl-A')">
+          <span class="key">Ctrl-A</span>
+          <span class="shortcut-desc">Line start</span>
+          <button class="shortcut-try">Try</button>
         </div>
-        <div class="shortcut">
+        <div class="shortcut" onclick="tryShortcut(this, 'Ctrl-E')">
+          <span class="key">Ctrl-E</span>
+          <span class="shortcut-desc">Line end</span>
+          <button class="shortcut-try">Try</button>
+        </div>
+        <div class="shortcut" onclick="tryShortcut(this, 'Ctrl-K')">
           <span class="key">Ctrl-K</span>
           <span class="shortcut-desc">Kill to end</span>
+          <button class="shortcut-try">Try</button>
         </div>
-        <div class="shortcut">
+        <div class="shortcut" onclick="tryShortcut(this, 'Ctrl-U')">
+          <span class="key">Ctrl-U</span>
+          <span class="shortcut-desc">Kill to start</span>
+          <button class="shortcut-try">Try</button>
+        </div>
+        <div class="shortcut" onclick="tryShortcut(this, '/')">
           <span class="key">/</span>
           <span class="shortcut-desc">Search conversation</span>
+          <button class="shortcut-try">Try</button>
         </div>
-        <div class="shortcut">
+        <div class="shortcut" onclick="tryShortcut(this, 'n/N')">
           <span class="key">n / N</span>
           <span class="shortcut-desc">Next/prev match</span>
+          <button class="shortcut-try">Try</button>
         </div>
-        <div class="shortcut">
+        <div class="shortcut" onclick="tryShortcut(this, 'Tab')">
           <span class="key">Tab</span>
           <span class="shortcut-desc">Switch views</span>
+          <button class="shortcut-try">Try</button>
         </div>
-        <div class="shortcut">
-          <span class="key">k</span>
-          <span class="shortcut-desc">Kill operation</span>
+        <div class="shortcut" onclick="tryShortcut(this, 'Ctrl-C')">
+          <span class="key">Ctrl-C</span>
+          <span class="shortcut-desc">Cancel generation</span>
+          <button class="shortcut-try">Try</button>
+        </div>
+        <div class="shortcut" onclick="tryShortcut(this, 'Ctrl-L')">
+          <span class="key">Ctrl-L</span>
+          <span class="shortcut-desc">Clear screen</span>
+          <button class="shortcut-try">Try</button>
+        </div>
+        <div class="shortcut" onclick="tryShortcut(this, 'Esc')">
+          <span class="key">Esc</span>
+          <span class="shortcut-desc">Cancel/close</span>
+          <button class="shortcut-try">Try</button>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="commands">
-      <h2>Instant Slash Commands (No LLM)</h2>
+    <section class="commands">
+      <h2>Instant Slash Commands</h2>
+      <p style="color: var(--dim); margin-bottom: 1rem; font-size: 0.9rem;">No LLM call. Execute immediately.</p>
       <div class="command-list">
-        <div class="command"><span class="command-name">/build</span><span class="command-desc">Build project</span></div>
-        <div class="command"><span class="command-name">/test</span><span class="command-desc">Run tests</span></div>
-        <div class="command"><span class="command-name">/check</span><span class="command-desc">Type check</span></div>
-        <div class="command"><span class="command-name">/diff</span><span class="command-desc">Git diff</span></div>
-        <div class="command"><span class="command-name">/commit</span><span class="command-desc">Git commit</span></div>
-        <div class="command"><span class="command-name">/status</span><span class="command-desc">Project status</span></div>
-        <div class="command"><span class="command-name">/ls</span><span class="command-desc">List files</span></div>
-        <div class="command"><span class="command-name">/grep</span><span class="command-desc">Search files</span></div>
-        <div class="command"><span class="command-name">/view</span><span class="command-desc">Read file</span></div>
-        <div class="command"><span class="command-name">/cost</span><span class="command-desc">Token usage</span></div>
-        <div class="command"><span class="command-name">/model</span><span class="command-desc">Current model</span></div>
-        <div class="command"><span class="command-name">/doctor</span><span class="command-desc">Health check</span></div>
+        <div class="command" onclick="copyCommand('/build')"><span class="command-name">/build</span><span class="command-desc">Build project</span></div>
+        <div class="command" onclick="copyCommand('/test')"><span class="command-name">/test</span><span class="command-desc">Run tests</span></div>
+        <div class="command" onclick="copyCommand('/check')"><span class="command-name">/check</span><span class="command-desc">Type check</span></div>
+        <div class="command" onclick="copyCommand('/diff')"><span class="command-name">/diff</span><span class="command-desc">Git diff</span></div>
+        <div class="command" onclick="copyCommand('/commit')"><span class="command-name">/commit</span><span class="command-desc">Git commit</span></div>
+        <div class="command" onclick="copyCommand('/status')"><span class="command-name">/status</span><span class="command-desc">Project status</span></div>
+        <div class="command" onclick="copyCommand('/ls')"><span class="command-name">/ls</span><span class="command-desc">List files</span></div>
+        <div class="command" onclick="copyCommand('/grep')"><span class="command-name">/grep</span><span class="command-desc">Search files</span></div>
+        <div class="command" onclick="copyCommand('/view')"><span class="command-name">/view</span><span class="command-desc">Read file</span></div>
+        <div class="command" onclick="copyCommand('/cost')"><span class="command-name">/cost</span><span class="command-desc">Token usage</span></div>
+        <div class="command" onclick="copyCommand('/model')"><span class="command-name">/model</span><span class="command-desc">Current model</span></div>
+        <div class="command" onclick="copyCommand('/doctor')"><span class="command-name">/doctor</span><span class="command-desc">Health check</span></div>
       </div>
-    </div>
+    </section>
 
-    <div class="workflow">
+    <section class="workflow">
       <h2>Typical Flow</h2>
       <div class="workflow-demo">
         <div class="workflow-line"><span class="workflow-prompt">$</span> hyle</div>
-        <div class="workflow-line"><span class="workflow-output">[Resumed session abc123]</span></div>
+        <div class="workflow-line"><span class="workflow-output">[Resumed session abc123 - webapp - auth feature]</span></div>
         <div class="workflow-line"><span class="workflow-comment"># pick up where you left off</span></div>
         <br>
         <div class="workflow-line"><span class="workflow-prompt">></span> /status</div>
-        <div class="workflow-line"><span class="workflow-output">3 modified, 1 staged</span></div>
+        <div class="workflow-line"><span class="workflow-output">3 modified, 1 staged, tests passing</span></div>
         <br>
-        <div class="workflow-line"><span class="workflow-prompt">></span> add logging to the auth module</div>
-        <div class="workflow-line"><span class="workflow-output">[reading src/auth.rs...]</span></div>
-        <div class="workflow-line"><span class="workflow-output">[writing src/auth.rs...]</span></div>
+        <div class="workflow-line"><span class="workflow-prompt">></span> add rate limiting to the auth endpoints</div>
+        <div class="workflow-line"><span class="workflow-output">[reading src/routes/auth.rs...]</span></div>
+        <div class="workflow-line"><span class="workflow-output">[writing src/middleware/rate_limit.rs...]</span></div>
+        <div class="workflow-line"><span class="workflow-output">[writing src/routes/auth.rs...]</span></div>
         <br>
         <div class="workflow-line"><span class="workflow-prompt">></span> /test</div>
-        <div class="workflow-line"><span class="workflow-output">364 passed</span></div>
+        <div class="workflow-line"><span class="workflow-output">running 89 tests... ok. 89 passed</span></div>
         <br>
-        <div class="workflow-line"><span class="workflow-prompt">></span> /commit "add auth logging"</div>
-        <div class="workflow-line"><span class="workflow-output">[main 8f2a1b3] add auth logging</span></div>
+        <div class="workflow-line"><span class="workflow-prompt">></span> /commit "add rate limiting to auth"</div>
+        <div class="workflow-line"><span class="workflow-output">[main 8f2a1b3] add rate limiting to auth</span></div>
+        <div class="workflow-line"><span class="workflow-output"> 2 files changed, 67 insertions(+), 3 deletions(-)</span></div>
       </div>
-    </div>
+    </section>
 
     <div class="features">
       <div class="feature">
-        <div class="feature-icon">⚡</div>
+        <div class="feature-icon">~</div>
         <h3>20Hz Refresh</h3>
         <p>TUI updates 20 times per second. No lag.</p>
       </div>
       <div class="feature">
-        <div class="feature-icon">💾</div>
+        <div class="feature-icon">&gt;</div>
         <h3>Auto-Resume</h3>
         <p>Sessions persist. Just type hyle to continue.</p>
       </div>
       <div class="feature">
-        <div class="feature-icon">📝</div>
+        <div class="feature-icon">#</div>
         <h3>Queue Prompts</h3>
         <p>Type while generating. Prompts queue up.</p>
       </div>
@@ -325,5 +747,202 @@
       <a class="switcher-item active" href="flow.html">Flow</a>
     </div>
   </div>
+
+  <script>
+    // Keyboard Trainer
+    const exercises = [
+      { keys: ['Ctrl', 'K'], task: 'Kill to end of line', hint: 'Deletes everything after cursor' },
+      { keys: ['Ctrl', 'A'], task: 'Move to line start', hint: 'Jump to beginning' },
+      { keys: ['Ctrl', 'E'], task: 'Move to line end', hint: 'Jump to end' },
+      { keys: ['Ctrl', 'U'], task: 'Kill to start of line', hint: 'Deletes everything before cursor' },
+      { keys: ['Ctrl', 'C'], task: 'Cancel current operation', hint: 'Stop generation or cancel' },
+      { keys: ['Ctrl', 'L'], task: 'Clear screen', hint: 'Fresh view' }
+    ];
+    let currentExercise = 0;
+    let completed = 0;
+
+    function updateTrainer() {
+      const ex = exercises[currentExercise];
+      document.getElementById('trainerTask').textContent = `Press ${ex.keys.join('+')} to ${ex.task.toLowerCase()}`;
+      document.getElementById('trainerHint').textContent = ex.hint;
+
+      const keyDisplay = document.getElementById('keyDisplay');
+      keyDisplay.innerHTML = ex.keys.map((k, i) => `<span class="trainer-key" id="key${i}">${k}</span>`).join('');
+
+      document.getElementById('trainerScore').textContent = `${completed} / ${exercises.length} completed`;
+
+      const dots = document.querySelectorAll('.progress-dot');
+      dots.forEach((dot, i) => {
+        dot.classList.remove('done', 'current');
+        if (i < completed) dot.classList.add('done');
+        if (i === currentExercise) dot.classList.add('current');
+      });
+    }
+
+    document.addEventListener('keydown', function(e) {
+      const ex = exercises[currentExercise];
+      const isCtrl = e.ctrlKey || e.metaKey;
+      const key = e.key.toUpperCase();
+
+      // Check for Ctrl+key combos
+      if (isCtrl && ex.keys[0] === 'Ctrl' && ex.keys[1] === key) {
+        e.preventDefault();
+
+        // Animate success
+        document.querySelectorAll('.trainer-key').forEach(k => k.classList.add('success'));
+
+        setTimeout(() => {
+          completed++;
+          currentExercise = (currentExercise + 1) % exercises.length;
+          if (completed >= exercises.length) {
+            document.getElementById('trainerTask').textContent = 'All exercises complete!';
+            document.getElementById('trainerHint').textContent = 'You\'ve mastered the shortcuts';
+          } else {
+            updateTrainer();
+          }
+        }, 500);
+      }
+    });
+
+    // Terminal Demo
+    const terminalSteps = [
+      { type: 'prompt', text: '$ hyle' },
+      { type: 'output', text: '[Resumed session 7f3a2b1 - webapp]', delay: 500 },
+      { type: 'output', text: '[47 messages, last: auth middleware]', delay: 200 },
+      { type: 'prompt', text: '> /status', delay: 800 },
+      { type: 'output', text: 'Branch: feature/auth', delay: 300 },
+      { type: 'output', text: 'Modified: 3 files, Staged: 1', delay: 100 },
+      { type: 'output', text: 'Tests: 89 passing', delay: 100 },
+      { type: 'prompt', text: '> add session timeout to auth', delay: 1000 },
+      { type: 'output', text: '[reading src/middleware/auth.rs...]', delay: 600 },
+      { type: 'output', text: '[reading src/config.rs...]', delay: 400 },
+      { type: 'output', text: '[writing src/middleware/auth.rs...]', delay: 800 },
+      { type: 'highlight', text: 'Added session_timeout config (default: 24h)', delay: 300 },
+      { type: 'highlight', text: 'Updated validate_session() to check expiry', delay: 200 },
+      { type: 'prompt', text: '> /test auth', delay: 700 },
+      { type: 'output', text: 'running 12 tests...', delay: 400 },
+      { type: 'success', text: 'test result: ok. 12 passed; 0 failed', delay: 800 },
+      { type: 'prompt', text: '>', delay: 500, cursor: true }
+    ];
+
+    let terminalIndex = 0;
+    let terminalTimeout = null;
+
+    function renderTerminal() {
+      const body = document.getElementById('terminalBody');
+      let html = '';
+      for (let i = 0; i <= terminalIndex && i < terminalSteps.length; i++) {
+        const step = terminalSteps[i];
+        if (step.type === 'prompt') {
+          html += `<div class="term-line"><span class="term-prompt">${step.text.startsWith('$') ? '$' : '>'}</span> <span class="term-cmd">${step.text.substring(2)}</span>${step.cursor ? '<span class="term-cursor"></span>' : ''}</div>`;
+        } else if (step.type === 'output') {
+          html += `<div class="term-line"><span class="term-output">${step.text}</span></div>`;
+        } else if (step.type === 'highlight') {
+          html += `<div class="term-line"><span class="term-highlight">${step.text}</span></div>`;
+        } else if (step.type === 'success') {
+          html += `<div class="term-line"><span class="term-success">${step.text}</span></div>`;
+        }
+      }
+      body.innerHTML = html;
+    }
+
+    function playTerminal() {
+      if (terminalTimeout) clearTimeout(terminalTimeout);
+      terminalIndex = 0;
+      renderTerminal();
+
+      function nextStep() {
+        if (terminalIndex < terminalSteps.length - 1) {
+          terminalIndex++;
+          renderTerminal();
+          const delay = terminalSteps[terminalIndex].delay || 500;
+          terminalTimeout = setTimeout(nextStep, delay);
+        }
+      }
+
+      terminalTimeout = setTimeout(nextStep, 500);
+    }
+
+    function resetTerminal() {
+      if (terminalTimeout) clearTimeout(terminalTimeout);
+      terminalIndex = 0;
+      renderTerminal();
+    }
+
+    // Prompt Queue
+    let queueCount = 3;
+    function addToQueue() {
+      const input = document.getElementById('queueInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      queueCount++;
+      const list = document.getElementById('queueList');
+      const li = document.createElement('li');
+      li.className = 'queue-item';
+      li.innerHTML = `<span class="queue-num">${queueCount}</span><span class="queue-text">${text}</span>`;
+      list.appendChild(li);
+      input.value = '';
+    }
+
+    // Simulate queue processing
+    setInterval(() => {
+      const items = document.querySelectorAll('.queue-item');
+      if (items.length > 1) {
+        items[0].remove();
+        const remaining = document.querySelectorAll('.queue-item');
+        remaining.forEach((item, i) => {
+          item.querySelector('.queue-num').textContent = i + 1;
+          if (i === 0) {
+            item.classList.add('active');
+            if (!item.querySelector('.queue-spinner')) {
+              const spinner = document.createElement('div');
+              spinner.className = 'queue-spinner';
+              item.appendChild(spinner);
+            }
+          }
+        });
+      }
+    }, 5000);
+
+    // Session selection
+    function selectSession(el) {
+      document.querySelectorAll('.session-item').forEach(s => s.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function resumeSession(e) {
+      e.stopPropagation();
+      const item = e.target.closest('.session-item');
+      const project = item.querySelector('.session-project').textContent;
+      alert(`Resuming session: ${project}\n\nIn a real terminal, run: hyle --session ${project}`);
+    }
+
+    function sortSessions(by) {
+      // Just visual feedback for demo
+      document.querySelectorAll('.session-controls button').forEach(b => b.style.borderColor = 'var(--dim)');
+      event.target.style.borderColor = 'var(--accent)';
+    }
+
+    // Shortcut try
+    function tryShortcut(el, shortcut) {
+      el.classList.add('trying');
+      setTimeout(() => el.classList.remove('trying'), 1500);
+    }
+
+    // Copy command
+    function copyCommand(cmd) {
+      navigator.clipboard.writeText(cmd).then(() => {
+        const el = event.target.closest('.command');
+        const orig = el.querySelector('.command-desc').textContent;
+        el.querySelector('.command-desc').textContent = 'Copied!';
+        setTimeout(() => el.querySelector('.command-desc').textContent = orig, 1500);
+      });
+    }
+
+    // Initialize
+    updateTrainer();
+    renderTerminal();
+  </script>
 </body>
 </html>

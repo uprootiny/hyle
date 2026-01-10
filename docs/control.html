@@ -12,6 +12,8 @@
       --border: #ddd;
       --muted: #555;
       --code-bg: #fff;
+      --green: #22c55e;
+      --yellow: #eab308;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -20,7 +22,7 @@
       color: var(--fg);
       line-height: 1.6;
     }
-    .container { max-width: 800px; margin: 0 auto; padding: 4rem 2rem; }
+    .container { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
 
     h1 {
       font-size: 2.5rem;
@@ -41,34 +43,299 @@
       border-top: 1px solid var(--border);
     }
 
-    .principle {
+    /* Live Audit Log */
+    .audit-log {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
       margin: 2rem 0;
     }
-    .principle h3 {
-      font-size: 1.1rem;
+    .audit-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .audit-header h3 { font-size: 0.9rem; }
+    .audit-controls { display: flex; gap: 0.5rem; }
+    .audit-controls button {
+      padding: 0.25rem 0.75rem;
+      font-size: 0.75rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .audit-controls button:hover { border-color: var(--fg); }
+    .audit-controls button.active { background: var(--fg); color: var(--bg); }
+    .audit-body {
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+    }
+    .audit-entry {
+      display: grid;
+      grid-template-columns: 90px 70px 1fr auto;
+      gap: 1rem;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .audit-entry:hover { background: var(--bg); }
+    .audit-entry.expanded { background: #fffbeb; }
+    .audit-time { color: var(--muted); }
+    .audit-type { font-weight: 500; }
+    .audit-type.read { color: #3b82f6; }
+    .audit-type.write { color: #f97316; }
+    .audit-type.bash { color: #8b5cf6; }
+    .audit-type.blocked { color: var(--accent); }
+    .audit-target { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .audit-status { font-size: 0.7rem; }
+    .audit-status.ok { color: var(--green); }
+    .audit-status.blocked { color: var(--accent); }
+    .audit-detail {
+      display: none;
+      grid-column: 1 / -1;
+      padding: 1rem;
+      background: #fffbeb;
+      border-top: 1px dashed var(--border);
+      margin-top: 0.5rem;
+    }
+    .audit-entry.expanded .audit-detail { display: block; }
+    .audit-detail pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 0.75rem;
+      overflow-x: auto;
+      font-size: 0.75rem;
+    }
+    .audit-detail h4 {
+      font-size: 0.75rem;
+      color: var(--muted);
       margin-bottom: 0.5rem;
+    }
+
+    /* Command Inspection */
+    .command-inspect {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+    .inspect-header {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    .inspect-body { padding: 1rem; }
+    .inspect-input {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .inspect-input input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.85rem;
+      border: 1px solid var(--border);
+    }
+    .inspect-input button {
+      padding: 0.5rem 1rem;
+      background: var(--fg);
+      color: var(--bg);
+      border: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .inspect-result {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 1rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      min-height: 100px;
+    }
+    .inspect-line { margin: 0.25rem 0; }
+    .inspect-label { color: var(--muted); display: inline-block; width: 120px; }
+    .inspect-value { }
+    .inspect-value.safe { color: var(--green); }
+    .inspect-value.blocked { color: var(--accent); }
+    .inspect-value.warn { color: var(--yellow); }
+
+    /* File Diff Viewer */
+    .diff-viewer {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+    .diff-header {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .diff-file { font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
+    .diff-stats { font-size: 0.8rem; color: var(--muted); }
+    .diff-stats .add { color: var(--green); }
+    .diff-stats .del { color: var(--accent); }
+    .diff-body {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+    }
+    .diff-line {
+      display: grid;
+      grid-template-columns: 40px 40px 1fr;
+      padding: 0 1rem;
+    }
+    .diff-line.add { background: #dcfce7; }
+    .diff-line.del { background: #fee2e2; }
+    .diff-line.ctx { background: var(--code-bg); }
+    .diff-ln { color: var(--muted); text-align: right; padding-right: 0.5rem; user-select: none; }
+    .diff-content { white-space: pre; overflow-x: auto; }
+    .diff-content::before { margin-right: 0.5rem; }
+    .diff-line.add .diff-content::before { content: '+'; color: var(--green); }
+    .diff-line.del .diff-content::before { content: '-'; color: var(--accent); }
+    .diff-line.ctx .diff-content::before { content: ' '; }
+
+    /* Security Filters */
+    .security-filters {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+    .filters-header {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    .filters-body { padding: 1rem; }
+    .filter-list { list-style: none; }
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .filter-pattern {
+      font-family: 'IBM Plex Mono', monospace;
+      background: var(--bg);
+      padding: 0.25rem 0.5rem;
+      min-width: 180px;
+    }
+    .filter-reason { color: var(--muted); flex: 1; }
+    .filter-test {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      cursor: pointer;
+    }
+    .filter-test:hover { border-color: var(--fg); }
+
+    /* Source Explorer */
+    .source-explorer {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+    .explorer-header {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    .explorer-body {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+    }
+    .explorer-tree {
+      border-right: 1px solid var(--border);
+      padding: 0.5rem 0;
+    }
+    .tree-item {
+      padding: 0.4rem 1rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      cursor: pointer;
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
-    .principle h3::before {
-      content: '';
-      width: 8px;
-      height: 8px;
-      background: var(--accent);
-    }
-    .principle p {
-      color: var(--muted);
-      margin-bottom: 1rem;
-    }
-    .principle pre {
-      background: var(--code-bg);
-      border: 1px solid var(--border);
+    .tree-item:hover { background: var(--bg); }
+    .tree-item.active { background: #fffbeb; border-left: 2px solid var(--accent); }
+    .tree-icon { width: 14px; text-align: center; color: var(--muted); }
+    .explorer-code {
       padding: 1rem;
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       overflow-x: auto;
+      max-height: 400px;
+      overflow-y: auto;
     }
+    .code-line {
+      display: grid;
+      grid-template-columns: 30px 1fr;
+      gap: 1rem;
+    }
+    .code-ln { color: var(--muted); text-align: right; user-select: none; }
+    .code-content { white-space: pre; }
+    .code-content .kw { color: #d62828; }
+    .code-content .fn { color: #3b82f6; }
+    .code-content .str { color: #22c55e; }
+    .code-content .cmt { color: #9ca3af; font-style: italic; }
+
+    /* Trust Checklist */
+    .trust-checklist {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+    .checklist-header {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    .checklist-body { padding: 1rem; }
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .check-box {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .check-box.checked { background: var(--green); border-color: var(--green); color: white; }
+    .check-content h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
+    .check-content p { font-size: 0.8rem; color: var(--muted); }
+    .check-verify {
+      margin-left: auto;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      cursor: pointer;
+    }
+    .check-verify:hover { border-color: var(--fg); }
 
     .comparison {
       display: grid;
@@ -78,6 +345,8 @@
     }
     @media (max-width: 600px) {
       .comparison { grid-template-columns: 1fr; }
+      .explorer-body { grid-template-columns: 1fr; }
+      .explorer-tree { border-right: none; border-bottom: 1px solid var(--border); }
     }
     .comparison-col h4 {
       font-size: 0.9rem;
@@ -96,13 +365,13 @@
       border-bottom: 1px solid var(--border);
     }
     .comparison-col li::before {
-      content: '×';
+      content: 'x';
       margin-right: 0.5rem;
       color: var(--accent);
     }
     .comparison-col.good li::before {
-      content: '✓';
-      color: #22c55e;
+      content: '+';
+      color: var(--green);
     }
 
     .cta {
@@ -158,55 +427,319 @@
 <body>
   <div class="container">
     <h1>You should know what your tools do.</h1>
-    <p class="subtitle">hyle is an AI code assistant that shows every action, runs locally, and never hides what's happening.</p>
+    <p class="subtitle">hyle is an AI code assistant that shows every action, runs locally, and never hides what's happening. Verify everything yourself.</p>
 
-    <h2>Transparency Principles</h2>
+    <h2>Live Audit Log</h2>
+    <p style="color: var(--muted); margin-bottom: 1rem; font-size: 0.9rem;">Every operation is logged. Click any entry to inspect details.</p>
 
-    <div class="principle">
-      <h3>Every action is visible</h3>
-      <p>Tool calls are shown in real-time. No hidden operations.</p>
-      <pre>[Executing 3 tool(s)...]
-
-## read result:
-  1| fn main() {
-  2|     println!("hello");
-  3| }
-
-## write result:
-  Wrote 45 bytes to src/main.rs
-  Backup: src/main.rs.1704825600.bak
-
-## bash result:
-  cargo test
-  test result: ok. 3 passed</pre>
+    <div class="audit-log">
+      <div class="audit-header">
+        <h3>Session Audit Trail</h3>
+        <div class="audit-controls">
+          <button class="active" onclick="filterAudit('all')">All</button>
+          <button onclick="filterAudit('read')">Read</button>
+          <button onclick="filterAudit('write')">Write</button>
+          <button onclick="filterAudit('bash')">Bash</button>
+          <button onclick="filterAudit('blocked')">Blocked</button>
+        </div>
+      </div>
+      <div class="audit-body" id="auditBody">
+        <div class="audit-entry" data-type="read" onclick="toggleAuditDetail(this)">
+          <span class="audit-time">14:23:01.234</span>
+          <span class="audit-type read">READ</span>
+          <span class="audit-target">src/handlers/auth.rs</span>
+          <span class="audit-status ok">OK</span>
+          <div class="audit-detail">
+            <h4>Operation Details</h4>
+            <pre>Tool: read_file
+Path: /home/dev/myproject/src/handlers/auth.rs
+Bytes read: 2,847
+Duration: 0.3ms
+Permissions: 644
+Owner: dev:dev</pre>
+          </div>
+        </div>
+        <div class="audit-entry" data-type="write" onclick="toggleAuditDetail(this)">
+          <span class="audit-time">14:23:02.567</span>
+          <span class="audit-type write">WRITE</span>
+          <span class="audit-target">src/handlers/auth.rs</span>
+          <span class="audit-status ok">OK</span>
+          <div class="audit-detail">
+            <h4>Operation Details</h4>
+            <pre>Tool: write_file
+Path: /home/dev/myproject/src/handlers/auth.rs
+Bytes written: 2,912
+Lines changed: +3, -1
+Backup: .hyle/backups/auth.rs.1704825782.bak
+Diff preview:
+  + use tracing::{info, warn};
+  + info!("auth attempt: {}", username);
+  - // TODO: add logging</pre>
+          </div>
+        </div>
+        <div class="audit-entry" data-type="bash" onclick="toggleAuditDetail(this)">
+          <span class="audit-time">14:23:03.891</span>
+          <span class="audit-type bash">BASH</span>
+          <span class="audit-target">cargo test --lib</span>
+          <span class="audit-status ok">OK</span>
+          <div class="audit-detail">
+            <h4>Operation Details</h4>
+            <pre>Tool: run_command
+Command: cargo test --lib
+Working directory: /home/dev/myproject
+Exit code: 0
+Duration: 4.2s
+Stdout: running 47 tests...
+        test result: ok. 47 passed; 0 failed</pre>
+          </div>
+        </div>
+        <div class="audit-entry" data-type="blocked" onclick="toggleAuditDetail(this)">
+          <span class="audit-time">14:23:05.123</span>
+          <span class="audit-type blocked">BLOCKED</span>
+          <span class="audit-target">rm -rf /</span>
+          <span class="audit-status blocked">DENIED</span>
+          <div class="audit-detail">
+            <h4>Security Block Details</h4>
+            <pre>Tool: run_command (BLOCKED)
+Command: rm -rf /
+Matched filter: "rm -rf /"
+Filter category: destructive_filesystem
+Action: Command rejected, user notified
+Logged to: ~/.local/state/hyle/security.log</pre>
+          </div>
+        </div>
+        <div class="audit-entry" data-type="read" onclick="toggleAuditDetail(this)">
+          <span class="audit-time">14:23:06.789</span>
+          <span class="audit-type read">READ</span>
+          <span class="audit-target">Cargo.toml</span>
+          <span class="audit-status ok">OK</span>
+          <div class="audit-detail">
+            <h4>Operation Details</h4>
+            <pre>Tool: read_file
+Path: /home/dev/myproject/Cargo.toml
+Bytes read: 1,234
+Duration: 0.2ms</pre>
+          </div>
+        </div>
+        <div class="audit-entry" data-type="bash" onclick="toggleAuditDetail(this)">
+          <span class="audit-time">14:23:08.012</span>
+          <span class="audit-type bash">BASH</span>
+          <span class="audit-target">cargo clippy -- -D warnings</span>
+          <span class="audit-status ok">OK</span>
+          <div class="audit-detail">
+            <h4>Operation Details</h4>
+            <pre>Tool: run_command
+Command: cargo clippy -- -D warnings
+Exit code: 0
+Duration: 8.7s
+Warnings: 0</pre>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="principle">
-      <h3>Code is open source</h3>
-      <p>Every line is readable. No obfuscation. MIT license.</p>
-      <pre>// src/tools.rs - what actually runs
-pub fn execute_bash(command: &str) -> Result<String> {
-    // Blocked patterns checked first
-    if BLOCKED_PATTERNS.iter().any(|p| command.contains(p)) {
-        return Err(anyhow!("Command blocked by safety filter"));
-    }
-    // Then executes via std::process::Command
-    ...
-}</pre>
+    <h2>Command Inspector</h2>
+    <p style="color: var(--muted); margin-bottom: 1rem; font-size: 0.9rem;">Test any command against hyle's security filters before execution.</p>
+
+    <div class="command-inspect">
+      <div class="inspect-header">Test Command Safety</div>
+      <div class="inspect-body">
+        <div class="inspect-input">
+          <input type="text" id="cmdInput" placeholder="Enter a command to inspect..." value="curl https://api.example.com/data | jq .">
+          <button onclick="inspectCommand()">Inspect</button>
+        </div>
+        <div class="inspect-result" id="cmdResult">
+          <div class="inspect-line">
+            <span class="inspect-label">Command:</span>
+            <span class="inspect-value">curl https://api.example.com/data | jq .</span>
+          </div>
+          <div class="inspect-line">
+            <span class="inspect-label">Status:</span>
+            <span class="inspect-value safe">ALLOWED</span>
+          </div>
+          <div class="inspect-line">
+            <span class="inspect-label">Network access:</span>
+            <span class="inspect-value warn">Yes - external URL</span>
+          </div>
+          <div class="inspect-line">
+            <span class="inspect-label">Pipe chain:</span>
+            <span class="inspect-value">curl -> jq (2 commands)</span>
+          </div>
+          <div class="inspect-line">
+            <span class="inspect-label">Risk level:</span>
+            <span class="inspect-value warn">MEDIUM - network request</span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="principle">
-      <h3>No telemetry, no tracking</h3>
-      <p>Your prompts go to OpenRouter. That's it. Nothing stored elsewhere.</p>
-      <pre>Files written:
-  ~/.config/hyle/config.json    # Your API key (0600)
-  ~/.cache/hyle/models.json     # Model list cache
-  ~/.local/state/hyle/sessions/ # Your conversations
+    <h2>File Change Diff</h2>
+    <p style="color: var(--muted); margin-bottom: 1rem; font-size: 0.9rem;">Every file modification shows exactly what changed. Nothing hidden.</p>
 
-Files NOT written:
-  - No analytics endpoints
-  - No crash reports
-  - No usage tracking</pre>
+    <div class="diff-viewer">
+      <div class="diff-header">
+        <span class="diff-file">src/handlers/auth.rs</span>
+        <span class="diff-stats"><span class="add">+12</span> / <span class="del">-3</span></span>
+      </div>
+      <div class="diff-body">
+        <div class="diff-line ctx"><span class="diff-ln">42</span><span class="diff-ln">42</span><span class="diff-content">use axum::{extract::State, Json};</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">43</span><span class="diff-ln">43</span><span class="diff-content">use sqlx::PgPool;</span></div>
+        <div class="diff-line add"><span class="diff-ln"></span><span class="diff-ln">44</span><span class="diff-content">use tracing::{info, warn, instrument};</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">44</span><span class="diff-ln">45</span><span class="diff-content"></span></div>
+        <div class="diff-line del"><span class="diff-ln">45</span><span class="diff-ln"></span><span class="diff-content">// TODO: add logging</span></div>
+        <div class="diff-line add"><span class="diff-ln"></span><span class="diff-ln">46</span><span class="diff-content">#[instrument(skip(pool, password))]</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">46</span><span class="diff-ln">47</span><span class="diff-content">pub async fn login(</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">47</span><span class="diff-ln">48</span><span class="diff-content">    State(pool): State&lt;PgPool&gt;,</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">48</span><span class="diff-ln">49</span><span class="diff-content">    Json(creds): Json&lt;LoginRequest&gt;,</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">49</span><span class="diff-ln">50</span><span class="diff-content">) -&gt; Result&lt;Json&lt;AuthResponse&gt;, AppError&gt; {</span></div>
+        <div class="diff-line add"><span class="diff-ln"></span><span class="diff-ln">51</span><span class="diff-content">    info!(username = %creds.username, "login attempt");</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">50</span><span class="diff-ln">52</span><span class="diff-content">    let user = sqlx::query_as!(User,</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">51</span><span class="diff-ln">53</span><span class="diff-content">        "SELECT * FROM users WHERE username = $1",</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">52</span><span class="diff-ln">54</span><span class="diff-content">        &amp;creds.username</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">53</span><span class="diff-ln">55</span><span class="diff-content">    ).fetch_optional(&amp;pool).await?;</span></div>
+        <div class="diff-line del"><span class="diff-ln">54</span><span class="diff-ln"></span><span class="diff-content">    // TODO: log failed attempts</span></div>
+        <div class="diff-line add"><span class="diff-ln"></span><span class="diff-ln">56</span><span class="diff-content">    </span></div>
+        <div class="diff-line ctx"><span class="diff-ln">55</span><span class="diff-ln">57</span><span class="diff-content">    let user = match user {</span></div>
+        <div class="diff-line del"><span class="diff-ln">56</span><span class="diff-ln"></span><span class="diff-content">        None =&gt; return Err(AppError::Unauthorized),</span></div>
+        <div class="diff-line add"><span class="diff-ln"></span><span class="diff-ln">58</span><span class="diff-content">        None =&gt; {</span></div>
+        <div class="diff-line add"><span class="diff-ln"></span><span class="diff-ln">59</span><span class="diff-content">            warn!(username = %creds.username, "user not found");</span></div>
+        <div class="diff-line add"><span class="diff-ln"></span><span class="diff-ln">60</span><span class="diff-content">            return Err(AppError::Unauthorized);</span></div>
+        <div class="diff-line add"><span class="diff-ln"></span><span class="diff-ln">61</span><span class="diff-content">        }</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">57</span><span class="diff-ln">62</span><span class="diff-content">        Some(u) =&gt; u,</span></div>
+        <div class="diff-line ctx"><span class="diff-ln">58</span><span class="diff-ln">63</span><span class="diff-content">    };</span></div>
+      </div>
+    </div>
+
+    <h2>Security Filters</h2>
+    <p style="color: var(--muted); margin-bottom: 1rem; font-size: 0.9rem;">Commands are checked against these patterns. All filters are visible in source.</p>
+
+    <div class="security-filters">
+      <div class="filters-header">Active Command Filters (src/safety.rs:23-67)</div>
+      <div class="filters-body">
+        <ul class="filter-list">
+          <li class="filter-item">
+            <span class="filter-pattern">rm -rf /</span>
+            <span class="filter-reason">Destructive filesystem operation</span>
+            <button class="filter-test" onclick="testFilter('rm -rf /')">Test</button>
+          </li>
+          <li class="filter-item">
+            <span class="filter-pattern">:(){ :|:& };:</span>
+            <span class="filter-reason">Fork bomb pattern</span>
+            <button class="filter-test" onclick="testFilter(':(){ :|:& };:')">Test</button>
+          </li>
+          <li class="filter-item">
+            <span class="filter-pattern">mkfs.*</span>
+            <span class="filter-reason">Filesystem format command</span>
+            <button class="filter-test" onclick="testFilter('mkfs.ext4 /dev/sda1')">Test</button>
+          </li>
+          <li class="filter-item">
+            <span class="filter-pattern">dd if=.* of=/dev/</span>
+            <span class="filter-reason">Direct device write</span>
+            <button class="filter-test" onclick="testFilter('dd if=/dev/zero of=/dev/sda')">Test</button>
+          </li>
+          <li class="filter-item">
+            <span class="filter-pattern">chmod -R 777 /</span>
+            <span class="filter-reason">Insecure permission change</span>
+            <button class="filter-test" onclick="testFilter('chmod -R 777 /')">Test</button>
+          </li>
+          <li class="filter-item">
+            <span class="filter-pattern">curl .* | bash</span>
+            <span class="filter-reason">Remote code execution</span>
+            <button class="filter-test" onclick="testFilter('curl example.com/script.sh | bash')">Test</button>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>Source Code Explorer</h2>
+    <p style="color: var(--muted); margin-bottom: 1rem; font-size: 0.9rem;">Browse the actual implementation. Every security decision is documented.</p>
+
+    <div class="source-explorer">
+      <div class="explorer-header">hyle/src/</div>
+      <div class="explorer-body">
+        <div class="explorer-tree">
+          <div class="tree-item active" onclick="showSource('safety')">
+            <span class="tree-icon">rs</span>
+            <span>safety.rs</span>
+          </div>
+          <div class="tree-item" onclick="showSource('tools')">
+            <span class="tree-icon">rs</span>
+            <span>tools.rs</span>
+          </div>
+          <div class="tree-item" onclick="showSource('audit')">
+            <span class="tree-icon">rs</span>
+            <span>audit.rs</span>
+          </div>
+          <div class="tree-item" onclick="showSource('config')">
+            <span class="tree-icon">rs</span>
+            <span>config.rs</span>
+          </div>
+          <div class="tree-item" onclick="showSource('session')">
+            <span class="tree-icon">rs</span>
+            <span>session.rs</span>
+          </div>
+        </div>
+        <div class="explorer-code" id="sourceCode">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <h2>Trust Verification Checklist</h2>
+    <p style="color: var(--muted); margin-bottom: 1rem; font-size: 0.9rem;">Don't take our word for it. Verify each claim yourself.</p>
+
+    <div class="trust-checklist">
+      <div class="checklist-header">Verification Steps</div>
+      <div class="checklist-body">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-content">
+            <h4>Read the source code</h4>
+            <p>All code is MIT licensed at github.com/uprootiny/hyle</p>
+          </div>
+          <button class="check-verify" onclick="window.open('https://github.com/uprootiny/hyle')">Open GitHub</button>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-content">
+            <h4>Check network traffic</h4>
+            <p>Run with tcpdump or wireshark. Only traffic is to OpenRouter API.</p>
+          </div>
+          <button class="check-verify" onclick="copyToClipboard('sudo tcpdump -i any host api.openrouter.ai')">Copy tcpdump cmd</button>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-content">
+            <h4>Inspect file writes</h4>
+            <p>Use inotifywait to monitor. Only writes to ~/.config/hyle and ~/.local/state/hyle</p>
+          </div>
+          <button class="check-verify" onclick="copyToClipboard('inotifywait -m -r ~/.config/hyle ~/.local/state/hyle')">Copy monitor cmd</button>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-content">
+            <h4>Build from source</h4>
+            <p>Clone, audit, and compile yourself. cargo build --release</p>
+          </div>
+          <button class="check-verify" onclick="copyToClipboard('git clone https://github.com/uprootiny/hyle && cd hyle && cargo build --release')">Copy build cmd</button>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-content">
+            <h4>Run the test suite</h4>
+            <p>364 tests covering safety filters, file operations, and session handling.</p>
+          </div>
+          <button class="check-verify" onclick="copyToClipboard('cargo test')">Copy test cmd</button>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-content">
+            <h4>Check for telemetry endpoints</h4>
+            <p>grep -r "analytics\|telemetry\|tracking" src/ returns nothing.</p>
+          </div>
+          <button class="check-verify" onclick="copyToClipboard('grep -rn \"analytics\\|telemetry\\|tracking\\|sentry\\|mixpanel\" src/')">Copy grep cmd</button>
+        </div>
+      </div>
     </div>
 
     <h2>Comparison</h2>
@@ -239,7 +772,7 @@ Files NOT written:
     </div>
 
     <footer>
-      MIT License &middot; <a href="https://github.com/uprootiny/hyle">GitHub</a> &middot; 364 tests
+      MIT License &middot; <a href="https://github.com/uprootiny/hyle">GitHub</a> &middot; 364 tests &middot; Zero telemetry
     </footer>
   </div>
 
@@ -261,5 +794,342 @@ Files NOT written:
       <a class="switcher-item" href="flow.html">Flow</a>
     </div>
   </div>
+
+  <script>
+    // Source code samples
+    const sourceCodes = {
+      safety: `<span class="cmt">// src/safety.rs - Command safety filters</span>
+<span class="kw">use</span> regex::Regex;
+<span class="kw">use</span> lazy_static::lazy_static;
+
+lazy_static! {
+    <span class="kw">static ref</span> BLOCKED_PATTERNS: Vec<Regex> = vec![
+        <span class="cmt">// Destructive filesystem operations</span>
+        Regex::new(<span class="str">r"rm\\s+-rf\\s+/"</span>).unwrap(),
+        Regex::new(<span class="str">r"rm\\s+-rf\\s+~"</span>).unwrap(),
+
+        <span class="cmt">// Fork bombs and system exploits</span>
+        Regex::new(<span class="str">r":\\(\\)\\{\\s*:\\|:&\\s*\\};:"</span>).unwrap(),
+
+        <span class="cmt">// Dangerous device operations</span>
+        Regex::new(<span class="str">r"mkfs\\.\\w+"</span>).unwrap(),
+        Regex::new(<span class="str">r"dd\\s+if=.*of=/dev/"</span>).unwrap(),
+
+        <span class="cmt">// Remote code execution</span>
+        Regex::new(<span class="str">r"curl.*\\|\\s*(bash|sh)"</span>).unwrap(),
+        Regex::new(<span class="str">r"wget.*\\|\\s*(bash|sh)"</span>).unwrap(),
+    ];
+}
+
+<span class="kw">pub fn</span> <span class="fn">is_command_safe</span>(cmd: &str) -> SafetyResult {
+    <span class="kw">for</span> pattern <span class="kw">in</span> BLOCKED_PATTERNS.iter() {
+        <span class="kw">if</span> pattern.is_match(cmd) {
+            <span class="kw">return</span> SafetyResult::Blocked {
+                pattern: pattern.as_str().to_string(),
+                reason: <span class="fn">get_block_reason</span>(pattern),
+            };
+        }
+    }
+    SafetyResult::Safe
+}`,
+      tools: `<span class="cmt">// src/tools.rs - Tool execution with safety checks</span>
+<span class="kw">use</span> crate::safety::{is_command_safe, SafetyResult};
+<span class="kw">use</span> crate::audit::AuditLog;
+<span class="kw">use</span> std::process::Command;
+
+<span class="kw">pub async fn</span> <span class="fn">execute_bash</span>(
+    cmd: &str,
+    audit: &AuditLog,
+) -> Result<ToolOutput> {
+    <span class="cmt">// Always check safety first</span>
+    <span class="kw">match</span> <span class="fn">is_command_safe</span>(cmd) {
+        SafetyResult::Blocked { pattern, reason } => {
+            audit.<span class="fn">log_blocked</span>(cmd, &pattern, &reason).<span class="kw">await</span>?;
+            <span class="kw">return</span> Err(anyhow!(
+                <span class="str">"Command blocked: {} ({})"</span>,
+                reason, pattern
+            ));
+        }
+        SafetyResult::Safe => {}
+    }
+
+    <span class="cmt">// Log before execution</span>
+    <span class="kw">let</span> entry = audit.<span class="fn">log_start</span>(<span class="str">"bash"</span>, cmd).<span class="kw">await</span>?;
+
+    <span class="cmt">// Execute command</span>
+    <span class="kw">let</span> output = Command::new(<span class="str">"sh"</span>)
+        .arg(<span class="str">"-c"</span>)
+        .arg(cmd)
+        .output()?;
+
+    <span class="cmt">// Log completion</span>
+    audit.<span class="fn">log_complete</span>(entry, &output).<span class="kw">await</span>?;
+
+    Ok(ToolOutput::from(output))
+}`,
+      audit: `<span class="cmt">// src/audit.rs - Session audit logging</span>
+<span class="kw">use</span> chrono::{DateTime, Utc};
+<span class="kw">use</span> serde::{Deserialize, Serialize};
+<span class="kw">use</span> std::path::PathBuf;
+
+#[derive(Serialize, Deserialize)]
+<span class="kw">pub struct</span> AuditEntry {
+    <span class="kw">pub</span> timestamp: DateTime<Utc>,
+    <span class="kw">pub</span> tool: String,
+    <span class="kw">pub</span> target: String,
+    <span class="kw">pub</span> status: AuditStatus,
+    <span class="kw">pub</span> duration_ms: u64,
+    <span class="kw">pub</span> details: serde_json::Value,
+}
+
+<span class="kw">impl</span> AuditLog {
+    <span class="kw">pub fn</span> <span class="fn">new</span>(session_dir: PathBuf) -> Self {
+        <span class="kw">let</span> path = session_dir.join(<span class="str">"audit.jsonl"</span>);
+        Self { path, entries: vec![] }
+    }
+
+    <span class="kw">pub async fn</span> <span class="fn">log_start</span>(&self, tool: &str, target: &str) -> Result<AuditEntry> {
+        <span class="kw">let</span> entry = AuditEntry {
+            timestamp: Utc::now(),
+            tool: tool.to_string(),
+            target: target.to_string(),
+            status: AuditStatus::InProgress,
+            duration_ms: 0,
+            details: json!({}),
+        };
+        self.<span class="fn">append</span>(&entry).<span class="kw">await</span>?;
+        Ok(entry)
+    }
+
+    <span class="cmt">// All entries written to disk immediately</span>
+    <span class="kw">async fn</span> <span class="fn">append</span>(&self, entry: &AuditEntry) -> Result<()> {
+        <span class="kw">let</span> line = serde_json::to_string(entry)?;
+        tokio::fs::OpenOptions::new()
+            .create(<span class="kw">true</span>)
+            .append(<span class="kw">true</span>)
+            .open(&self.path).<span class="kw">await</span>?
+            .write_all(format!(<span class="str">"{}\\n"</span>, line).as_bytes()).<span class="kw">await</span>?;
+        Ok(())
+    }
+}`,
+      config: `<span class="cmt">// src/config.rs - Configuration with secure defaults</span>
+<span class="kw">use</span> serde::{Deserialize, Serialize};
+<span class="kw">use</span> std::path::PathBuf;
+
+#[derive(Serialize, Deserialize)]
+<span class="kw">pub struct</span> Config {
+    <span class="cmt">// API key stored with 0600 permissions</span>
+    <span class="kw">pub</span> api_key: Option<String>,
+
+    <span class="cmt">// Default model selection</span>
+    <span class="kw">pub</span> model: String,
+
+    <span class="cmt">// Safety settings - all enabled by default</span>
+    <span class="kw">pub</span> safety: SafetyConfig,
+}
+
+#[derive(Serialize, Deserialize)]
+<span class="kw">pub struct</span> SafetyConfig {
+    <span class="cmt">// Cannot be disabled</span>
+    <span class="kw">pub</span> block_destructive: <span class="kw">bool</span>, <span class="cmt">// always true</span>
+
+    <span class="cmt">// User-configurable</span>
+    <span class="kw">pub</span> require_confirm_writes: <span class="kw">bool</span>,
+    <span class="kw">pub</span> backup_before_write: <span class="kw">bool</span>,
+    <span class="kw">pub</span> audit_logging: <span class="kw">bool</span>,
+}
+
+<span class="kw">impl</span> Default <span class="kw">for</span> SafetyConfig {
+    <span class="kw">fn</span> <span class="fn">default</span>() -> Self {
+        Self {
+            block_destructive: <span class="kw">true</span>, <span class="cmt">// hardcoded</span>
+            require_confirm_writes: <span class="kw">true</span>,
+            backup_before_write: <span class="kw">true</span>,
+            audit_logging: <span class="kw">true</span>,
+        }
+    }
+}
+
+<span class="cmt">// Files created with restricted permissions</span>
+<span class="kw">pub fn</span> <span class="fn">save_config</span>(config: &Config, path: &PathBuf) -> Result<()> {
+    <span class="kw">let</span> json = serde_json::to_string_pretty(config)?;
+    std::fs::write(path, json)?;
+
+    <span class="cmt">// Set 0600 permissions (owner read/write only)</span>
+    #[cfg(unix)]
+    {
+        <span class="kw">use</span> std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    }
+    Ok(())
+}`,
+      session: `<span class="cmt">// src/session.rs - Session persistence</span>
+<span class="kw">use</span> chrono::{DateTime, Utc};
+<span class="kw">use</span> serde::{Deserialize, Serialize};
+<span class="kw">use</span> std::path::PathBuf;
+
+#[derive(Serialize, Deserialize)]
+<span class="kw">pub struct</span> Session {
+    <span class="kw">pub</span> id: String,
+    <span class="kw">pub</span> created: DateTime<Utc>,
+    <span class="kw">pub</span> project_dir: PathBuf,
+    <span class="kw">pub</span> messages: Vec<Message>,
+}
+
+<span class="cmt">// Sessions stored locally only</span>
+<span class="cmt">// ~/.local/state/hyle/sessions/{id}/</span>
+<span class="cmt">//   session.json   - metadata</span>
+<span class="cmt">//   messages.jsonl - conversation</span>
+<span class="cmt">//   audit.jsonl    - operation log</span>
+
+<span class="kw">impl</span> Session {
+    <span class="kw">pub fn</span> <span class="fn">session_dir</span>(&self) -> PathBuf {
+        dirs::state_dir()
+            .unwrap_or_else(|| PathBuf::from(<span class="str">"~/.local/state"</span>))
+            .join(<span class="str">"hyle"</span>)
+            .join(<span class="str">"sessions"</span>)
+            .join(&self.id)
+    }
+
+    <span class="kw">pub async fn</span> <span class="fn">save</span>(&self) -> Result<()> {
+        <span class="kw">let</span> dir = self.<span class="fn">session_dir</span>();
+        tokio::fs::create_dir_all(&dir).<span class="kw">await</span>?;
+
+        <span class="kw">let</span> path = dir.join(<span class="str">"session.json"</span>);
+        <span class="kw">let</span> json = serde_json::to_string_pretty(self)?;
+        tokio::fs::write(path, json).<span class="kw">await</span>?;
+
+        Ok(())
+    }
+
+    <span class="cmt">// No cloud sync, no telemetry</span>
+    <span class="cmt">// Data stays on your machine</span>
+}`
+    };
+
+    // Show source code
+    function showSource(module) {
+      document.querySelectorAll('.tree-item').forEach(item => item.classList.remove('active'));
+      event.target.closest('.tree-item').classList.add('active');
+
+      const code = sourceCodes[module];
+      const lines = code.split('\n');
+      let html = '';
+      lines.forEach((line, i) => {
+        html += `<div class="code-line"><span class="code-ln">${i + 1}</span><span class="code-content">${line}</span></div>`;
+      });
+      document.getElementById('sourceCode').innerHTML = html;
+    }
+
+    // Initialize source view
+    showSource('safety');
+
+    // Audit log toggle
+    function toggleAuditDetail(entry) {
+      entry.classList.toggle('expanded');
+    }
+
+    // Audit filter
+    function filterAudit(type) {
+      document.querySelectorAll('.audit-controls button').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      document.querySelectorAll('.audit-entry').forEach(entry => {
+        if (type === 'all' || entry.dataset.type === type) {
+          entry.style.display = 'grid';
+        } else {
+          entry.style.display = 'none';
+        }
+      });
+    }
+
+    // Command inspector
+    const blockedPatterns = [
+      { pattern: /rm\s+-rf\s+\//, reason: 'Destructive filesystem operation' },
+      { pattern: /:\(\)\{\s*:\|:&\s*\};:/, reason: 'Fork bomb pattern' },
+      { pattern: /mkfs\.\w+/, reason: 'Filesystem format command' },
+      { pattern: /dd\s+if=.*of=\/dev\//, reason: 'Direct device write' },
+      { pattern: /chmod\s+-R\s+777\s+\//, reason: 'Insecure permission change' },
+      { pattern: /curl.*\|\s*(bash|sh)/, reason: 'Remote code execution' },
+      { pattern: /wget.*\|\s*(bash|sh)/, reason: 'Remote code execution' },
+    ];
+
+    function inspectCommand() {
+      const cmd = document.getElementById('cmdInput').value;
+      let result = '';
+
+      result += `<div class="inspect-line"><span class="inspect-label">Command:</span><span class="inspect-value">${cmd}</span></div>`;
+
+      // Check against patterns
+      let blocked = false;
+      let matchedPattern = '';
+      let blockReason = '';
+
+      for (const {pattern, reason} of blockedPatterns) {
+        if (pattern.test(cmd)) {
+          blocked = true;
+          matchedPattern = pattern.toString();
+          blockReason = reason;
+          break;
+        }
+      }
+
+      if (blocked) {
+        result += `<div class="inspect-line"><span class="inspect-label">Status:</span><span class="inspect-value blocked">BLOCKED</span></div>`;
+        result += `<div class="inspect-line"><span class="inspect-label">Matched filter:</span><span class="inspect-value blocked">${matchedPattern}</span></div>`;
+        result += `<div class="inspect-line"><span class="inspect-label">Reason:</span><span class="inspect-value blocked">${blockReason}</span></div>`;
+        result += `<div class="inspect-line"><span class="inspect-label">Risk level:</span><span class="inspect-value blocked">CRITICAL - command rejected</span></div>`;
+      } else {
+        result += `<div class="inspect-line"><span class="inspect-label">Status:</span><span class="inspect-value safe">ALLOWED</span></div>`;
+
+        // Check for network
+        if (/curl|wget|http|ftp/.test(cmd)) {
+          result += `<div class="inspect-line"><span class="inspect-label">Network access:</span><span class="inspect-value warn">Yes - external request</span></div>`;
+        }
+
+        // Check for pipes
+        const pipeCount = (cmd.match(/\|/g) || []).length;
+        if (pipeCount > 0) {
+          result += `<div class="inspect-line"><span class="inspect-label">Pipe chain:</span><span class="inspect-value">${pipeCount + 1} commands</span></div>`;
+        }
+
+        // Check for file writes
+        if (/>\s*\S|tee|write|mv|cp/.test(cmd)) {
+          result += `<div class="inspect-line"><span class="inspect-label">File writes:</span><span class="inspect-value warn">Possible - will log</span></div>`;
+        }
+
+        // Risk assessment
+        let risk = 'LOW';
+        if (/curl|wget/.test(cmd)) risk = 'MEDIUM';
+        if (/sudo/.test(cmd)) risk = 'HIGH';
+        result += `<div class="inspect-line"><span class="inspect-label">Risk level:</span><span class="inspect-value ${risk === 'LOW' ? 'safe' : 'warn'}">${risk}</span></div>`;
+      }
+
+      document.getElementById('cmdResult').innerHTML = result;
+    }
+
+    // Test filter from list
+    function testFilter(cmd) {
+      document.getElementById('cmdInput').value = cmd;
+      inspectCommand();
+      document.querySelector('.command-inspect').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Trust checklist
+    function toggleCheck(box) {
+      box.classList.toggle('checked');
+      box.textContent = box.classList.contains('checked') ? '+' : '';
+    }
+
+    // Copy to clipboard
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = orig, 1500);
+      });
+    }
+  </script>
 </body>
 </html>
