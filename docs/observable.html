@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>hyle - Observability</title>
+  <title>hyle - Observability Dashboard</title>
   <style>
     :root {
       --bg: #0f1419;
@@ -22,19 +22,22 @@
       font-family: 'JetBrains Mono', 'Fira Code', monospace;
       background: var(--bg);
       color: var(--fg);
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.5;
     }
 
     .dashboard {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: auto 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto auto 1fr 1fr;
       gap: 1px;
       background: var(--border);
       min-height: 100vh;
     }
-    @media (max-width: 800px) {
+    @media (max-width: 1000px) {
+      .dashboard { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
       .dashboard { grid-template-columns: 1fr; }
     }
 
@@ -46,33 +49,34 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
       padding-bottom: 0.5rem;
       border-bottom: 1px solid var(--border);
     }
     .panel-title {
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: var(--dim);
     }
     .panel-status {
-      font-size: 0.7rem;
-      padding: 0.2rem 0.5rem;
+      font-size: 0.65rem;
+      padding: 0.15rem 0.4rem;
       border-radius: 3px;
     }
     .status-ok { background: var(--green); color: var(--bg); }
     .status-warn { background: var(--orange); color: var(--bg); }
+    .status-error { background: var(--red); color: var(--bg); }
 
     .header-panel {
       grid-column: 1 / -1;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 1rem 2rem;
+      padding: 0.75rem 1.5rem;
     }
     .logo {
-      font-size: 1.5rem;
+      font-size: 1.3rem;
       font-weight: bold;
     }
     .logo span { color: var(--green); }
@@ -84,13 +88,33 @@
       text-align: right;
     }
     .header-stat-value {
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       color: var(--green);
     }
     .header-stat-label {
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       color: var(--dim);
       text-transform: uppercase;
+    }
+
+    /* Live indicator */
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.7rem;
+      color: var(--dim);
+    }
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
 
     /* Sparkline */
@@ -98,26 +122,27 @@
       display: flex;
       align-items: flex-end;
       gap: 2px;
-      height: 40px;
-      margin: 1rem 0;
+      height: 50px;
+      margin: 0.75rem 0;
     }
     .spark-bar {
       flex: 1;
       background: var(--blue);
       border-radius: 2px 2px 0 0;
-      min-width: 4px;
+      min-width: 3px;
       transition: height 0.3s;
     }
+    .spark-bar.highlight { background: var(--green); }
 
     /* Metrics table */
     .metrics-table {
       width: 100%;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
     }
     .metrics-row {
       display: flex;
       justify-content: space-between;
-      padding: 0.5rem 0;
+      padding: 0.4rem 0;
       border-bottom: 1px solid var(--border);
     }
     .metrics-row:last-child { border-bottom: none; }
@@ -126,42 +151,154 @@
     .value-green { color: var(--green); }
     .value-orange { color: var(--orange); }
     .value-red { color: var(--red); }
+    .value-blue { color: var(--blue); }
 
     /* Event log */
     .event-log {
-      font-size: 0.8rem;
-      max-height: 200px;
+      font-size: 0.75rem;
+      max-height: 220px;
       overflow-y: auto;
     }
     .event {
-      padding: 0.4rem 0;
+      padding: 0.35rem 0;
       border-bottom: 1px solid var(--border);
       display: flex;
-      gap: 1rem;
+      gap: 0.75rem;
+      align-items: flex-start;
     }
-    .event-time { color: var(--dim); min-width: 60px; }
-    .event-type { min-width: 60px; }
-    .event-type.tool { color: var(--blue); }
-    .event-type.api { color: var(--purple); }
-    .event-type.error { color: var(--red); }
-    .event-msg { color: var(--fg); }
+    .event:last-child { border-bottom: none; }
+    .event-time { color: var(--dim); min-width: 55px; font-size: 0.7rem; }
+    .event-type {
+      min-width: 50px;
+      font-size: 0.65rem;
+      padding: 0.1rem 0.3rem;
+      border-radius: 2px;
+      text-align: center;
+    }
+    .event-type.tool { background: rgba(89,194,255,0.2); color: var(--blue); }
+    .event-type.api { background: rgba(210,166,255,0.2); color: var(--purple); }
+    .event-type.error { background: rgba(240,113,120,0.2); color: var(--red); }
+    .event-type.info { background: rgba(184,204,82,0.2); color: var(--green); }
+    .event-msg { color: var(--fg); flex: 1; }
 
-    /* Architecture */
+    /* Architecture diagram */
     .arch {
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       line-height: 1.3;
       color: var(--dim);
     }
     .arch pre {
       margin: 0.5rem 0;
       color: var(--fg);
+      font-size: 0.65rem;
     }
+    .arch-node {
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .arch-node:hover { color: var(--green); }
+    .arch-node.active { color: var(--green); font-weight: bold; }
+
+    /* Gauge */
+    .gauge-container {
+      display: flex;
+      justify-content: space-around;
+      margin: 1rem 0;
+    }
+    .gauge {
+      text-align: center;
+    }
+    .gauge-ring {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: conic-gradient(var(--green) 0deg, var(--green) var(--value), var(--border) var(--value), var(--border) 360deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 0.5rem;
+    }
+    .gauge-inner {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+    .gauge-label {
+      font-size: 0.65rem;
+      color: var(--dim);
+      text-transform: uppercase;
+    }
+
+    /* Session list */
+    .session-list {
+      font-size: 0.75rem;
+    }
+    .session-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .session-item:hover { background: var(--bg); margin: 0 -1rem; padding: 0.5rem 1rem; }
+    .session-id { color: var(--blue); font-family: monospace; }
+    .session-time { color: var(--dim); font-size: 0.7rem; }
+    .session-status {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .session-active { background: var(--green); }
+    .session-idle { background: var(--orange); }
+    .session-ended { background: var(--dim); }
+
+    /* Model selector */
+    .model-selector {
+      margin-top: 0.5rem;
+    }
+    .model-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.4rem 0.5rem;
+      margin: 0.25rem 0;
+      background: var(--bg);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .model-item:hover { background: var(--border); }
+    .model-item.active { border-left: 2px solid var(--green); }
+    .model-name { font-size: 0.75rem; }
+    .model-cost { font-size: 0.7rem; color: var(--dim); }
+
+    /* Terminal preview */
+    .terminal-preview {
+      background: #0a0a0a;
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-size: 0.7rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .term-line { margin: 0.2rem 0; }
+    .term-prompt { color: var(--green); }
+    .term-output { color: var(--dim); }
+    .term-tool { color: var(--blue); }
 
     footer {
       grid-column: 1 / -1;
-      padding: 1rem 2rem;
-      text-align: center;
-      font-size: 0.75rem;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.7rem;
       color: var(--dim);
       border-top: 1px solid var(--border);
     }
@@ -192,10 +329,14 @@
 <body>
   <div class="dashboard">
     <div class="panel header-panel">
-      <div class="logo"><span>></span> hyle</div>
+      <div class="logo"><span>&gt;</span> hyle</div>
+      <div class="live-indicator">
+        <span class="live-dot"></span>
+        <span>Live</span>
+      </div>
       <div class="header-stats">
         <div class="header-stat">
-          <div class="header-stat-value">364</div>
+          <div class="header-stat-value" id="testCount">364</div>
           <div class="header-stat-label">Tests</div>
         </div>
         <div class="header-stat">
@@ -205,6 +346,10 @@
         <div class="header-stat">
           <div class="header-stat-value">35+</div>
           <div class="header-stat-label">Models</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-value" id="uptime">00:00:00</div>
+          <div class="header-stat-label">Uptime</div>
         </div>
       </div>
     </div>
@@ -218,15 +363,19 @@
       <div class="metrics-table">
         <div class="metrics-row">
           <span class="metrics-label">Prompt tokens</span>
-          <span class="metrics-value">124,892</span>
+          <span class="metrics-value" id="promptTokens">124,892</span>
         </div>
         <div class="metrics-row">
           <span class="metrics-label">Completion tokens</span>
-          <span class="metrics-value">48,231</span>
+          <span class="metrics-value" id="completionTokens">48,231</span>
         </div>
         <div class="metrics-row">
           <span class="metrics-label">Context efficiency</span>
-          <span class="metrics-value value-green">78%</span>
+          <span class="metrics-value value-green" id="contextEff">78%</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metrics-label">Cost (today)</span>
+          <span class="metrics-value value-blue">$0.42</span>
         </div>
       </div>
     </div>
@@ -234,80 +383,171 @@
     <div class="panel">
       <div class="panel-header">
         <span class="panel-title">Latency</span>
-        <span class="panel-status status-ok">p99 &lt;2s</span>
+        <span class="panel-status status-ok" id="latencyStatus">p99 &lt;2s</span>
+      </div>
+      <div class="gauge-container">
+        <div class="gauge">
+          <div class="gauge-ring" style="--value: 122deg;">
+            <div class="gauge-inner" id="ttftP50">340ms</div>
+          </div>
+          <div class="gauge-label">TTFT p50</div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-ring" style="--value: 216deg;">
+            <div class="gauge-inner" id="ttftP99">1.2s</div>
+          </div>
+          <div class="gauge-label">TTFT p99</div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-ring" style="--value: 252deg;">
+            <div class="gauge-inner" id="tps">42</div>
+          </div>
+          <div class="gauge-label">Tok/sec</div>
+        </div>
       </div>
       <div class="metrics-table">
-        <div class="metrics-row">
-          <span class="metrics-label">TTFT (p50)</span>
-          <span class="metrics-value value-green">340ms</span>
-        </div>
-        <div class="metrics-row">
-          <span class="metrics-label">TTFT (p99)</span>
-          <span class="metrics-value value-orange">1.2s</span>
-        </div>
         <div class="metrics-row">
           <span class="metrics-label">Total (p50)</span>
           <span class="metrics-value">2.8s</span>
         </div>
         <div class="metrics-row">
-          <span class="metrics-label">Tokens/sec</span>
-          <span class="metrics-value value-green">42</span>
+          <span class="metrics-label">API calls (24h)</span>
+          <span class="metrics-value">847</span>
         </div>
       </div>
     </div>
 
     <div class="panel">
       <div class="panel-header">
-        <span class="panel-title">Event Log</span>
+        <span class="panel-title">Active Model</span>
       </div>
-      <div class="event-log">
+      <div class="model-selector">
+        <div class="model-item active" onclick="selectModel(this, 'claude-3.5-sonnet')">
+          <span class="model-name">claude-3.5-sonnet</span>
+          <span class="model-cost">$3/M in</span>
+        </div>
+        <div class="model-item" onclick="selectModel(this, 'gpt-4o')">
+          <span class="model-name">gpt-4o</span>
+          <span class="model-cost">$5/M in</span>
+        </div>
+        <div class="model-item" onclick="selectModel(this, 'llama-3.1-70b')">
+          <span class="model-name">llama-3.1-70b</span>
+          <span class="model-cost">free</span>
+        </div>
+        <div class="model-item" onclick="selectModel(this, 'deepseek-coder')">
+          <span class="model-name">deepseek-coder</span>
+          <span class="model-cost">$0.14/M in</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="grid-column: span 2;">
+      <div class="panel-header">
+        <span class="panel-title">Event Log</span>
+        <span class="panel-status">streaming</span>
+      </div>
+      <div class="event-log" id="eventLog">
         <div class="event">
           <span class="event-time">14:23:01</span>
           <span class="event-type tool">TOOL</span>
-          <span class="event-msg">read src/agent.rs</span>
+          <span class="event-msg">read src/agent.rs (2,847 bytes)</span>
         </div>
         <div class="event">
           <span class="event-time">14:23:02</span>
           <span class="event-type api">API</span>
-          <span class="event-msg">stream_completion 1847 tokens</span>
+          <span class="event-msg">stream_completion started, model=claude-3.5-sonnet</span>
+        </div>
+        <div class="event">
+          <span class="event-time">14:23:04</span>
+          <span class="event-type info">INFO</span>
+          <span class="event-msg">context compressed: 45,231 -> 12,847 tokens (72% reduction)</span>
         </div>
         <div class="event">
           <span class="event-time">14:23:05</span>
           <span class="event-type tool">TOOL</span>
-          <span class="event-msg">write src/agent.rs (atomic)</span>
+          <span class="event-msg">write src/agent.rs (atomic, backup created)</span>
         </div>
         <div class="event">
           <span class="event-time">14:23:05</span>
           <span class="event-type tool">TOOL</span>
-          <span class="event-msg">bash cargo test</span>
+          <span class="event-msg">bash: cargo test --lib agent</span>
         </div>
         <div class="event">
           <span class="event-time">14:23:12</span>
+          <span class="event-type info">INFO</span>
+          <span class="event-msg">tests passed: 47/47 in 6.8s</span>
+        </div>
+        <div class="event">
+          <span class="event-time">14:23:13</span>
           <span class="event-type api">API</span>
-          <span class="event-msg">rate_limit detected, switching model</span>
+          <span class="event-msg">stream complete: 1,847 tokens, TTFT=340ms</span>
         </div>
       </div>
     </div>
 
     <div class="panel">
       <div class="panel-header">
+        <span class="panel-title">Sessions</span>
+      </div>
+      <div class="session-list">
+        <div class="session-item" onclick="showSession('abc123')">
+          <span class="session-id">abc123</span>
+          <span class="session-time">now</span>
+          <span class="session-status session-active"></span>
+        </div>
+        <div class="session-item" onclick="showSession('def456')">
+          <span class="session-id">def456</span>
+          <span class="session-time">2h ago</span>
+          <span class="session-status session-idle"></span>
+        </div>
+        <div class="session-item" onclick="showSession('ghi789')">
+          <span class="session-id">ghi789</span>
+          <span class="session-time">yesterday</span>
+          <span class="session-status session-ended"></span>
+        </div>
+        <div class="session-item" onclick="showSession('jkl012')">
+          <span class="session-id">jkl012</span>
+          <span class="session-time">2d ago</span>
+          <span class="session-status session-ended"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="grid-column: span 2;">
+      <div class="panel-header">
         <span class="panel-title">Thread Architecture</span>
       </div>
       <div class="arch">
-        <pre>
-TUI Event Loop (50ms, ~20Hz)
-├── telemetry_rx.try_recv() ← OS thread
-├── process_bg_responses()  ← BgWorker
-├── rx.try_recv()           ← API stream
-├── event::poll()           ← Keyboard
-└── render_tui()            ← Pure CPU
+        <pre id="archDiagram">
+<span class="arch-node" data-node="tui" onclick="showArch('tui')">TUI Event Loop (50ms, ~20Hz)</span>
+├── <span class="arch-node" data-node="telemetry" onclick="showArch('telemetry')">telemetry_rx.try_recv()</span> &larr; OS thread
+├── <span class="arch-node" data-node="bg" onclick="showArch('bg')">process_bg_responses()</span>  &larr; BgWorker
+├── <span class="arch-node" data-node="api" onclick="showArch('api')">rx.try_recv()</span>           &larr; API stream
+├── <span class="arch-node" data-node="input" onclick="showArch('input')">event::poll()</span>           &larr; Keyboard
+└── <span class="arch-node" data-node="render" onclick="showArch('render')">render_tui()</span>            &larr; Pure CPU
         </pre>
-        <p>Non-blocking I/O throughout. All file operations via spawn_blocking.</p>
+        <p id="archDetail">Click a component to see details. Non-blocking I/O throughout. All file operations via spawn_blocking.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Live Terminal</span>
+      </div>
+      <div class="terminal-preview" id="terminalPreview">
+        <div class="term-line"><span class="term-prompt">&gt;</span> add error handling to parse_config</div>
+        <div class="term-line"><span class="term-tool">[read]</span> <span class="term-output">src/config.rs</span></div>
+        <div class="term-line"><span class="term-tool">[patch]</span> <span class="term-output">src/config.rs +15 lines</span></div>
+        <div class="term-line"><span class="term-tool">[bash]</span> <span class="term-output">cargo test config</span></div>
+        <div class="term-line"><span class="term-output">test config::tests::parse_valid ... ok</span></div>
+        <div class="term-line"><span class="term-output">test config::tests::parse_missing ... ok</span></div>
+        <div class="term-line"><span class="term-output">test config::tests::parse_invalid ... ok</span></div>
       </div>
     </div>
 
     <footer>
-      <a href="https://github.com/uprootiny/hyle">github.com/uprootiny/hyle</a> &middot; MIT License &middot; v0.3.3
+      <span><a href="https://github.com/uprootiny/hyle">github.com/uprootiny/hyle</a> &middot; MIT License &middot; v0.3.3</span>
+      <span>Last refresh: <span id="lastRefresh">just now</span></span>
     </footer>
   </div>
 
@@ -331,15 +571,144 @@ TUI Event Loop (50ms, ~20Hz)
   </div>
 
   <script>
-    // Generate sparkline
+    // Generate sparkline with live updates
     const sparkline = document.getElementById('sparkline');
-    const values = [40, 55, 30, 70, 85, 60, 45, 90, 75, 50, 65, 80, 55, 70, 40, 85, 60, 75, 90, 65];
-    values.forEach(v => {
-      const bar = document.createElement('div');
-      bar.className = 'spark-bar';
-      bar.style.height = v + '%';
-      sparkline.appendChild(bar);
-    });
+    let sparkValues = [40, 55, 30, 70, 85, 60, 45, 90, 75, 50, 65, 80, 55, 70, 40, 85, 60, 75, 90, 65];
+
+    function renderSparkline() {
+      sparkline.innerHTML = '';
+      sparkValues.forEach((v, i) => {
+        const bar = document.createElement('div');
+        bar.className = 'spark-bar' + (i === sparkValues.length - 1 ? ' highlight' : '');
+        bar.style.height = v + '%';
+        sparkline.appendChild(bar);
+      });
+    }
+    renderSparkline();
+
+    // Simulate live updates
+    setInterval(() => {
+      sparkValues.shift();
+      sparkValues.push(30 + Math.random() * 60);
+      renderSparkline();
+
+      // Update token counts
+      const promptTokens = parseInt(document.getElementById('promptTokens').textContent.replace(/,/g, ''));
+      document.getElementById('promptTokens').textContent = (promptTokens + Math.floor(Math.random() * 100)).toLocaleString();
+
+      const completionTokens = parseInt(document.getElementById('completionTokens').textContent.replace(/,/g, ''));
+      document.getElementById('completionTokens').textContent = (completionTokens + Math.floor(Math.random() * 50)).toLocaleString();
+    }, 3000);
+
+    // Uptime counter
+    let uptimeSeconds = 0;
+    setInterval(() => {
+      uptimeSeconds++;
+      const h = Math.floor(uptimeSeconds / 3600);
+      const m = Math.floor((uptimeSeconds % 3600) / 60);
+      const s = uptimeSeconds % 60;
+      document.getElementById('uptime').textContent =
+        `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }, 1000);
+
+    // Add events to log
+    const events = [
+      { type: 'tool', msg: 'read src/lib.rs (1,234 bytes)' },
+      { type: 'api', msg: 'stream_completion chunk received' },
+      { type: 'info', msg: 'salience score computed: 0.87' },
+      { type: 'tool', msg: 'search "impl.*Display" in src/' },
+      { type: 'api', msg: 'rate_limit warning, backing off' },
+      { type: 'tool', msg: 'bash: cargo clippy --all-targets' },
+      { type: 'info', msg: 'backup rotated: kept 5 most recent' },
+      { type: 'tool', msg: 'write src/tools.rs (atomic)' },
+    ];
+
+    function addEvent() {
+      const eventLog = document.getElementById('eventLog');
+      const e = events[Math.floor(Math.random() * events.length)];
+      const now = new Date();
+      const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+      const div = document.createElement('div');
+      div.className = 'event';
+      div.innerHTML = `
+        <span class="event-time">${time}</span>
+        <span class="event-type ${e.type}">${e.type.toUpperCase()}</span>
+        <span class="event-msg">${e.msg}</span>
+      `;
+      eventLog.insertBefore(div, eventLog.firstChild);
+
+      // Keep only last 20 events
+      while (eventLog.children.length > 20) {
+        eventLog.removeChild(eventLog.lastChild);
+      }
+
+      document.getElementById('lastRefresh').textContent = 'just now';
+    }
+
+    setInterval(addEvent, 5000);
+
+    // Model selector
+    function selectModel(el, model) {
+      document.querySelectorAll('.model-item').forEach(m => m.classList.remove('active'));
+      el.classList.add('active');
+      addEvent(); // Simulate an event
+    }
+
+    // Session selector
+    function showSession(id) {
+      const term = document.getElementById('terminalPreview');
+      const sessions = {
+        'abc123': [
+          { p: true, t: '> add error handling to parse_config' },
+          { t: '[read] src/config.rs' },
+          { t: '[patch] src/config.rs +15 lines' },
+          { t: '[bash] cargo test config' },
+          { t: 'test config::tests::parse_valid ... ok' },
+        ],
+        'def456': [
+          { p: true, t: '> refactor the logging module' },
+          { t: '[read] src/logging.rs' },
+          { t: '[write] src/tracing.rs' },
+          { t: '[bash] cargo build' },
+          { t: 'Compiling hyle v0.3.3' },
+        ],
+        'ghi789': [
+          { p: true, t: '> fix the rate limiting bug' },
+          { t: '[read] src/client.rs' },
+          { t: '[patch] src/client.rs' },
+          { t: '[bash] cargo test client' },
+          { t: 'test client::tests::rate_limit ... ok' },
+        ],
+        'jkl012': [
+          { p: true, t: '> add session persistence' },
+          { t: '[write] src/session.rs' },
+          { t: '[bash] cargo test session' },
+          { t: 'test session::tests::save_load ... ok' },
+        ]
+      };
+
+      term.innerHTML = (sessions[id] || sessions['abc123']).map(l =>
+        l.p ? `<div class="term-line"><span class="term-prompt">&gt;</span> ${l.t.slice(2)}</div>`
+            : `<div class="term-line"><span class="term-tool">${l.t.split(' ')[0]}</span> <span class="term-output">${l.t.split(' ').slice(1).join(' ')}</span></div>`
+      ).join('');
+    }
+
+    // Architecture detail
+    const archDetails = {
+      tui: 'Main event loop running at 20Hz. Orchestrates all UI updates and input handling. Uses crossterm for terminal control.',
+      telemetry: 'Receives metrics from background threads via mpsc channel. Non-blocking try_recv ensures UI responsiveness.',
+      bg: 'Background worker results (file reads, searches) arrive here. Processed in batches to avoid UI jank.',
+      api: 'SSE stream from OpenRouter. Tokens arrive continuously during generation.',
+      input: 'Keyboard events via crossterm::event. Supports vim-style navigation and readline shortcuts.',
+      render: 'Pure function of state. ratatui renders to a frame buffer, then flushes to terminal. No I/O during render.'
+    };
+
+    function showArch(node) {
+      document.querySelectorAll('.arch-node').forEach(n => n.classList.remove('active'));
+      document.querySelector(`[data-node="${node}"]`).classList.add('active');
+      document.getElementById('archDetail').textContent = archDetails[node];
+    }
   </script>
 </body>
 </html>
