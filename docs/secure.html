@@ -23,40 +23,94 @@
       font-size: 14px;
       line-height: 1.6;
     }
-    .container { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
+    .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
 
-    header {
-      margin-bottom: 3rem;
-    }
+    header { margin-bottom: 2rem; }
     h1 {
       font-size: 1.5rem;
       font-weight: 400;
       margin-bottom: 0.5rem;
     }
     h1 span { color: var(--green); }
-    .subtitle {
-      color: #8b949e;
-      font-size: 0.9rem;
-    }
+    .subtitle { color: #8b949e; font-size: 0.9rem; }
 
+    /* Terminal Demo */
+    .terminal-section {
+      margin-bottom: 2rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .terminal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .terminal-title { color: #8b949e; font-size: 0.75rem; }
+    .terminal-controls { display: flex; gap: 0.5rem; }
+    .terminal-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: #8b949e;
+      font-family: inherit;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .terminal-btn:hover { color: var(--fg); border-color: #8b949e; }
+    .terminal-btn.active { color: var(--green); border-color: var(--green); }
+    .terminal-body {
+      padding: 1rem;
+      min-height: 220px;
+    }
+    .replay-line {
+      margin: 0.15rem 0;
+      opacity: 0;
+      animation: fadeIn 0.1s ease forwards;
+    }
+    @keyframes fadeIn { to { opacity: 1; } }
+    .prompt { color: var(--green); }
+    .dim { color: #484f58; }
+    .error { color: var(--red); }
+    .warn { color: var(--yellow); }
+    .success { color: var(--green); }
+
+    /* Security Grid */
+    h2 {
+      font-size: 1rem;
+      font-weight: 500;
+      margin: 2rem 0 1rem;
+      color: var(--blue);
+    }
     .security-grid {
       display: grid;
-      gap: 1rem;
-      margin-bottom: 3rem;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
     }
     .security-item {
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 1rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
     }
-    .security-item h3 {
+    .security-item:hover { border-color: #8b949e; }
+    .security-item.open { border-color: var(--green); }
+    .security-header {
       display: flex;
       align-items: center;
       gap: 0.5rem;
+    }
+    .security-item h3 {
       font-size: 0.9rem;
       font-weight: 500;
-      margin-bottom: 0.5rem;
+      flex: 1;
     }
     .status-icon {
       width: 8px;
@@ -68,6 +122,7 @@
     .security-item p {
       color: #8b949e;
       font-size: 0.85rem;
+      margin-top: 0.5rem;
     }
     .security-item code {
       background: var(--bg);
@@ -75,14 +130,40 @@
       border-radius: 3px;
       font-size: 0.8rem;
     }
-
-    h2 {
-      font-size: 1rem;
-      font-weight: 500;
-      margin: 2rem 0 1rem;
-      color: var(--blue);
+    .security-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
     }
+    .security-item.open .security-body { max-height: 400px; }
+    .security-content {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .security-code {
+      background: var(--bg);
+      padding: 0.75rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      margin-bottom: 0.75rem;
+    }
+    .security-actions { display: flex; gap: 0.5rem; }
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: #8b949e;
+      font-family: inherit;
+      font-size: 0.7rem;
+      padding: 0.3rem 0.6rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .copy-btn:hover { color: var(--fg); border-color: #8b949e; }
+    .copy-btn.copied { color: var(--green); border-color: var(--green); }
 
+    /* Blocked List */
     .blocked-list {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -101,11 +182,14 @@
       padding: 0.5rem 0;
       border-bottom: 1px solid var(--border);
       font-size: 0.85rem;
+      cursor: pointer;
     }
     .blocked-pattern:last-child { border-bottom: none; }
+    .blocked-pattern:hover { background: rgba(255,255,255,0.02); }
     .blocked-pattern .pattern { color: var(--red); }
     .blocked-pattern .reason { color: #8b949e; }
 
+    /* Flow Diagram */
     .flow-diagram {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -115,10 +199,9 @@
       overflow-x: auto;
       margin-bottom: 2rem;
     }
-    .flow-diagram pre {
-      color: var(--fg);
-    }
+    .flow-diagram pre { color: var(--fg); }
 
+    /* Audit Info */
     .audit-info {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -136,9 +219,61 @@
     .audit-label { color: #8b949e; }
     .audit-value { color: var(--green); }
 
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-content {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.5rem;
+      max-width: 650px;
+      max-height: 80vh;
+      overflow: auto;
+      width: 90%;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-title { color: var(--blue); }
+    .modal-close {
+      background: none;
+      border: 1px solid var(--border);
+      color: #8b949e;
+      padding: 0.2rem 0.5rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .modal-close:hover { color: var(--red); border-color: var(--red); }
+    .modal-body {
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .modal-body .line-num {
+      color: #30363d;
+      display: inline-block;
+      width: 3ch;
+      text-align: right;
+      margin-right: 1.5ch;
+      user-select: none;
+    }
+
     footer {
-      margin-top: 3rem;
-      padding-top: 2rem;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
       border-top: 1px solid var(--border);
       text-align: center;
       color: #8b949e;
@@ -175,79 +310,247 @@
       <p class="subtitle">Guardrails, audit trails, and defense in depth</p>
     </header>
 
+    <div class="terminal-section">
+      <div class="terminal-header">
+        <span class="terminal-title">SECURITY DEMO</span>
+        <div class="terminal-controls">
+          <button class="terminal-btn" id="playBtn" onclick="toggleReplay()">play</button>
+          <button class="terminal-btn" onclick="restartReplay()">restart</button>
+          <button class="terminal-btn" onclick="cycleDemo()">next</button>
+        </div>
+      </div>
+      <div class="terminal-body" id="terminalBody"></div>
+    </div>
+
+    <h2>Security Controls</h2>
     <div class="security-grid">
-      <div class="security-item">
-        <h3><span class="status-icon status-ok"></span> Destructive Command Blocking</h3>
+      <div class="security-item" onclick="toggleItem(this)">
+        <div class="security-header">
+          <span class="status-icon status-ok"></span>
+          <h3>Destructive Command Blocking</h3>
+        </div>
         <p>Pattern matching blocks <code>rm -rf</code>, fork bombs, disk overwrites before execution</p>
+        <div class="security-body">
+          <div class="security-content">
+            <div class="security-code">
+// Blocked patterns in src/tools.rs
+const BLOCKED_PATTERNS: &[&str] = &[
+    "rm -rf",
+    "rm -r /",
+    ":(){ :|:& };:",     // fork bomb
+    "dd if=/dev/zero",   // disk overwrite
+    "curl | sh",         // RCE
+    "wget | bash",       // RCE
+    "> /dev/sda",        // disk write
+    "mkfs.",             // format disk
+];
+
+// Check runs before any bash execution
+fn is_blocked(cmd: &str) -> bool {
+    BLOCKED_PATTERNS.iter().any(|p| cmd.contains(p))
+}</div>
+            <div class="security-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('blocklist')">copy config</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); showFile('blocklist')">view full list</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="security-item">
-        <h3><span class="status-icon status-ok"></span> Atomic File Writes</h3>
+
+      <div class="security-item" onclick="toggleItem(this)">
+        <div class="security-header">
+          <span class="status-icon status-ok"></span>
+          <h3>Atomic File Writes</h3>
+        </div>
         <p>Write to temp file, fsync, rename. No partial writes. No corruption.</p>
+        <div class="security-body">
+          <div class="security-content">
+            <div class="security-code">
+pub fn atomic_write(path: &Path, content: &[u8]) -> io::Result<()> {
+    // 1. Write to temp file in same directory
+    let temp = path.with_extension("tmp");
+    let mut file = File::create(&temp)?;
+    file.write_all(content)?;
+
+    // 2. Force to disk (critical for atomicity)
+    file.sync_all()?;
+
+    // 3. Atomic rename (POSIX guarantees)
+    fs::rename(&temp, path)?;
+
+    // 4. Verify content matches
+    let readback = fs::read(path)?;
+    assert_eq!(readback, content, "Write verification failed");
+
+    Ok(())
+}</div>
+            <div class="security-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('atomic')">copy impl</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); showFile('atomic')">view full source</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="security-item">
-        <h3><span class="status-icon status-ok"></span> Write Verification</h3>
-        <p>Read-back check after every write confirms content matches intent</p>
-      </div>
-      <div class="security-item">
-        <h3><span class="status-icon status-ok"></span> Backup Rotation</h3>
+
+      <div class="security-item" onclick="toggleItem(this)">
+        <div class="security-header">
+          <span class="status-icon status-ok"></span>
+          <h3>Backup Rotation</h3>
+        </div>
         <p>Timestamped backups for every modified file. Last 3 versions kept.</p>
+        <div class="security-body">
+          <div class="security-content">
+            <div class="security-code">
+$ ls ~/.local/state/hyle/backups/myproject/
+
+src/auth/jwt.rs.2026-01-10T14:23:15.bak
+src/auth/jwt.rs.2026-01-10T15:42:03.bak
+src/auth/jwt.rs.2026-01-10T16:18:47.bak
+
+$ hyle restore src/auth/jwt.rs --version 2026-01-10T14:23:15
+<span class="success">Restored src/auth/jwt.rs from backup</span>
+
+$ hyle restore src/auth/jwt.rs --list
+Available versions:
+  1. 2026-01-10T16:18:47 (latest)
+  2. 2026-01-10T15:42:03
+  3. 2026-01-10T14:23:15</div>
+            <div class="security-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('backup')">copy config</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); showFile('backup')">view metadata</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="security-item">
-        <h3><span class="status-icon status-ok"></span> Secure Config Storage</h3>
+
+      <div class="security-item" onclick="toggleItem(this)">
+        <div class="security-header">
+          <span class="status-icon status-ok"></span>
+          <h3>Secure Config Storage</h3>
+        </div>
         <p>API key stored with <code>0600</code> permissions in XDG config directory</p>
+        <div class="security-body">
+          <div class="security-content">
+            <div class="security-code">
+$ ls -la ~/.config/hyle/
+total 8
+drwx------ 2 user user 4096 Jan 10 14:00 .
+-rw------- 1 user user  256 Jan 10 14:00 config.json
+
+$ cat ~/.config/hyle/config.json
+{
+  "api_key": "sk-or-v1-xxxx...redacted",
+  "default_model": "deepseek-coder",
+  "fallback_models": ["qwen/qwen-2.5-coder-32b-instruct"]
+}
+
+// Config is never logged, printed, or sent to telemetry
+// Key is read once at startup, stored in memory only</div>
+            <div class="security-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('config')">copy setup</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="security-item">
-        <h3><span class="status-icon status-ok"></span> Tool Timeout</h3>
-        <p>60s default timeout on all tool executions. Configurable.</p>
+
+      <div class="security-item" onclick="toggleItem(this)">
+        <div class="security-header">
+          <span class="status-icon status-ok"></span>
+          <h3>Audit Logging</h3>
+        </div>
+        <p>Every operation logged with timestamp, prompt, file, and checksum</p>
+        <div class="security-body">
+          <div class="security-content">
+            <div class="security-code">
+$ hyle audit --since "24h" --format json | jq '.[0]'
+{
+  "timestamp": "2026-01-10T14:23:15.234Z",
+  "session_id": "sess_8f3a2b1c",
+  "operation": "write",
+  "file": "src/auth/jwt.rs",
+  "lines_changed": 47,
+  "checksum_before": "sha256:a1b2c3d4...",
+  "checksum_after": "sha256:e5f6g7h8...",
+  "prompt": "add token expiration check",
+  "model": "deepseek-coder",
+  "backup_path": "~/.local/state/hyle/backups/..."
+}</div>
+            <div class="security-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('audit')">copy query</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); showFile('audit')">view schema</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="security-item" onclick="toggleItem(this)">
+        <div class="security-header">
+          <span class="status-icon status-ok"></span>
+          <h3>Tool Timeout</h3>
+        </div>
+        <p>60s default timeout on all tool executions. Configurable per-command.</p>
+        <div class="security-body">
+          <div class="security-content">
+            <div class="security-code">
+// Default timeouts in config
+[timeouts]
+bash = "60s"
+read = "10s"
+write = "30s"
+glob = "10s"
+grep = "30s"
+
+// Long-running commands can be configured
+[timeouts.overrides]
+"cargo build" = "300s"
+"cargo test" = "600s"
+"npm install" = "300s"
+
+// Timeout triggers graceful shutdown, then SIGKILL
+// Output up to timeout point is captured and returned</div>
+            <div class="security-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('timeout')">copy config</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <h2>Blocked Patterns</h2>
     <div class="blocked-list">
       <h3>BLOCKED_PATTERNS in src/tools.rs</h3>
-      <div class="blocked-pattern">
+      <div class="blocked-pattern" onclick="showBlockedDetail('rm')">
         <span class="pattern">rm -rf</span>
         <span class="reason">Recursive force delete</span>
       </div>
-      <div class="blocked-pattern">
+      <div class="blocked-pattern" onclick="showBlockedDetail('root')">
         <span class="pattern">rm -r /</span>
         <span class="reason">Root directory delete</span>
       </div>
-      <div class="blocked-pattern">
+      <div class="blocked-pattern" onclick="showBlockedDetail('fork')">
         <span class="pattern">:(){ :|:& };</span>
         <span class="reason">Fork bomb</span>
       </div>
-      <div class="blocked-pattern">
+      <div class="blocked-pattern" onclick="showBlockedDetail('dd')">
         <span class="pattern">dd if=/dev/zero</span>
         <span class="reason">Disk overwrite</span>
       </div>
-      <div class="blocked-pattern">
+      <div class="blocked-pattern" onclick="showBlockedDetail('curl')">
         <span class="pattern">curl | sh</span>
         <span class="reason">Remote code execution</span>
       </div>
-      <div class="blocked-pattern">
+      <div class="blocked-pattern" onclick="showBlockedDetail('wget')">
         <span class="pattern">wget | bash</span>
         <span class="reason">Remote code execution</span>
       </div>
-    </div>
-
-    <h2>Write Flow</h2>
-    <div class="flow-diagram">
-      <pre>
-write(path, content)
-    │
-    ├── 1. Check file size limit (10MB)
-    │
-    ├── 2. Create backup: path.{timestamp}.bak
-    │
-    ├── 3. Write to temp file: path.tmp.{random}
-    │
-    ├── 4. fsync() temp file
-    │
-    ├── 5. rename() temp → path (atomic)
-    │
-    └── 6. Read back and verify content matches
-      </pre>
+      <div class="blocked-pattern" onclick="showBlockedDetail('sda')">
+        <span class="pattern">&gt; /dev/sda</span>
+        <span class="reason">Direct disk write</span>
+      </div>
+      <div class="blocked-pattern" onclick="showBlockedDetail('mkfs')">
+        <span class="pattern">mkfs.</span>
+        <span class="reason">Format filesystem</span>
+      </div>
     </div>
 
     <h2>Audit Information</h2>
@@ -262,7 +565,11 @@ write(path, content)
       </div>
       <div class="audit-row">
         <span class="audit-label">Dependencies</span>
-        <span class="audit-value">38 crates</span>
+        <span class="audit-value">38 crates (cargo-audit clean)</span>
+      </div>
+      <div class="audit-row">
+        <span class="audit-label">unsafe blocks</span>
+        <span class="audit-value">0</span>
       </div>
       <div class="audit-row">
         <span class="audit-label">License</span>
@@ -277,6 +584,17 @@ write(path, content)
     <footer>
       <a href="https://github.com/uprootiny/hyle">Audit the source</a> &middot; MIT License
     </footer>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title" id="modalTitle">file</span>
+        <button class="modal-close" onclick="closeModal()">x</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
   </div>
 
   <div class="variant-switcher">
@@ -297,5 +615,467 @@ write(path, content)
       <a class="switcher-item" href="flow.html">Flow</a>
     </div>
   </div>
+
+<script>
+  const files = {
+    blocklist: `# Extended blocklist configuration
+# ~/.config/hyle/blocklist.toml
+
+[patterns]
+# File system destruction
+filesystem = [
+    "rm\\\\s+-rf",
+    "rm\\\\s+-r\\\\s+/",
+    "rm\\\\s+--no-preserve-root",
+    "rmdir\\\\s+--ignore-fail-on-non-empty\\\\s+/",
+]
+
+# Process/system attacks
+system = [
+    ":(){ :|:& };:",        # fork bomb
+    "dd\\\\s+if=/dev/zero",  # disk overwrite
+    "dd\\\\s+of=/dev/sd",    # direct disk write
+    "> /dev/sd",            # redirect to disk
+    "mkfs\\\\.",             # format filesystem
+    "shred\\\\s+-",          # secure delete
+]
+
+# Remote code execution
+rce = [
+    "curl.*\\\\|.*sh",
+    "wget.*\\\\|.*bash",
+    "curl.*\\\\|.*bash",
+    "wget.*\\\\|.*sh",
+]
+
+# Database destruction
+database = [
+    "DROP\\\\s+DATABASE",
+    "DROP\\\\s+SCHEMA.*CASCADE",
+    "TRUNCATE.*CASCADE",
+]
+
+# Kubernetes destruction
+kubernetes = [
+    "kubectl\\\\s+delete.*--all",
+    "kubectl\\\\s+delete\\\\s+namespace",
+]
+
+[behavior]
+# Log blocked attempts
+log_blocked = true
+log_path = "~/.local/state/hyle/blocked.log"
+
+# Allow override with explicit flag
+allow_override = true
+override_flag = "--allow-destructive"`,
+
+    atomic: `//! Atomic file operations with verification and backup.
+//! src/fs/atomic.rs
+
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use sha2::{Sha256, Digest};
+
+pub struct WriteResult {
+    pub path: PathBuf,
+    pub size_bytes: usize,
+    pub checksum: String,
+    pub checksum_before: Option<String>,
+    pub backup_path: Option<PathBuf>,
+}
+
+/// Write content atomically with backup and verification.
+pub fn atomic_write_verified(
+    path: &Path,
+    content: &[u8],
+    backup_dir: Option<&Path>,
+) -> io::Result<WriteResult> {
+    // Step 1: Create backup if file exists
+    let backup_path = if path.exists() {
+        backup_dir.map(|dir| create_backup(path, dir)).transpose()?
+    } else {
+        None
+    };
+
+    // Step 2: Compute checksum of existing content
+    let checksum_before = path.exists()
+        .then(|| compute_checksum(&fs::read(path).ok()?))
+        .flatten();
+
+    // Step 3: Write to temp file (same directory for atomicity)
+    let temp = path.with_extension(format!("tmp.{}", std::process::id()));
+    {
+        let mut file = File::create(&temp)?;
+        file.write_all(content)?;
+        file.sync_all()?;  // Force to disk BEFORE rename
+    }
+
+    // Step 4: Atomic rename
+    fs::rename(&temp, path)?;
+
+    // Step 5: Verify write succeeded
+    let readback = fs::read(path)?;
+    if readback != content {
+        // Restore from backup if verification fails
+        if let Some(ref backup) = backup_path {
+            fs::copy(backup, path)?;
+        }
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            "Write verification failed"
+        ));
+    }
+
+    Ok(WriteResult {
+        path: path.to_owned(),
+        size_bytes: content.len(),
+        checksum: compute_checksum(content),
+        checksum_before,
+        backup_path,
+    })
+}
+
+fn create_backup(path: &Path, backup_dir: &Path) -> io::Result<PathBuf> {
+    fs::create_dir_all(backup_dir)?;
+    let timestamp = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S");
+    let backup_name = format!(
+        "{}.{}.bak",
+        path.file_name().unwrap().to_string_lossy(),
+        timestamp
+    );
+    let backup_path = backup_dir.join(&backup_name);
+    fs::copy(path, &backup_path)?;
+
+    // Rotate old backups (keep last 3)
+    rotate_backups(backup_dir, path, 3)?;
+
+    Ok(backup_path)
+}
+
+fn compute_checksum(content: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content);
+    format!("sha256:{:x}", hasher.finalize())
+}`,
+
+    backup: `{
+  "file": "src/auth/jwt.rs",
+  "backup_path": "~/.local/state/hyle/backups/myproject/src/auth/jwt.rs.2026-01-10T14:23:15.bak",
+  "created_at": "2026-01-10T14:23:15Z",
+  "session_id": "sess_8f3a2b1c",
+  "operation": "write",
+  "prompt": "add token expiration check to verify_token function",
+  "model": "deepseek-coder",
+  "original": {
+    "checksum": "sha256:a1b2c3d4e5f6789...",
+    "size_bytes": 2847,
+    "lines": 98
+  },
+  "retention": {
+    "keep_count": 3,
+    "keep_days": 7,
+    "auto_compress_after_days": 1
+  },
+  "restore_command": "hyle restore src/auth/jwt.rs --version 2026-01-10T14:23:15"
+}`,
+
+    audit: `// Audit log schema
+// Format: JSONL (one JSON object per line)
+// Location: ~/.local/state/hyle/audit.jsonl
+
+interface AuditRecord {
+  // Timing
+  timestamp: string;          // ISO 8601
+  duration_ms: number;
+
+  // Session
+  session_id: string;
+  sequence: number;           // Operation index in session
+
+  // Operation
+  operation: "read" | "write" | "patch" | "bash" | "glob" | "grep";
+  status: "success" | "blocked" | "error" | "timeout";
+
+  // File operations
+  file?: string;
+  lines_changed?: number;
+  checksum_before?: string;
+  checksum_after?: string;
+  backup_path?: string;
+
+  // Bash operations
+  command?: string;
+  exit_code?: number;
+  stdout_lines?: number;
+  stderr_lines?: number;
+  blocked_reason?: string;
+
+  // AI context
+  prompt: string;
+  model: string;
+  tokens_input?: number;
+  tokens_output?: number;
+
+  // Environment
+  user: string;               // $USER
+  hostname: string;
+  cwd: string;
+  git_branch?: string;
+  git_commit?: string;
+}
+
+// Query examples:
+// All writes today:
+//   jq 'select(.operation == "write")' audit.jsonl
+
+// Blocked commands:
+//   jq 'select(.status == "blocked")' audit.jsonl
+
+// By session:
+//   jq 'select(.session_id == "sess_abc123")' audit.jsonl`
+  };
+
+  const prompts = {
+    blocklist: `# Add custom blocklist patterns
+# ~/.config/hyle/blocklist.toml
+
+[patterns.custom]
+# Add your infrastructure-specific patterns
+my_patterns = [
+    "kubectl delete namespace production",
+    "terraform destroy",
+    "aws ec2 terminate-instances",
+]`,
+
+    atomic: `Show me the atomic write implementation in hyle.
+I need to understand how it prevents corruption
+and implements the write-temp-fsync-rename pattern.`,
+
+    backup: `Configure backup retention for my project.
+I want to keep 5 versions instead of 3,
+and compress backups after 12 hours.`,
+
+    audit: `Export audit log for the last 24 hours.
+Filter to only write and bash operations.
+Format as JSON for compliance review.`,
+
+    config: `# Set up hyle with secure config
+hyle config set key YOUR_OPENROUTER_KEY
+chmod 600 ~/.config/hyle/config.json`,
+
+    timeout: `# Configure timeouts for your project
+# ~/.config/hyle/config.toml
+
+[timeouts]
+bash = "120s"  # Double default for slow builds
+
+[timeouts.overrides]
+"cargo build --release" = "600s"
+"npm run build" = "300s"`
+  };
+
+  const demos = [
+    {
+      title: 'Blocked destructive command',
+      lines: [
+        { text: '$ hyle', type: 'prompt' },
+        { text: '> clean up all the temporary files', type: 'input' },
+        { text: '', type: 'blank' },
+        { text: '[analyzing request...]', type: 'dim' },
+        { text: '[generating cleanup command...]', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: '[BLOCKED] Destructive pattern detected:', type: 'error' },
+        { text: '  rm -rf /tmp/* ~/.cache/* ./target/', type: 'error' },
+        { text: '', type: 'blank' },
+        { text: 'Pattern: rm -rf', type: 'dim' },
+        { text: 'Reason: Recursive force delete', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: 'Safe alternatives:', type: 'prompt' },
+        { text: '  cargo clean', type: 'dim' },
+        { text: '  rm -ri (interactive)', type: 'dim' },
+      ]
+    },
+    {
+      title: 'Atomic write with backup',
+      lines: [
+        { text: '$ hyle', type: 'prompt' },
+        { text: '> add rate limiting to the auth handler', type: 'input' },
+        { text: '', type: 'blank' },
+        { text: '[reading src/handlers/auth.rs...]', type: 'dim' },
+        { text: '[creating backup: auth.rs.2026-01-10T16:42:03.bak]', type: 'dim' },
+        { text: '[writing to auth.rs.tmp.48291...]', type: 'dim' },
+        { text: '[fsync: forcing to disk...]', type: 'dim' },
+        { text: '[atomic rename: tmp -> auth.rs]', type: 'dim' },
+        { text: '[verifying: checksum match confirmed]', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: 'Updated src/handlers/auth.rs', type: 'success' },
+        { text: 'Backup: ~/.local/state/hyle/backups/...', type: 'dim' },
+      ]
+    },
+    {
+      title: 'Audit log query',
+      lines: [
+        { text: '$ hyle audit --since "1h" --operation write', type: 'prompt' },
+        { text: '', type: 'blank' },
+        { text: 'TIMESTAMP            FILE                    LINES  PROMPT', type: 'dim' },
+        { text: '2026-01-10T16:42:03  src/handlers/auth.rs    +47    add rate limiting', type: 'success' },
+        { text: '2026-01-10T16:38:15  src/middleware/log.rs   +12    add request id', type: 'success' },
+        { text: '2026-01-10T16:35:02  src/config.rs           +8     add timeout config', type: 'success' },
+        { text: '', type: 'blank' },
+        { text: '3 operations, 67 lines changed', type: 'dim' },
+        { text: 'All operations have backups available', type: 'dim' },
+      ]
+    }
+  ];
+
+  let currentDemo = 0;
+  let currentLine = 0;
+  let isPlaying = false;
+  let interval = null;
+
+  function renderLine(line) {
+    const div = document.createElement('div');
+    div.className = 'replay-line';
+    switch(line.type) {
+      case 'prompt':
+        div.innerHTML = `<span class="prompt">${line.text}</span>`;
+        break;
+      case 'input':
+        div.textContent = line.text;
+        break;
+      case 'dim':
+        div.innerHTML = `<span class="dim">${line.text}</span>`;
+        break;
+      case 'error':
+        div.innerHTML = `<span class="error">${line.text}</span>`;
+        break;
+      case 'warn':
+        div.innerHTML = `<span class="warn">${line.text}</span>`;
+        break;
+      case 'success':
+        div.innerHTML = `<span class="success">${line.text}</span>`;
+        break;
+      default:
+        div.innerHTML = '&nbsp;';
+    }
+    return div;
+  }
+
+  function playNext() {
+    const demo = demos[currentDemo];
+    const body = document.getElementById('terminalBody');
+    if (currentLine < demo.lines.length) {
+      body.appendChild(renderLine(demo.lines[currentLine]));
+      currentLine++;
+    } else {
+      stopReplay();
+    }
+  }
+
+  function startReplay() {
+    isPlaying = true;
+    document.getElementById('playBtn').textContent = 'pause';
+    document.getElementById('playBtn').classList.add('active');
+    interval = setInterval(playNext, 280);
+  }
+
+  function stopReplay() {
+    isPlaying = false;
+    document.getElementById('playBtn').textContent = 'play';
+    document.getElementById('playBtn').classList.remove('active');
+    if (interval) { clearInterval(interval); interval = null; }
+  }
+
+  function toggleReplay() {
+    if (isPlaying) stopReplay(); else startReplay();
+  }
+
+  function restartReplay() {
+    stopReplay();
+    currentLine = 0;
+    document.getElementById('terminalBody').innerHTML = '';
+    startReplay();
+  }
+
+  function cycleDemo() {
+    stopReplay();
+    currentDemo = (currentDemo + 1) % demos.length;
+    currentLine = 0;
+    document.getElementById('terminalBody').innerHTML = '';
+    startReplay();
+  }
+
+  function toggleItem(el) {
+    document.querySelectorAll('.security-item.open').forEach(e => {
+      if (e !== el) e.classList.remove('open');
+    });
+    el.classList.toggle('open');
+  }
+
+  function showFile(key) {
+    const content = files[key];
+    if (!content) return;
+
+    const lines = content.split('\n');
+    const numbered = lines.map((line, i) =>
+      `<span class="line-num">${String(i + 1).padStart(3)}</span>${escapeHtml(line)}`
+    ).join('\n');
+
+    const titles = {
+      blocklist: 'blocklist.toml',
+      atomic: 'src/fs/atomic.rs',
+      backup: 'backup_metadata.json',
+      audit: 'audit_schema.ts'
+    };
+
+    document.getElementById('modalTitle').textContent = titles[key] || key;
+    document.getElementById('modalBody').innerHTML = `<pre>${numbered}</pre>`;
+    document.getElementById('modal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function copyPrompt(key) {
+    const prompt = prompts[key];
+    if (!prompt) return;
+
+    navigator.clipboard.writeText(prompt).then(() => {
+      event.target.textContent = 'copied!';
+      event.target.classList.add('copied');
+      setTimeout(() => {
+        event.target.textContent = 'copy config';
+        event.target.classList.remove('copied');
+      }, 1500);
+    });
+  }
+
+  function showBlockedDetail(pattern) {
+    const details = {
+      rm: 'rm -rf recursively deletes files without confirmation. A typo like "rm -rf / tmp" (note the space) deletes your entire filesystem.',
+      root: 'rm -r / deletes the root filesystem. Even with --no-preserve-root protection, this pattern indicates dangerous intent.',
+      fork: 'Fork bomb: :(){ :|:& };: creates processes exponentially until system crashes. Can require hard reboot.',
+      dd: 'dd if=/dev/zero writes zeros to disk, destroying all data. Often used accidentally with wrong of= target.',
+      curl: 'curl | sh downloads and executes arbitrary code. Attacker-controlled URL = attacker-controlled shell.',
+      wget: 'wget | bash is equivalent to curl | sh. Never pipe untrusted URLs to shell interpreters.',
+      sda: '> /dev/sda redirects output directly to disk device, bypassing filesystem. Corrupts partition table.',
+      mkfs: 'mkfs.* formats a filesystem, destroying all data. Blocks mkfs.ext4, mkfs.xfs, etc.'
+    };
+    alert(details[pattern] || 'Pattern blocked for safety.');
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  window.addEventListener('load', () => setTimeout(startReplay, 500));
+</script>
 </body>
 </html>
