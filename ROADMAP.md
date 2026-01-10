@@ -75,6 +75,20 @@
 
 ---
 
+## v0.6 - Advanced TUI
+
+**Goal:** Novel interaction patterns
+
+- [ ] Pinned prompts (click to pin, float at top)
+- [ ] Relevance decay indicator per pinned prompt
+- [ ] Retrigger widget (re-run pinned prompt)
+- [ ] Clickable elements in terminal output
+- [ ] Prompt history browser with fuzzy search
+- [ ] Split view: code diff + conversation
+- [ ] 120+ tests
+
+---
+
 ## v1.0 - Release
 
 **Goal:** All landing page promises delivered

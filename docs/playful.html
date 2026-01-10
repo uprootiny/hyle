@@ -8,6 +8,7 @@
     @keyframes drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
     @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
     @keyframes gradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+    @keyframes typing { from { width: 0; } to { width: 100%; } }
 
     :root {
       --bg: #1a1625;
@@ -55,7 +56,7 @@
 
     .hero {
       text-align: center;
-      padding: 4rem 0;
+      padding: 4rem 0 2rem;
     }
     h1 {
       font-size: clamp(2.5rem, 10vw, 5rem);
@@ -74,7 +75,142 @@
       margin-bottom: 2rem;
     }
 
-    /* Live canvas demo */
+    h2 {
+      font-size: 1.1rem;
+      color: var(--iris);
+      margin-bottom: 1rem;
+      font-weight: normal;
+      text-align: center;
+    }
+
+    /* Prompt Composer */
+    .composer {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+    .composer-row {
+      margin-bottom: 1rem;
+    }
+    .composer-label {
+      font-size: 0.75rem;
+      color: var(--pine);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .pill-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .pill {
+      padding: 0.4rem 0.9rem;
+      border-radius: 20px;
+      border: 1px solid;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: transparent;
+      font-family: inherit;
+    }
+    .pill:hover { transform: scale(1.05); }
+    .pill.selected { color: var(--bg) !important; }
+
+    .pill[data-cat="type"] { border-color: var(--rose); color: var(--rose); }
+    .pill[data-cat="type"].selected { background: var(--rose); }
+    .pill[data-cat="visual"] { border-color: var(--gold); color: var(--gold); }
+    .pill[data-cat="visual"].selected { background: var(--gold); }
+    .pill[data-cat="physics"] { border-color: var(--foam); color: var(--foam); }
+    .pill[data-cat="physics"].selected { background: var(--foam); }
+    .pill[data-cat="color"] { border-color: var(--iris); color: var(--iris); }
+    .pill[data-cat="color"].selected { background: var(--iris); }
+    .pill[data-cat="export"] { border-color: var(--pine); color: var(--pine); }
+    .pill[data-cat="export"].selected { background: var(--pine); }
+
+    .composed-prompt {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+      min-height: 60px;
+      font-size: 0.85rem;
+      color: var(--foam);
+      line-height: 1.6;
+    }
+    .composed-prompt:empty::before {
+      content: 'Select pills to compose your prompt...';
+      color: var(--pine);
+      opacity: 0.6;
+    }
+    .composer-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .composer-btn {
+      padding: 0.6rem 1.5rem;
+      border-radius: 8px;
+      border: none;
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-generate {
+      background: linear-gradient(135deg, var(--rose), var(--iris));
+      color: var(--bg);
+      flex: 1;
+    }
+    .btn-generate:hover { transform: scale(1.02); box-shadow: 0 4px 20px rgba(235, 111, 146, 0.3); }
+    .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-clear {
+      background: transparent;
+      border: 1px solid var(--pine);
+      color: var(--pine);
+    }
+    .btn-clear:hover { border-color: var(--fg); color: var(--fg); }
+    .btn-copy {
+      background: transparent;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+    }
+    .btn-copy:hover { background: var(--gold); color: var(--bg); }
+
+    /* Live Generation Preview */
+    .generation-preview {
+      background: var(--surface);
+      border-radius: 12px;
+      margin: 2rem 0;
+      overflow: hidden;
+      display: none;
+    }
+    .generation-preview.active { display: block; }
+    .gen-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: rgba(0,0,0,0.2);
+    }
+    .gen-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rose); }
+    .gen-dot.generating { animation: pulse 0.5s infinite; background: var(--foam); }
+    .gen-status { font-size: 0.8rem; color: var(--pine); }
+    .gen-body {
+      padding: 1rem;
+      font-size: 0.85rem;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .gen-line { margin: 0.25rem 0; opacity: 0; animation: fadeIn 0.3s forwards; }
+    @keyframes fadeIn { to { opacity: 1; } }
+    .gen-file { color: var(--gold); }
+    .gen-code { color: var(--fg); padding-left: 1rem; }
+    .gen-action { color: var(--foam); }
+    .gen-comment { color: var(--pine); font-style: italic; }
+
+    /* Interactive demo canvas */
     .demo-canvas {
       width: 100%;
       height: 200px;
@@ -118,19 +254,9 @@
     .project:nth-child(5) .project-preview { background: linear-gradient(135deg, var(--pine), var(--gold)); }
     .project:nth-child(6) .project-preview { background: linear-gradient(135deg, var(--rose), var(--foam)); }
 
-    .project-info {
-      padding: 1rem;
-    }
-    .project-title {
-      font-size: 1rem;
-      margin-bottom: 0.5rem;
-      color: var(--fg);
-    }
-    .project-desc {
-      font-size: 0.8rem;
-      color: var(--pine);
-      margin-bottom: 0.75rem;
-    }
+    .project-info { padding: 1rem; }
+    .project-title { font-size: 1rem; margin-bottom: 0.5rem; color: var(--fg); }
+    .project-desc { font-size: 0.8rem; color: var(--pine); margin-bottom: 0.75rem; }
     .project-prompt {
       display: none;
       background: var(--bg);
@@ -141,10 +267,7 @@
       margin-top: 0.75rem;
     }
     .project.expanded .project-prompt { display: block; }
-    .project-actions {
-      display: flex;
-      gap: 0.5rem;
-    }
+    .project-actions { display: flex; gap: 0.5rem; }
     .project-btn {
       flex: 1;
       padding: 0.5rem;
@@ -155,8 +278,8 @@
       cursor: pointer;
       transition: background 0.2s;
     }
-    .btn-copy { background: var(--pine); color: var(--fg); }
-    .btn-copy:hover { background: var(--foam); color: var(--bg); }
+    .btn-copy-proj { background: var(--pine); color: var(--fg); }
+    .btn-copy-proj:hover { background: var(--foam); color: var(--bg); }
     .btn-expand { background: transparent; border: 1px solid var(--pine); color: var(--pine); }
     .btn-expand:hover { border-color: var(--iris); color: var(--iris); }
 
@@ -174,25 +297,16 @@
       align-items: center;
       gap: 0.5rem;
     }
-    .terminal-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-    }
+    .terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
     .dot-red { background: #ff5f56; }
     .dot-yellow { background: #ffbd2e; }
     .dot-green { background: #27c93f; }
-    .terminal-title {
-      flex: 1;
-      text-align: center;
-      font-size: 0.8rem;
-      color: #666;
-    }
+    .terminal-title { flex: 1; text-align: center; font-size: 0.8rem; color: #666; }
     .terminal-body {
       padding: 1rem;
       font-size: 0.85rem;
       line-height: 1.6;
-      height: 300px;
+      height: 350px;
       overflow-y: auto;
     }
     .term-line { margin: 0.25rem 0; }
@@ -227,87 +341,6 @@
     }
     .term-btn:hover { background: var(--pine); }
 
-    /* Code preview */
-    .code-modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.9);
-      z-index: 1000;
-      padding: 2rem;
-      overflow-y: auto;
-    }
-    .code-modal.open { display: flex; flex-direction: column; }
-    .code-modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-    .code-modal-title { color: var(--gold); font-size: 1rem; }
-    .code-modal-close {
-      background: none;
-      border: none;
-      color: var(--fg);
-      font-size: 1.5rem;
-      cursor: pointer;
-    }
-    .code-modal-body {
-      flex: 1;
-      background: #0d0d0d;
-      border-radius: 8px;
-      padding: 1rem;
-      overflow: auto;
-    }
-    .code-modal-body pre {
-      margin: 0;
-      font-size: 0.8rem;
-      line-height: 1.5;
-    }
-    .line-num { color: #555; margin-right: 1rem; user-select: none; }
-
-    /* Ideas section */
-    .ideas {
-      text-align: center;
-      margin: 3rem 0;
-    }
-    .ideas h2 {
-      font-size: 1.2rem;
-      color: var(--iris);
-      margin-bottom: 1.5rem;
-      font-weight: normal;
-    }
-    .idea-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      justify-content: center;
-    }
-    .idea-tag {
-      padding: 0.5rem 1rem;
-      background: transparent;
-      border: 1px solid;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .idea-tag:nth-child(1) { border-color: var(--rose); color: var(--rose); }
-    .idea-tag:nth-child(2) { border-color: var(--gold); color: var(--gold); }
-    .idea-tag:nth-child(3) { border-color: var(--iris); color: var(--iris); }
-    .idea-tag:nth-child(4) { border-color: var(--foam); color: var(--foam); }
-    .idea-tag:nth-child(5) { border-color: var(--pine); color: var(--pine); }
-    .idea-tag:nth-child(6) { border-color: var(--rose); color: var(--rose); }
-    .idea-tag:nth-child(7) { border-color: var(--gold); color: var(--gold); }
-    .idea-tag:nth-child(8) { border-color: var(--iris); color: var(--iris); }
-    .idea-tag:hover {
-      background: currentColor;
-      color: var(--bg);
-    }
-
     .cta {
       text-align: center;
       margin: 4rem 0 2rem;
@@ -323,10 +356,7 @@
       font-weight: 500;
       transition: all 0.3s;
     }
-    .cta a:hover {
-      background: var(--iris);
-      color: var(--bg);
-    }
+    .cta a:hover { background: var(--iris); color: var(--bg); }
 
     footer {
       text-align: center;
@@ -342,7 +372,6 @@
       background: transparent; border: 1px solid var(--pine);
       color: var(--pine); cursor: pointer; font-size: 12px;
       display: flex; align-items: center; justify-content: center;
-      transition: all 0.3s;
     }
     .switcher-toggle:hover { border-color: var(--iris); color: var(--iris); }
     .switcher-panel {
@@ -368,8 +397,81 @@
       <p class="tagline">describe it. watch it emerge.</p>
     </div>
 
+    <h2>compose your vision</h2>
+    <div class="composer">
+      <div class="composer-row">
+        <div class="composer-label">Type</div>
+        <div class="pill-group">
+          <button class="pill" data-cat="type" data-text="particle system">particles</button>
+          <button class="pill" data-cat="type" data-text="shader">shader</button>
+          <button class="pill" data-cat="type" data-text="physics simulation">physics</button>
+          <button class="pill" data-cat="type" data-text="fractal">fractal</button>
+          <button class="pill" data-cat="type" data-text="cellular automaton">automata</button>
+          <button class="pill" data-cat="type" data-text="generative tree">l-system</button>
+        </div>
+      </div>
+      <div class="composer-row">
+        <div class="composer-label">Visual Style</div>
+        <div class="pill-group">
+          <button class="pill" data-cat="visual" data-text="with trails">trails</button>
+          <button class="pill" data-cat="visual" data-text="with glow effect">glow</button>
+          <button class="pill" data-cat="visual" data-text="wireframe">wireframe</button>
+          <button class="pill" data-cat="visual" data-text="filled polygons">solid</button>
+          <button class="pill" data-cat="visual" data-text="with blur">blur</button>
+          <button class="pill" data-cat="visual" data-text="pixelated">pixel</button>
+        </div>
+      </div>
+      <div class="composer-row">
+        <div class="composer-label">Behavior</div>
+        <div class="pill-group">
+          <button class="pill" data-cat="physics" data-text="responding to mouse position">mouse reactive</button>
+          <button class="pill" data-cat="physics" data-text="driven by audio FFT">audio reactive</button>
+          <button class="pill" data-cat="physics" data-text="with perlin noise flow field">flow field</button>
+          <button class="pill" data-cat="physics" data-text="with gravity and collision">physics</button>
+          <button class="pill" data-cat="physics" data-text="orbiting a center point">orbital</button>
+        </div>
+      </div>
+      <div class="composer-row">
+        <div class="composer-label">Colors</div>
+        <div class="pill-group">
+          <button class="pill" data-cat="color" data-text="using rainbow hue cycling">rainbow</button>
+          <button class="pill" data-cat="color" data-text="with viridis colormap">viridis</button>
+          <button class="pill" data-cat="color" data-text="black and white only">monochrome</button>
+          <button class="pill" data-cat="color" data-text="with neon cyberpunk palette">neon</button>
+          <button class="pill" data-cat="color" data-text="earth tones palette">earth</button>
+          <button class="pill" data-cat="color" data-text="velocity-based coloring">velocity</button>
+        </div>
+      </div>
+      <div class="composer-row">
+        <div class="composer-label">Output</div>
+        <div class="pill-group">
+          <button class="pill" data-cat="export" data-text="export frames as png sequence">png sequence</button>
+          <button class="pill" data-cat="export" data-text="save as gif">gif</button>
+          <button class="pill" data-cat="export" data-text="fullscreen mode">fullscreen</button>
+          <button class="pill" data-cat="export" data-text="with fps counter">show fps</button>
+        </div>
+      </div>
+
+      <div class="composed-prompt" id="composedPrompt"></div>
+
+      <div class="composer-actions">
+        <button class="composer-btn btn-clear" onclick="clearPills()">Clear</button>
+        <button class="composer-btn btn-copy" onclick="copyComposed()">Copy</button>
+        <button class="composer-btn btn-generate" id="generateBtn" onclick="generateFromComposed()" disabled>Generate</button>
+      </div>
+    </div>
+
+    <div class="generation-preview" id="generationPreview">
+      <div class="gen-header">
+        <div class="gen-dot" id="genDot"></div>
+        <span class="gen-status" id="genStatus">Generating...</span>
+      </div>
+      <div class="gen-body" id="genBody"></div>
+    </div>
+
     <canvas class="demo-canvas" id="demoCanvas"></canvas>
 
+    <h2>example projects</h2>
     <div class="projects">
       <div class="project" onclick="toggleProject(this)">
         <div class="project-preview">~</div>
@@ -380,8 +482,8 @@
             <strong>Prompt:</strong> create a particle system with 10000 particles following a perlin noise flow field. use webgl for rendering. color particles by their velocity magnitude using a viridis colormap. add mouse interaction to push particles away.
           </div>
           <div class="project-actions">
-            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(0)">Copy prompt</button>
-            <button class="project-btn btn-expand">Show code</button>
+            <button class="project-btn btn-copy-proj" onclick="event.stopPropagation(); copyPrompt(0)">Copy prompt</button>
+            <button class="project-btn btn-expand">Expand</button>
           </div>
         </div>
       </div>
@@ -395,8 +497,8 @@
             <strong>Prompt:</strong> build an audio visualizer with concentric rings. use web audio api to get FFT data. map low frequencies to inner rings, highs to outer. smooth the values with exponential decay. add bloom effect using offscreen canvas.
           </div>
           <div class="project-actions">
-            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(1)">Copy prompt</button>
-            <button class="project-btn btn-expand">Show code</button>
+            <button class="project-btn btn-copy-proj" onclick="event.stopPropagation(); copyPrompt(1)">Copy prompt</button>
+            <button class="project-btn btn-expand">Expand</button>
           </div>
         </div>
       </div>
@@ -410,8 +512,8 @@
             <strong>Prompt:</strong> implement an l-system tree generator. start with axiom "F" and rules F -> FF+[+F-F-F]-[-F+F+F]. add random angle variation for organic look. simulate wind with sinusoidal branch displacement. cycle colors through seasons.
           </div>
           <div class="project-actions">
-            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(2)">Copy prompt</button>
-            <button class="project-btn btn-expand">Show code</button>
+            <button class="project-btn btn-copy-proj" onclick="event.stopPropagation(); copyPrompt(2)">Copy prompt</button>
+            <button class="project-btn btn-expand">Expand</button>
           </div>
         </div>
       </div>
@@ -425,8 +527,8 @@
             <strong>Prompt:</strong> implement gray-scott reaction diffusion. use webgl compute shaders for the simulation. expose feed rate (0.055) and kill rate (0.062) as sliders. render chemical A as brightness. add click to inject chemical B.
           </div>
           <div class="project-actions">
-            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(3)">Copy prompt</button>
-            <button class="project-btn btn-expand">Show code</button>
+            <button class="project-btn btn-copy-proj" onclick="event.stopPropagation(); copyPrompt(3)">Copy prompt</button>
+            <button class="project-btn btn-expand">Expand</button>
           </div>
         </div>
       </div>
@@ -440,8 +542,8 @@
             <strong>Prompt:</strong> create a cloth simulation using verlet integration. make a 30x30 grid of points connected by distance constraints. pin top row. add gravity and wind (oscillating horizontal force). solve constraints 3 times per frame. render as triangles.
           </div>
           <div class="project-actions">
-            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(4)">Copy prompt</button>
-            <button class="project-btn btn-expand">Show code</button>
+            <button class="project-btn btn-copy-proj" onclick="event.stopPropagation(); copyPrompt(4)">Copy prompt</button>
+            <button class="project-btn btn-expand">Expand</button>
           </div>
         </div>
       </div>
@@ -455,13 +557,14 @@
             <strong>Prompt:</strong> implement 2d metaballs in a fragment shader. place 8 blobs with smooth movement using sin/cos. compute distance field as sum of (radius/distance). threshold at 1.0 for the surface. add inner glow using field gradient.
           </div>
           <div class="project-actions">
-            <button class="project-btn btn-copy" onclick="event.stopPropagation(); copyPrompt(5)">Copy prompt</button>
-            <button class="project-btn btn-expand">Show code</button>
+            <button class="project-btn btn-copy-proj" onclick="event.stopPropagation(); copyPrompt(5)">Copy prompt</button>
+            <button class="project-btn btn-expand">Expand</button>
           </div>
         </div>
       </div>
     </div>
 
+    <h2>watch it happen</h2>
     <div class="terminal">
       <div class="terminal-header">
         <span class="terminal-dot dot-red"></span>
@@ -478,20 +581,6 @@
       </div>
     </div>
 
-    <div class="ideas">
-      <h2>explore possibilities</h2>
-      <div class="idea-tags">
-        <span class="idea-tag" onclick="showIdea(this)">generative art</span>
-        <span class="idea-tag" onclick="showIdea(this)">shaders</span>
-        <span class="idea-tag" onclick="showIdea(this)">physics sims</span>
-        <span class="idea-tag" onclick="showIdea(this)">audio reactive</span>
-        <span class="idea-tag" onclick="showIdea(this)">fractals</span>
-        <span class="idea-tag" onclick="showIdea(this)">cellular automata</span>
-        <span class="idea-tag" onclick="showIdea(this)">procedural</span>
-        <span class="idea-tag" onclick="showIdea(this)">data viz</span>
-      </div>
-    </div>
-
     <div class="cta">
       <a href="https://github.com/uprootiny/hyle">start creating</a>
     </div>
@@ -500,16 +589,6 @@
       <a href="https://github.com/uprootiny/hyle">github</a> &middot; mit license &middot; built for makers
     </footer>
   </main>
-
-  <div class="code-modal" id="codeModal">
-    <div class="code-modal-header">
-      <span class="code-modal-title" id="modalTitle">particle_flow.rs</span>
-      <button class="code-modal-close" onclick="closeModal()">&times;</button>
-    </div>
-    <div class="code-modal-body">
-      <pre id="modalCode"></pre>
-    </div>
-  </div>
 
   <div class="variant-switcher">
     <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">*</div>
@@ -576,7 +655,6 @@
       ctx.fillRect(0, 0, demoCanvas.width, demoCanvas.height);
 
       particles.forEach(p => {
-        // Attract to mouse
         const dx = mouse.x - p.x;
         const dy = mouse.y - p.y;
         const dist = Math.sqrt(dx*dx + dy*dy);
@@ -584,28 +662,20 @@
           p.vx += dx / dist * 0.5;
           p.vy += dy / dist * 0.5;
         }
-
-        // Damping
         p.vx *= 0.98;
         p.vy *= 0.98;
-
-        // Update position
         p.x += p.vx;
         p.y += p.vy;
-
-        // Wrap around
         if (p.x < 0) p.x = demoCanvas.width;
         if (p.x > demoCanvas.width) p.x = 0;
         if (p.y < 0) p.y = demoCanvas.height;
         if (p.y > demoCanvas.height) p.y = 0;
 
-        // Draw
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
         ctx.fill();
       });
-
       requestAnimationFrame(animateParticles);
     }
 
@@ -619,6 +689,156 @@
     animateParticles();
     window.addEventListener('resize', resizeCanvas);
 
+    // Pill composer
+    const selectedPills = new Map();
+
+    document.querySelectorAll('.pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        const cat = pill.dataset.cat;
+        const text = pill.dataset.text;
+
+        // Deselect other pills in same category
+        document.querySelectorAll(`.pill[data-cat="${cat}"]`).forEach(p => {
+          p.classList.remove('selected');
+          selectedPills.delete(p);
+        });
+
+        // Toggle this pill
+        if (selectedPills.has(pill)) {
+          selectedPills.delete(pill);
+          pill.classList.remove('selected');
+        } else {
+          selectedPills.set(pill, text);
+          pill.classList.add('selected');
+        }
+
+        updateComposedPrompt();
+      });
+    });
+
+    function updateComposedPrompt() {
+      const parts = [];
+      const categories = ['type', 'visual', 'physics', 'color', 'export'];
+
+      categories.forEach(cat => {
+        document.querySelectorAll(`.pill[data-cat="${cat}"].selected`).forEach(pill => {
+          parts.push(pill.dataset.text);
+        });
+      });
+
+      const prompt = parts.length > 0
+        ? `create a ${parts.join(' ')}`
+        : '';
+
+      document.getElementById('composedPrompt').textContent = prompt;
+      document.getElementById('generateBtn').disabled = parts.length === 0;
+    }
+
+    function clearPills() {
+      document.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+      selectedPills.clear();
+      updateComposedPrompt();
+      document.getElementById('generationPreview').classList.remove('active');
+    }
+
+    function copyComposed() {
+      const text = document.getElementById('composedPrompt').textContent;
+      if (text) {
+        navigator.clipboard.writeText(text);
+        const btn = event.target;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+      }
+    }
+
+    // Generation simulation
+    function generateFromComposed() {
+      const prompt = document.getElementById('composedPrompt').textContent;
+      if (!prompt) return;
+
+      const preview = document.getElementById('generationPreview');
+      const genBody = document.getElementById('genBody');
+      const genDot = document.getElementById('genDot');
+      const genStatus = document.getElementById('genStatus');
+
+      preview.classList.add('active');
+      genBody.innerHTML = '';
+      genDot.classList.add('generating');
+      genStatus.textContent = 'Generating...';
+
+      // Parse prompt for generation
+      const hasParticles = prompt.includes('particle');
+      const hasShader = prompt.includes('shader');
+      const hasPhysics = prompt.includes('physics');
+      const hasAudio = prompt.includes('audio');
+      const hasMouse = prompt.includes('mouse');
+      const hasExport = prompt.includes('export') || prompt.includes('gif');
+
+      const lines = [
+        { type: 'action', text: `> ${prompt}`, delay: 0 },
+        { type: 'comment', text: '# analyzing requirements...', delay: 400 },
+        { type: 'action', text: '[read] Cargo.toml', delay: 800 },
+        { type: 'action', text: '[read] src/main.rs', delay: 1000 },
+      ];
+
+      if (hasParticles) {
+        lines.push({ type: 'action', text: '[write] src/particles.rs', delay: 1300 });
+        lines.push({ type: 'code', text: 'pub struct Particle {', delay: 1400 });
+        lines.push({ type: 'code', text: '    pos: Vec2,', delay: 1500 });
+        lines.push({ type: 'code', text: '    vel: Vec2,', delay: 1600 });
+        lines.push({ type: 'code', text: '    color: Color,', delay: 1700 });
+        lines.push({ type: 'code', text: '}', delay: 1800 });
+      }
+
+      if (hasShader) {
+        lines.push({ type: 'action', text: '[write] shaders/frag.glsl', delay: 1900 });
+        lines.push({ type: 'code', text: 'void main() {', delay: 2000 });
+        lines.push({ type: 'code', text: '    vec2 uv = gl_FragCoord.xy / resolution;', delay: 2100 });
+        lines.push({ type: 'code', text: '    // compute effect...', delay: 2200 });
+        lines.push({ type: 'code', text: '}', delay: 2300 });
+      }
+
+      if (hasAudio) {
+        lines.push({ type: 'action', text: '[write] src/audio.rs', delay: 2400 });
+        lines.push({ type: 'code', text: 'use cpal::traits::*;', delay: 2500 });
+        lines.push({ type: 'code', text: 'use rustfft::FftPlanner;', delay: 2600 });
+      }
+
+      if (hasMouse) {
+        lines.push({ type: 'action', text: '[patch] src/input.rs', delay: 2700 });
+        lines.push({ type: 'code', text: 'fn handle_mouse(&mut self, pos: Vec2) {', delay: 2800 });
+        lines.push({ type: 'code', text: '    self.mouse_pos = pos;', delay: 2900 });
+        lines.push({ type: 'code', text: '}', delay: 3000 });
+      }
+
+      if (hasExport) {
+        lines.push({ type: 'action', text: '[write] src/export.rs', delay: 3100 });
+        lines.push({ type: 'code', text: 'use image::{ImageBuffer, Rgba};', delay: 3200 });
+      }
+
+      lines.push({ type: 'action', text: '[bash] cargo build --release', delay: 3400 });
+      lines.push({ type: 'comment', text: 'Compiling creative_project v0.1.0', delay: 3700 });
+      lines.push({ type: 'comment', text: 'Finished release [optimized] target(s)', delay: 4200 });
+      lines.push({ type: 'action', text: '[bash] cargo run --release', delay: 4500 });
+      lines.push({ type: 'comment', text: '# window opens with your creation', delay: 4800 });
+
+      lines.forEach(line => {
+        setTimeout(() => {
+          const div = document.createElement('div');
+          div.className = 'gen-line gen-' + line.type;
+          div.textContent = line.text;
+          div.style.animationDelay = '0s';
+          genBody.appendChild(div);
+          genBody.scrollTop = genBody.scrollHeight;
+        }, line.delay);
+      });
+
+      setTimeout(() => {
+        genDot.classList.remove('generating');
+        genStatus.textContent = 'Complete';
+      }, 5000);
+    }
+
     // Project prompts
     const prompts = [
       'create a particle system with 10000 particles following a perlin noise flow field. use webgl for rendering. color particles by their velocity magnitude using a viridis colormap. add mouse interaction to push particles away.',
@@ -629,9 +849,7 @@
       'implement 2d metaballs in a fragment shader. place 8 blobs with smooth movement using sin/cos. compute distance field as sum of (radius/distance). threshold at 1.0 for the surface. add inner glow using field gradient.'
     ];
 
-    function toggleProject(el) {
-      el.classList.toggle('expanded');
-    }
+    function toggleProject(el) { el.classList.toggle('expanded'); }
 
     function copyPrompt(idx) {
       navigator.clipboard.writeText(prompts[idx]);
@@ -674,6 +892,43 @@
       },
       {
         lines: [
+          { type: 'prompt', text: '> implement reaction diffusion with adjustable parameters' },
+          { type: 'output', text: '[read] src/main.rs' },
+          { type: 'comment', text: '# setting up Gray-Scott simulation...' },
+          { type: 'output', text: '[write] src/simulation.rs' },
+          { type: 'file', text: 'pub struct GrayScott {' },
+          { type: 'file', text: '    grid_a: Vec<Vec<f32>>,' },
+          { type: 'file', text: '    grid_b: Vec<Vec<f32>>,' },
+          { type: 'file', text: '    feed: f32,  // default 0.055' },
+          { type: 'file', text: '    kill: f32,  // default 0.062' },
+          { type: 'file', text: '    da: f32,    // diffusion A: 1.0' },
+          { type: 'file', text: '    db: f32,    // diffusion B: 0.5' },
+          { type: 'file', text: '}' },
+          { type: 'file', text: '' },
+          { type: 'file', text: 'impl GrayScott {' },
+          { type: 'file', text: '    pub fn step(&mut self) {' },
+          { type: 'file', text: '        for y in 1..self.height-1 {' },
+          { type: 'file', text: '            for x in 1..self.width-1 {' },
+          { type: 'file', text: '                let a = self.grid_a[y][x];' },
+          { type: 'file', text: '                let b = self.grid_b[y][x];' },
+          { type: 'file', text: '                let lap_a = self.laplacian_a(x, y);' },
+          { type: 'file', text: '                let lap_b = self.laplacian_b(x, y);' },
+          { type: 'file', text: '                let reaction = a * b * b;' },
+          { type: 'file', text: '                self.next_a[y][x] = a + self.da * lap_a - reaction + self.feed * (1.0 - a);' },
+          { type: 'file', text: '                self.next_b[y][x] = b + self.db * lap_b + reaction - (self.kill + self.feed) * b;' },
+          { type: 'file', text: '            }' },
+          { type: 'file', text: '        }' },
+          { type: 'file', text: '    }' },
+          { type: 'file', text: '}' },
+          { type: 'output', text: '[write] src/ui.rs' },
+          { type: 'file', text: 'egui::Slider::new(&mut sim.feed, 0.01..=0.1).text("Feed Rate")' },
+          { type: 'file', text: 'egui::Slider::new(&mut sim.kill, 0.01..=0.1).text("Kill Rate")' },
+          { type: 'output', text: '[bash] cargo run' },
+          { type: 'comment', text: '# patterns emerge...' }
+        ]
+      },
+      {
+        lines: [
           { type: 'prompt', text: '> add mouse repulsion to the flow field' },
           { type: 'output', text: '[read] src/flow_field.rs' },
           { type: 'comment', text: '# adding force calculation...' },
@@ -691,37 +946,6 @@
           { type: 'output', text: '[bash] cargo test' },
           { type: 'output', text: 'test flow_field::tests::repulsion_force ... ok' },
           { type: 'comment', text: '# particles now flee the cursor' }
-        ]
-      },
-      {
-        lines: [
-          { type: 'prompt', text: '> make it export frames as png sequence' },
-          { type: 'output', text: '[read] src/renderer.rs' },
-          { type: 'output', text: '[write] src/export.rs' },
-          { type: 'file', text: 'use image::{ImageBuffer, Rgba};' },
-          { type: 'file', text: '' },
-          { type: 'file', text: 'pub struct FrameExporter {' },
-          { type: 'file', text: '    output_dir: PathBuf,' },
-          { type: 'file', text: '    frame_count: u32,' },
-          { type: 'file', text: '    width: u32,' },
-          { type: 'file', text: '    height: u32,' },
-          { type: 'file', text: '}' },
-          { type: 'file', text: '' },
-          { type: 'file', text: 'impl FrameExporter {' },
-          { type: 'file', text: '    pub fn export_frame(&mut self, pixels: &[u8]) {' },
-          { type: 'file', text: '        let path = self.output_dir.join(' },
-          { type: 'file', text: '            format!("frame_{:05}.png", self.frame_count)' },
-          { type: 'file', text: '        );' },
-          { type: 'file', text: '        let img = ImageBuffer::<Rgba<u8>, _>::from_raw(' },
-          { type: 'file', text: '            self.width, self.height, pixels.to_vec()' },
-          { type: 'file', text: '        ).unwrap();' },
-          { type: 'file', text: '        img.save(&path).unwrap();' },
-          { type: 'file', text: '        self.frame_count += 1;' },
-          { type: 'file', text: '    }' },
-          { type: 'file', text: '}' },
-          { type: 'output', text: '[bash] cargo run -- --export frames/' },
-          { type: 'output', text: 'Exported 360 frames to frames/' },
-          { type: 'comment', text: '# ready for ffmpeg' }
         ]
       }
     ];
@@ -781,34 +1005,7 @@
       playDemo();
     }
 
-    // Auto-start first demo
     setTimeout(playDemo, 500);
-
-    // Idea tag click
-    function showIdea(el) {
-      const idea = el.textContent;
-      const prompts = {
-        'generative art': 'create a generative art piece using perlin noise and geometric shapes',
-        'shaders': 'write a fragment shader that creates a plasma effect with time-based animation',
-        'physics sims': 'build a 2d physics sandbox with rigid body collision detection',
-        'audio reactive': 'make a visualizer that maps audio frequencies to visual elements',
-        'fractals': 'render a mandelbrot set with smooth coloring and zoom controls',
-        'cellular automata': 'implement conways game of life with custom rulesets',
-        'procedural': 'generate a procedural dungeon using binary space partitioning',
-        'data viz': 'create an animated force-directed graph visualization'
-      };
-      navigator.clipboard.writeText(prompts[idea] || idea);
-      el.style.background = el.style.color;
-      el.style.color = '#1a1625';
-      setTimeout(() => {
-        el.style.background = 'transparent';
-        el.style.color = '';
-      }, 1000);
-    }
-
-    function closeModal() {
-      document.getElementById('codeModal').classList.remove('open');
-    }
   </script>
 </body>
 </html>
