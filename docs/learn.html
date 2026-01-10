@@ -13,6 +13,7 @@
       --green: #22c55e;
       --border: #e5e5e5;
       --muted: #666;
+      --code-bg: #1e1e1e;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -21,7 +22,7 @@
       color: var(--fg);
       line-height: 1.7;
     }
-    .container { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; }
+    .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
 
     .hero {
       text-align: center;
@@ -34,19 +35,49 @@
       color: var(--accent);
     }
     .hero p {
-      font-size: 1.2rem;
+      font-size: 1.15rem;
       color: var(--muted);
-      max-width: 500px;
+      max-width: 550px;
       margin: 0 auto;
     }
 
+    /* Learning path selector */
+    .path-selector {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+    .path-btn {
+      padding: 0.75rem 1.5rem;
+      border: 2px solid var(--border);
+      background: transparent;
+      border-radius: 25px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .path-btn:hover { border-color: var(--accent); }
+    .path-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    /* Steps */
+    .steps {
+      margin: 2rem 0;
+    }
     .step {
       display: flex;
-      gap: 2rem;
-      padding: 2rem 0;
+      gap: 1.5rem;
+      padding: 1.5rem 0;
       border-bottom: 1px solid var(--border);
       align-items: flex-start;
     }
+    .step:last-child { border-bottom: none; }
     @media (max-width: 600px) {
       .step { flex-direction: column; gap: 1rem; }
     }
@@ -63,28 +94,90 @@
       font-size: 1.25rem;
       flex-shrink: 0;
     }
+    .step-content { flex: 1; }
     .step-content h3 {
-      font-size: 1.25rem;
+      font-size: 1.2rem;
       margin-bottom: 0.5rem;
     }
     .step-content p {
       color: var(--muted);
       margin-bottom: 0.75rem;
     }
-    .step-code {
-      background: #1e1e1e;
-      color: #d4d4d4;
-      padding: 1rem;
+
+    /* Terminal demo */
+    .step-terminal {
+      background: var(--code-bg);
       border-radius: 8px;
+      overflow: hidden;
       font-family: 'Fira Code', monospace;
       font-size: 0.85rem;
-      overflow-x: auto;
     }
-    .step-code .prompt { color: #6a9955; }
-    .step-code .comment { color: #6a9955; }
+    .term-header {
+      background: #333;
+      padding: 0.5rem 1rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .term-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .term-dot.red { background: #ff5f56; }
+    .term-dot.yellow { background: #ffbd2e; }
+    .term-dot.green { background: #27c93f; }
+    .term-body {
+      padding: 1rem;
+      color: #d4d4d4;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .term-line { margin: 0.25rem 0; }
+    .term-prompt { color: #22c55e; }
+    .term-comment { color: #6a9955; }
+    .term-output { color: #9ca3af; }
+    .term-highlight { color: #fbbf24; }
 
+    /* Expandable examples */
+    .example-card {
+      background: var(--accent-light);
+      border-radius: 12px;
+      margin: 1.5rem 0;
+      overflow: hidden;
+    }
+    .example-header {
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .example-header h4 {
+      color: var(--accent);
+      font-size: 1rem;
+    }
+    .example-toggle {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .example-content {
+      display: none;
+      padding: 0 1.25rem 1.25rem;
+    }
+    .example-card.open .example-content { display: block; }
+    .example-card.open .example-toggle { transform: rotate(45deg); }
+
+    /* Concepts grid */
     .concepts {
-      padding: 3rem 0;
+      padding: 2rem 0;
     }
     .concepts h2 {
       font-size: 1.5rem;
@@ -97,11 +190,14 @@
       gap: 1rem;
     }
     .concept {
-      padding: 1.5rem;
+      padding: 1.25rem;
       background: var(--accent-light);
       border-radius: 12px;
       text-align: center;
+      cursor: pointer;
+      transition: transform 0.2s;
     }
+    .concept:hover { transform: translateY(-4px); }
     .concept h4 {
       font-size: 1rem;
       margin-bottom: 0.5rem;
@@ -112,13 +208,52 @@
       color: var(--muted);
     }
 
+    /* Progress tracker */
+    .progress-section {
+      background: var(--accent-light);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .progress-header h3 { color: var(--accent); }
+    .progress-bar {
+      height: 8px;
+      background: white;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+    .progress-steps {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1rem;
+      font-size: 0.8rem;
+    }
+    .progress-step {
+      text-align: center;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .progress-step.done { color: var(--green); }
+    .progress-step.current { color: var(--accent); font-weight: 600; }
+
     .try-it {
       background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
       color: white;
-      padding: 3rem;
+      padding: 2.5rem;
       border-radius: 16px;
       text-align: center;
-      margin: 3rem 0;
+      margin: 2rem 0;
     }
     .try-it h2 {
       font-size: 1.5rem;
@@ -175,74 +310,186 @@
       <p>An AI coding assistant that explains what it's doing. Perfect for learning new languages, frameworks, and patterns.</p>
     </div>
 
-    <div class="step">
-      <div class="step-number">1</div>
-      <div class="step-content">
-        <h3>Install in one command</h3>
-        <p>Just Rust and a free API key. No complex setup.</p>
-        <div class="step-code">
-          <div><span class="prompt">$</span> cargo install --git https://github.com/uprootiny/hyle</div>
-          <div><span class="prompt">$</span> hyle config set key YOUR_FREE_KEY</div>
+    <div class="path-selector">
+      <button class="path-btn active" onclick="selectPath('rust')">Learn Rust</button>
+      <button class="path-btn" onclick="selectPath('web')">Web Dev</button>
+      <button class="path-btn" onclick="selectPath('cli')">CLI Tools</button>
+      <button class="path-btn" onclick="selectPath('api')">Build APIs</button>
+    </div>
+
+    <div class="progress-section">
+      <div class="progress-header">
+        <h3>Your Progress</h3>
+        <span id="progressPercent">25%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 25%"></div>
+      </div>
+      <div class="progress-steps">
+        <span class="progress-step done" onclick="goToStep(1)">Install</span>
+        <span class="progress-step current" onclick="goToStep(2)">First prompt</span>
+        <span class="progress-step" onclick="goToStep(3)">Watch & learn</span>
+        <span class="progress-step" onclick="goToStep(4)">Ask questions</span>
+      </div>
+    </div>
+
+    <div class="steps" id="stepsContainer">
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>Install in one command</h3>
+          <p>Just Rust and a free API key. No complex setup required.</p>
+          <div class="step-terminal">
+            <div class="term-header">
+              <span class="term-dot red"></span>
+              <span class="term-dot yellow"></span>
+              <span class="term-dot green"></span>
+            </div>
+            <div class="term-body">
+              <div class="term-line"><span class="term-prompt">$</span> cargo install --git https://github.com/uprootiny/hyle</div>
+              <div class="term-line"><span class="term-output">Compiling hyle v0.3.3</span></div>
+              <div class="term-line"><span class="term-output">Installed to ~/.cargo/bin/hyle</span></div>
+              <div class="term-line"><span class="term-prompt">$</span> hyle config set key YOUR_FREE_KEY</div>
+              <div class="term-line"><span class="term-output">Key saved to ~/.config/hyle/config.json</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>Describe what you want to build</h3>
+          <p>Use natural language. hyle understands context and asks clarifying questions.</p>
+          <div class="step-terminal">
+            <div class="term-header">
+              <span class="term-dot red"></span>
+              <span class="term-dot yellow"></span>
+              <span class="term-dot green"></span>
+            </div>
+            <div class="term-body">
+              <div class="term-line"><span class="term-prompt">&gt;</span> make a simple todo app in rust</div>
+              <div class="term-line"><span class="term-prompt">&gt;</span> explain each step as you go</div>
+              <div class="term-line"></div>
+              <div class="term-line"><span class="term-comment"># hyle starts working...</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>Watch and learn</h3>
+          <p>hyle shows every file it reads, every change it makes, every command it runs. Nothing hidden.</p>
+          <div class="step-terminal">
+            <div class="term-header">
+              <span class="term-dot red"></span>
+              <span class="term-dot yellow"></span>
+              <span class="term-dot green"></span>
+            </div>
+            <div class="term-body">
+              <div class="term-line"><span class="term-highlight">[read]</span> Cargo.toml</div>
+              <div class="term-line"><span class="term-comment"># I'll create the project structure first...</span></div>
+              <div class="term-line"><span class="term-highlight">[write]</span> src/main.rs</div>
+              <div class="term-line"><span class="term-output">use std::io::{self, Write};</span></div>
+              <div class="term-line"><span class="term-output">use std::collections::HashMap;</span></div>
+              <div class="term-line"><span class="term-output"></span></div>
+              <div class="term-line"><span class="term-output">struct TodoApp {</span></div>
+              <div class="term-line"><span class="term-output">    items: HashMap&lt;u32, String&gt;,</span></div>
+              <div class="term-line"><span class="term-output">    next_id: u32,</span></div>
+              <div class="term-line"><span class="term-output">}</span></div>
+              <div class="term-line"><span class="term-highlight">[bash]</span> cargo build</div>
+              <div class="term-line"><span class="term-output">Compiling todo_app v0.1.0</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+          <h3>Ask questions anytime</h3>
+          <p>Stuck? Curious? Just ask. The conversation continues with full context.</p>
+          <div class="step-terminal">
+            <div class="term-header">
+              <span class="term-dot red"></span>
+              <span class="term-dot yellow"></span>
+              <span class="term-dot green"></span>
+            </div>
+            <div class="term-body">
+              <div class="term-line"><span class="term-prompt">&gt;</span> why did you use HashMap instead of Vec?</div>
+              <div class="term-line"></div>
+              <div class="term-line"><span class="term-comment"># HashMap allows O(1) lookups by ID, which is</span></div>
+              <div class="term-line"><span class="term-comment"># useful when deleting specific todos. A Vec</span></div>
+              <div class="term-line"><span class="term-comment"># would require O(n) search. The tradeoff is</span></div>
+              <div class="term-line"><span class="term-comment"># slightly more memory usage.</span></div>
+              <div class="term-line"></div>
+              <div class="term-line"><span class="term-prompt">&gt;</span> show me an alternative with Vec</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="step">
-      <div class="step-number">2</div>
-      <div class="step-content">
-        <h3>Describe what you want to build</h3>
-        <p>Use natural language. hyle understands context.</p>
-        <div class="step-code">
-          <div><span class="prompt">></span> make a simple todo app in rust</div>
-          <div><span class="prompt">></span> explain each step as you go</div>
-        </div>
+    <div class="example-card" onclick="toggleExample(this)">
+      <div class="example-header">
+        <h4>Example: Build a URL shortener in 5 prompts</h4>
+        <button class="example-toggle">+</button>
+      </div>
+      <div class="example-content">
+        <ol style="margin-left: 1.5rem; color: var(--muted);">
+          <li>"Create a URL shortener with axum and sqlite"</li>
+          <li>"Add a POST /shorten endpoint that takes a URL"</li>
+          <li>"Add a GET /:code endpoint that redirects"</li>
+          <li>"Add click tracking and a /stats/:code endpoint"</li>
+          <li>"Write tests for all endpoints"</li>
+        </ol>
       </div>
     </div>
 
-    <div class="step">
-      <div class="step-number">3</div>
-      <div class="step-content">
-        <h3>Watch and learn</h3>
-        <p>hyle reads files, writes code, runs tests. Every action is visible.</p>
-        <div class="step-code">
-          <div><span class="comment"># hyle shows each tool call:</span></div>
-          <div>read(path="src/main.rs")</div>
-          <div>write(path="src/todo.rs", ...)</div>
-          <div>bash(command="cargo test")</div>
-        </div>
+    <div class="example-card" onclick="toggleExample(this)">
+      <div class="example-header">
+        <h4>Example: Learn async Rust through a chat server</h4>
+        <button class="example-toggle">+</button>
       </div>
-    </div>
-
-    <div class="step">
-      <div class="step-number">4</div>
-      <div class="step-content">
-        <h3>Ask questions anytime</h3>
-        <p>Stuck? Ask why. The conversation continues.</p>
-        <div class="step-code">
-          <div><span class="prompt">></span> why did you use a Vec instead of an array?</div>
-          <div><span class="prompt">></span> show me another way to do the error handling</div>
-        </div>
+      <div class="example-content">
+        <ol style="margin-left: 1.5rem; color: var(--muted);">
+          <li>"Build a TCP chat server using tokio"</li>
+          <li>"Explain how async/await works as you code"</li>
+          <li>"Add multiple room support with channels"</li>
+          <li>"Handle disconnections gracefully"</li>
+          <li>"Why is Arc&lt;Mutex&lt;_&gt;&gt; needed here?"</li>
+        </ol>
       </div>
     </div>
 
     <div class="concepts">
       <h2>What you'll learn</h2>
       <div class="concept-grid">
-        <div class="concept">
+        <div class="concept" onclick="showConcept('files')">
           <h4>File Operations</h4>
           <p>See how tools read, write, and patch files</p>
         </div>
-        <div class="concept">
+        <div class="concept" onclick="showConcept('shell')">
           <h4>Shell Commands</h4>
           <p>Watch build, test, and deploy commands</p>
         </div>
-        <div class="concept">
+        <div class="concept" onclick="showConcept('patterns')">
           <h4>Code Patterns</h4>
           <p>Learn idioms by seeing them applied</p>
         </div>
-        <div class="concept">
+        <div class="concept" onclick="showConcept('debug')">
           <h4>Debugging</h4>
           <p>Follow error resolution in real time</p>
+        </div>
+        <div class="concept" onclick="showConcept('testing')">
+          <h4>Testing</h4>
+          <p>Watch test-driven development in action</p>
+        </div>
+        <div class="concept" onclick="showConcept('arch')">
+          <h4>Architecture</h4>
+          <p>Understand project structure decisions</p>
         </div>
       </div>
     </div>
@@ -276,5 +523,50 @@
       <a class="switcher-item" href="flow.html">Flow</a>
     </div>
   </div>
+
+  <script>
+    function selectPath(path) {
+      document.querySelectorAll('.path-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // Update examples based on path
+      const pathContent = {
+        rust: 'Learn Rust fundamentals by building real applications',
+        web: 'Build modern web apps with Axum, HTMX, or Leptos',
+        cli: 'Create powerful command-line tools with clap',
+        api: 'Design and implement RESTful and GraphQL APIs'
+      };
+      // Could update the page content here
+    }
+
+    function goToStep(step) {
+      const steps = document.querySelectorAll('.progress-step');
+      steps.forEach((s, i) => {
+        s.classList.remove('done', 'current');
+        if (i < step - 1) s.classList.add('done');
+        if (i === step - 1) s.classList.add('current');
+      });
+
+      const progress = (step / 4) * 100;
+      document.getElementById('progressFill').style.width = progress + '%';
+      document.getElementById('progressPercent').textContent = progress + '%';
+    }
+
+    function toggleExample(el) {
+      el.classList.toggle('open');
+    }
+
+    function showConcept(concept) {
+      const concepts = {
+        files: 'File operations show exactly what hyle reads and writes. Every read shows line numbers, every write creates a backup first.',
+        shell: 'Shell commands display their full output. cargo build, npm test, docker compose - watch them run in real time.',
+        patterns: 'See idiomatic patterns applied: error handling with Result, builder pattern, dependency injection, and more.',
+        debug: 'When something breaks, watch hyle read error messages, identify root causes, and apply fixes systematically.',
+        testing: 'Follow TDD workflow: write test, see it fail, implement code, see it pass. Learn testing patterns naturally.',
+        arch: 'Understand why files are organized certain ways. Learn about separation of concerns, modules, and project layout.'
+      };
+      alert(concepts[concept]);
+    }
+  </script>
 </body>
 </html>
