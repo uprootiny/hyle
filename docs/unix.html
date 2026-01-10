@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>hyle</title>
+  <title>hyle - Unix Philosophy</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -22,6 +22,14 @@
     .cyan { color: #0ff; }
     .yellow { color: #ff0; }
     hr { border: none; border-top: 1px solid #030; margin: 1.5rem 0; }
+
+    /* Clickable file links */
+    .file-link {
+      color: #0ff;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .file-link:hover { color: #ff0; }
 
     /* Terminal Replay */
     .replay-section {
@@ -53,7 +61,7 @@
     .replay-btn:hover { color: #0f0; border-color: #060; }
     .replay-btn.active { color: #0ff; border-color: #0ff; }
     .replay-body {
-      min-height: 10em;
+      min-height: 12em;
       position: relative;
     }
     .replay-line {
@@ -93,15 +101,88 @@
     .example-body {
       max-height: 0;
       overflow: hidden;
-      transition: max-height 0.3s ease;
+      transition: max-height 0.4s ease;
       background: #000;
     }
     .example-item.open .example-body {
-      max-height: 300px;
+      max-height: 400px;
     }
     .example-content {
       padding: 1rem;
       border-top: 1px solid #030;
+    }
+    .example-prose {
+      color: #060;
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
+      line-height: 1.6;
+    }
+    .example-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    .copy-btn {
+      background: none;
+      border: 1px solid #030;
+      color: #060;
+      font-family: monospace;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      cursor: pointer;
+    }
+    .copy-btn:hover { color: #0f0; border-color: #060; }
+    .copy-btn.copied { color: #0ff; border-color: #0ff; }
+
+    /* File Preview Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-content {
+      background: #000;
+      border: 1px solid #030;
+      padding: 1rem;
+      max-width: 70ch;
+      max-height: 80vh;
+      overflow: auto;
+      position: relative;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #030;
+    }
+    .modal-title { color: #0ff; }
+    .modal-close {
+      background: none;
+      border: 1px solid #030;
+      color: #060;
+      font-family: monospace;
+      padding: 0.15rem 0.5rem;
+      cursor: pointer;
+    }
+    .modal-close:hover { color: #f00; border-color: #f00; }
+    .modal-body {
+      color: #0f0;
+      font-size: 0.85rem;
+    }
+    .modal-body .line-num {
+      color: #030;
+      display: inline-block;
+      width: 3ch;
+      text-align: right;
+      margin-right: 1ch;
+      user-select: none;
     }
 
     /* Variant Switcher */
@@ -150,7 +231,8 @@
        into file operations and shell commands.
 
        Output is text. Input is text. Context is JSON.
-       Integrates with grep, sed, awk, git, make.
+       Integrates with grep, sed, awk, git, make, and every
+       other tool in your arsenal.
 
 <span class="bright">TOOLS</span>
        read     Read file contents with line numbers
@@ -176,246 +258,440 @@
 
 <pre>
 <span class="bright">COMPOSABILITY</span>
+       The real power of Unix: small tools that connect. hyle
+       speaks the same language. Stdin, stdout, exit codes,
+       file paths. Chain it with anything.
 </pre>
 
 <!-- Expandable Examples -->
 <div class="examples-section">
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ find . -name "*.rs" | hyle --task "add docstrings"</span>
+      <span>$ find ~/code/lexer -name "*.rs" | hyle --task "add docstrings"</span>
       <span class="example-tag easy">[easy]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># Pipe file list, get docstrings added to all.
-# hyle reads stdin, processes each file, writes in place.
+        <div class="example-prose">
+          You wrote a lexer last weekend. Functions are named well but undocumented.
+          Running rustdoc gives you empty pages. Instead of manually writing 40+
+          doc comments, pipe the file list and let hyle read each file, understand
+          what each function does from context, and add accurate /// comments.
+          Five minutes later, rustdoc looks professional.
+        </div>
+<pre class="dim">$ find ~/code/lexer -name "*.rs" | wc -l
+14
 
-$ find src/ -name "*.rs" | hyle --task "add /// docstrings to public fns"
-[reading src/lib.rs...]
-[patching src/lib.rs...]
-[reading src/parser.rs...]
-[patching src/parser.rs...]
-<span class="bright">4 files updated</span></pre>
+$ find ~/code/lexer -name "*.rs" | hyle --task "add /// docs to pub fns"
+[reading <span class="file-link" onclick="event.stopPropagation(); showFile('lexer_lib')">src/lib.rs</span>...]
+[patching src/lib.rs: 8 docstrings]
+[reading <span class="file-link" onclick="event.stopPropagation(); showFile('lexer_token')">src/token.rs</span>...]
+[patching src/token.rs: 12 docstrings]
+[reading <span class="file-link" onclick="event.stopPropagation(); showFile('lexer_scanner')">src/scanner.rs</span>...]
+[patching src/scanner.rs: 15 docstrings]
+<span class="bright">14 files, 47 docstrings added</span></pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('docstrings')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ hyle --task "list todos" --json | jq '.items[]'</span>
+      <span>$ hyle --task "list security issues" --json | jq '.issues[]'</span>
       <span class="example-tag pipe">[pipe]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># JSON output mode for scripting.
-# Pipe to jq, awk, or your own tools.
-
-$ hyle --task "find all TODO comments" --json | jq -r '.items[].file'
-src/agent.rs
-src/tools.rs
-tests/integration.rs
-<span class="bright"># integrate with CI, editors, dashboards</span></pre>
+        <div class="example-prose">
+          JSON output mode transforms hyle into a scriptable security scanner.
+          Pipe to jq for filtering, to a dashboard for visualization, or into
+          your CI pipeline to fail builds. The structured output means you can
+          build workflows around it without parsing prose.
+        </div>
+<pre class="dim">$ hyle --task "find unwrap() in error paths, SQL without params" \
+    ~/code/inventory-api --json | jq -r '.issues[] | "\(.file):\(.line) \(.msg)"'
+src/db/queries.rs:42 format! in SQL query - potential injection
+src/handlers/orders.rs:78 unwrap() on db result
+src/handlers/orders.rs:134 unwrap() on user input parse
+<span class="bright"># pipe to slack, pagerduty, or block deployment</span></pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('security_scan')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ hyle --task "add logging" src/ | patch -p1</span>
+      <span>$ hyle --task "add request tracing" ~/code/axum-api | patch -p1</span>
       <span class="example-tag pipe">[pipe]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># Generate diff, review it, then apply with patch.
-# Full control over what gets written.
+        <div class="example-prose">
+          Production debugging requires traces. But adding tracing::info! to
+          every handler is tedious. Generate the diff first, review exactly what
+          will change, then apply with patch. Full control. If the diff looks
+          wrong, throw it away. No files touched until you say so.
+        </div>
+<pre class="dim">$ hyle --task "add tracing spans to all handlers" ~/code/axum-api --diff-only > tracing.patch
 
-$ hyle --task "add tracing::info to all handlers" src/api/ > changes.patch
-$ cat changes.patch   # review
-$ patch -p1 < changes.patch
-<span class="bright">patching file src/api/users.rs</span>
-<span class="bright">patching file src/api/auth.rs</span></pre>
+$ head -20 tracing.patch
+--- a/src/handlers/users.rs
++++ b/src/handlers/users.rs
+@@ -15,6 +15,7 @@
+ pub async fn get_user(Path(id): Path<Uuid>) -> impl IntoResponse {
++    let span = tracing::info_span!("get_user", user_id = %id);
++    let _guard = span.enter();
+     let user = db::users::find(id).await?;
+
+$ patch -p1 < tracing.patch
+<span class="bright">patching file src/handlers/users.rs</span>
+<span class="bright">patching file src/handlers/orders.rs</span>
+<span class="bright">patching file src/handlers/products.rs</span></pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('tracing')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ git diff HEAD~5 | hyle --task "summarize changes"</span>
+      <span>$ git diff origin/main | hyle --task "write PR description"</span>
       <span class="example-tag pipe">[pipe]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># Feed diffs directly, get summaries.
-# Great for commit messages, changelogs.
+        <div class="example-prose">
+          You've been coding for three hours. The diff is 400 lines across 12 files.
+          Writing a coherent PR description feels like work. Pipe the diff, get
+          a structured summary that actually explains what changed and why.
+          Your reviewers will thank you.
+        </div>
+<pre class="dim">$ git diff origin/main | hyle --task "PR description with summary and test plan"
 
-$ git diff HEAD~5 | hyle --task "write changelog entry"
-## v0.3.3
-- Fixed tool call parsing for OpenAI format
-- Added input field wrap support
-- Improved context tracking accuracy
-<span class="bright"># copy to CHANGELOG.md</span></pre>
+## Summary
+This PR adds rate limiting to the public API endpoints to prevent abuse
+and ensure fair usage across tenants.
+
+### Changes
+- Added `RateLimiter` middleware using token bucket algorithm
+- Configured per-endpoint limits in `config/limits.toml`
+- Added 429 responses with Retry-After headers
+- Updated integration tests to verify rate limiting behavior
+
+## Test Plan
+- [ ] Verify rate limits trigger at configured thresholds
+- [ ] Check Retry-After header accuracy
+- [ ] Confirm limits reset after window expires
+<span class="bright"># paste directly into PR</span></pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('pr_description')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ cat error.log | hyle --task "diagnose and fix"</span>
+      <span>$ journalctl -u trading-engine | tail -500 | hyle --task "diagnose"</span>
       <span class="example-tag easy">[easy]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># Pipe logs, get diagnosis and fixes.
-# hyle finds the source, applies the fix.
+        <div class="example-prose">
+          3am. PagerDuty fires. Logs are a wall of text. Instead of grep-scrolling
+          through stack traces, pipe the recent logs to hyle. It finds the pattern,
+          correlates timestamps, identifies the root cause, and points you to the
+          exact line of code. Incident resolved before your coffee gets cold.
+        </div>
+<pre class="dim">$ journalctl -u trading-engine --since "10 minutes ago" | \
+    hyle --task "find root cause of errors"
 
-$ tail -100 /var/log/myapp/error.log | hyle --task "find root cause"
-[analyzing stack traces...]
-[reading src/cache.rs...]
-<span class="bright">Root cause: HashMap::get().unwrap() at line 142</span>
-<span class="bright">The cache key isn't guaranteed to exist after TTL</span></pre>
+[analyzing 847 log lines...]
+[found 23 ERROR entries, 156 WARN entries]
+[correlating timestamps...]
+
+<span class="bright">Root cause:</span> Connection pool exhaustion starting at 03:14:22
+
+The orderbook matching engine at <span class="file-link" onclick="event.stopPropagation(); showFile('orderbook')">src/matching/engine.rs</span>:342
+acquires a DB connection for each fill but doesn't release it until
+the entire batch completes. During high volume (>1000 orders/sec),
+the pool (max 100) exhausts before batch completion.
+
+<span class="bright">Suggested fix:</span> Release connection after each fill, or batch fills
+into single transaction with connection acquired once.</pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('diagnose')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ hyle --task "port to async" src/sync.rs | tee async.rs</span>
+      <span>$ hyle --task "port to async" src/sync_client.rs | tee src/async_client.rs</span>
       <span class="example-tag wow">[wow]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># Generate new files without clobbering.
-# Use tee, redirect, whatever you want.
+        <div class="example-prose">
+          You have a working synchronous HTTP client. Now you need an async version
+          for the new tokio-based service. Manual conversion means updating every
+          function signature, replacing std::io with tokio::io, adding .await
+          everywhere. Let hyle do the mechanical work while you review the output.
+        </div>
+<pre class="dim">$ hyle --task "convert to async tokio, keep same API shape" \
+    ~/code/http-client/src/sync_client.rs | tee src/async_client.rs
 
-$ hyle --task "convert to async with tokio" src/sync.rs | tee src/async.rs
-[analyzing blocking calls...]
-[converting std::thread to tokio::spawn...]
-[adding .await to I/O operations...]
-<span class="bright">wrote 247 lines to stdout</span></pre>
+[analyzing blocking operations...]
+[std::net::TcpStream -> tokio::net::TcpStream]
+[std::io::Read -> tokio::io::AsyncReadExt]
+[fn connect() -> async fn connect()]
+[adding .await to 23 I/O operations]
+
+<span class="bright">wrote src/async_client.rs (312 lines)</span>
+
+$ diff src/sync_client.rs src/async_client.rs | head -15
+< pub fn connect(addr: &str) -> io::Result<Client> {
+---
+> pub async fn connect(addr: &str) -> io::Result<Client> {
+< let stream = TcpStream::connect(addr)?;
+---
+> let stream = TcpStream::connect(addr).await?;</pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('async_port')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ make test 2>&1 | hyle --task "fix failing tests"</span>
+      <span>$ cargo test 2>&1 | hyle --task "fix the failures"</span>
       <span class="example-tag easy">[easy]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># Pipe test output, get fixes applied.
-# Iterate until green.
-
-$ cargo test 2>&1 | hyle --task "fix the failures"
+        <div class="example-prose">
+          Refactoring broke 7 tests. The failures cascade - fix one, another
+          appears. Pipe the test output to hyle. It parses failures, reads the
+          test source, understands assertions, and patches either the test (if
+          the new behavior is correct) or the code (if it's a regression).
+        </div>
+<pre class="dim">$ cargo test 2>&1 | hyle --task "fix failures, preserve test intent"
 [parsing test output...]
-[3 failures in tests/api_test.rs...]
-[patching tests/api_test.rs...]
-<span class="bright">cargo test: 47 passed</span></pre>
+[found 7 failures in <span class="file-link" onclick="event.stopPropagation(); showFile('parser_tests')">tests/parser_tests.rs</span>]
+
+Failure 1: test_parse_expression
+  Expected: Expr::Binary but got Expr::Unary
+  Analysis: Parser precedence changed. Test expectation is stale.
+  [patching tests/parser_tests.rs:45]
+
+Failure 2: test_parse_function_call
+  Expected: 3 args but got 2
+  Analysis: Bug in parser - trailing comma handling wrong
+  [patching <span class="file-link" onclick="event.stopPropagation(); showFile('parser')">src/parser.rs</span>:178]
+
+<span class="bright">$ cargo test</span>
+<span class="bright">running 42 tests... ok</span></pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('fix_tests')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ ls src/**/*.rs | xargs -I{} hyle --task "add tests" {}</span>
+      <span>$ find src -name "*.rs" | xargs -P4 -I{} hyle --task "add tests" {}</span>
       <span class="example-tag pipe">[pipe]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># xargs integration for batch processing.
-# Each file gets its own hyle session.
+        <div class="example-prose">
+          Legacy codebase. Zero test coverage. Management wants 80% by Q2.
+          Batch process every file in parallel with xargs. Each hyle instance
+          reads one file, generates tests for its public functions, writes to
+          a corresponding test module. Coffee break while 200 files get tested.
+        </div>
+<pre class="dim">$ find ~/code/legacy-api/src -name "*.rs" | wc -l
+47
 
-$ find src -name "*.rs" | xargs -I{} hyle --task "add unit tests" {}
-[processing src/lib.rs...]
-[processing src/parser.rs...]
-[processing src/tools.rs...]
-<span class="bright">12 files processed, 89 tests added</span></pre>
+$ find ~/code/legacy-api/src -name "*.rs" | \
+    xargs -P4 -I{} hyle --task "add #[test] fns for pub items" {}
+
+[4 parallel workers]
+[processing src/models/user.rs → tests/models/user_test.rs]
+[processing src/models/order.rs → tests/models/order_test.rs]
+[processing src/handlers/auth.rs → tests/handlers/auth_test.rs]
+[processing src/handlers/api.rs → tests/handlers/api_test.rs]
+...
+<span class="bright">47 files processed, 312 tests generated</span>
+
+$ cargo test 2>&1 | tail -1
+<span class="bright">test result: ok. 312 passed; 0 failed</span></pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('batch_tests')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ hyle &lt;&lt;EOF ... EOF | sh</span>
+      <span>$ hyle --task "deploy script" &lt;&lt;EOF | sh</span>
       <span class="example-tag wow">[wow]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># Heredoc input, execute output.
-# Generate scripts, run them.
-
-$ hyle --task "create setup script" &lt;&lt;EOF | sh
-Need to: install deps, create config, start service
+        <div class="example-prose">
+          Heredoc input, shell execution. Describe what you need in plain English,
+          get executable shell commands. The | sh at the end means instant execution.
+          Dangerous? Sure. Powerful? Absolutely. Use with --dry-run first if you're
+          cautious. Or just trust the machine like a true Unix wizard.
+        </div>
+<pre class="dim">$ hyle --task "create deployment script" &lt;&lt;'EOF' | tee deploy.sh | sh
+Deploy the Rust service to prod:
+- Build release binary
+- Run migrations on DATABASE_URL
+- Copy binary to /opt/services/
+- Reload systemd unit
+- Health check on port 8080
 EOF
-[writing setup.sh...]
-<span class="bright">+ apt-get install -y postgresql redis</span>
-<span class="bright">+ cp config.example.json config.json</span>
-<span class="bright">+ systemctl start myapp</span></pre>
+
+<span class="bright">+ cargo build --release</span>
+   Compiling trading-engine v0.4.2
+   Finished release [optimized] target(s) in 45.23s
+<span class="bright">+ sqlx migrate run</span>
+Applied 3 migrations
+<span class="bright">+ sudo cp target/release/trading-engine /opt/services/</span>
+<span class="bright">+ sudo systemctl reload trading-engine</span>
+<span class="bright">+ curl -sf localhost:8080/health</span>
+{"status":"healthy","version":"0.4.2"}</pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('deploy_script')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ watch -n 60 'hyle --task "check for issues" src/'</span>
+      <span>$ watch -n 60 'hyle --task "audit" src/ --json | jq .score'</span>
       <span class="example-tag pipe">[pipe]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># Continuous monitoring with watch.
-# Lint, audit, suggest improvements.
+        <div class="example-prose">
+          Continuous code quality monitoring. Every minute, hyle scans the codebase,
+          computes a quality score, outputs JSON. Pipe to jq for the number, feed
+          into prometheus, display on Grafana. Watch code health in real-time as
+          your team commits. Alert when score drops.
+        </div>
+<pre class="dim">$ watch -n 60 'hyle --task "score: 0-100 for safety, clarity, tests" \
+    ~/code/payment-service/src --json | jq ".score"'
 
-$ watch -n 60 'hyle --task "report any code smells" src/ --json | jq .'
+Every 60s: hyle --task "score..." | jq ".score"
+
 {
-  "issues": [
-    {"file": "src/cache.rs", "line": 42, "msg": "unwrap in error path"}
-  ],
-  "suggestions": [...]
+  "safety": 82,
+  "clarity": 74,
+  "test_coverage": 91,
+  "overall": 82
 }
-<span class="bright"># integrate with alerting</span></pre>
+<span class="bright"># hook into prometheus: echo "code_quality $score" | curl --data-binary @- pushgateway:9091</span></pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('watch_audit')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ diff -u old.rs new.rs | hyle --task "explain changes"</span>
+      <span>$ git show HEAD:src/auth.rs | hyle --task "security review"</span>
       <span class="example-tag easy">[easy]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># Understand diffs from anywhere.
-# Code review helper.
+        <div class="example-prose">
+          Code review on a single file from git history. Fetch the version at any
+          commit, pipe it through security review. No checkout needed. Compare
+          reviews across commits to see if a change introduced vulnerabilities.
+          Integrate into CI: review every changed file before merge.
+        </div>
+<pre class="dim">$ git show HEAD:src/auth/jwt.rs | hyle --task "security review, OWASP top 10"
 
-$ diff -u main.rs.bak main.rs | hyle --task "explain what changed"
-<span class="bright">The changes add rate limiting to the API handler:</span>
-<span class="bright">1. New TokenBucket struct for request limiting</span>
-<span class="bright">2. Middleware that checks bucket before handling</span>
-<span class="bright">3. 429 response when rate exceeded</span></pre>
+<span class="bright">Security Review: src/auth/jwt.rs</span>
+
+[PASS] Token signature verification using RS256
+[PASS] Expiration claims checked before use
+[WARN] Line 45: aud claim not validated - accept any audience
+[WARN] Line 78: Token stored in localStorage per code comment
+       Recommendation: Use httpOnly cookie instead
+[FAIL] Line 112: Secret key loaded from env without rotation support
+       Risk: Key compromise requires code deploy to rotate
+
+Score: 72/100
+Critical: 0 | High: 1 | Medium: 2 | Low: 0</pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('security_review')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="example-item" onclick="toggleEx(this)">
     <div class="example-header">
-      <span>$ hyle --task "generate makefile" src/ > Makefile</span>
+      <span>$ hyle --task "Makefile" src/ Cargo.toml | tee Makefile</span>
       <span class="example-tag wow">[wow]</span>
     </div>
     <div class="example-body">
       <div class="example-content">
-<pre class="dim"># Analyze project, generate build system.
-# Works with make, just, cargo-make.
+        <div class="example-prose">
+          Analyze the project structure and generate a build system. hyle reads
+          Cargo.toml, understands the crate structure, figures out what commands
+          make sense, and writes a proper Makefile. Works for justfiles, taskfiles,
+          Makefiles, or any build system you prefer.
+        </div>
+<pre class="dim">$ hyle --task "generate Makefile: build, test, lint, bench, doc, release" \
+    ~/code/query-engine/src Cargo.toml | tee Makefile
 
-$ hyle --task "create Makefile with build, test, deploy targets" src/ > Makefile
-$ cat Makefile
-.PHONY: build test deploy
+.PHONY: all build test lint bench doc release clean
+
+all: build test lint
+
 build:
-	cargo build --release
+	cargo build
+
 test:
-	cargo test
-deploy:
-	scp target/release/app server:/opt/
-<span class="bright"># or generate justfile, taskfile.yml, etc.</span></pre>
+	cargo test --all-features
+	cargo test --doc
+
+lint:
+	cargo clippy -- -D warnings
+	cargo fmt --check
+
+bench:
+	cargo bench --bench query_bench
+
+doc:
+	cargo doc --no-deps --open
+
+release:
+	cargo build --release
+	strip target/release/query-engine
+
+clean:
+	cargo clean
+<span class="bright"># or: --task "generate justfile" for just</span></pre>
+        <div class="example-actions">
+          <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('makefile')">copy prompt</button>
+        </div>
       </div>
     </div>
   </div>
@@ -440,78 +716,82 @@ deploy:
 hyle 0.3.3                     2026-01                         <span class="bright">HYLE(1)</span>
 </pre>
 
+<!-- File Preview Modal -->
+<div class="modal-overlay" id="modal" onclick="closeModal()">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">file.rs</span>
+      <button class="modal-close" onclick="closeModal()">x</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
 <!--
 ============================================================================
-HIDDEN PROMPTSETS - Composability examples with actual prompts
+HIDDEN PROMPTSETS - Full prompts for each example
 ============================================================================
 
 Example 1: Add docstrings via pipe
-----------------------------------
-$ find src/ -name "*.rs" | hyle --task "Add /// documentation comments
-  to all public functions. Include @param and @returns where applicable.
-  Keep comments concise, one line where possible."
+Prompt: "Add /// documentation comments to all public functions. Include
+parameter descriptions and return value. Keep each doc comment to 1-3 lines.
+Don't add docs to private functions or simple getters."
 
-Example 2: JSON output for scripting
-----------------------------------
-$ hyle --task "Find all TODO, FIXME, and HACK comments in the codebase.
-  Return as JSON with file, line, and text fields." --json | jq '.'
+Example 2: JSON security scan
+Prompt: "Find security issues: unwrap() in error paths, format! in SQL queries,
+hardcoded secrets, missing input validation. Return as JSON with fields:
+{issues: [{file, line, severity, msg, suggestion}]}"
 
-Example 3: Generate diff for review
-----------------------------------
-$ hyle --task "Add tracing::info! calls at the entry and exit of each
-  public function in the API module. Include function name and arguments."
-  src/api/ --diff-only
+Example 3: Add tracing spans
+Prompt: "Add tracing::info_span! to all public async handler functions. Include
+function name, relevant parameters (user_id, request_id). Use span.enter() guard.
+Don't modify private functions or non-handlers."
 
-Example 4: Summarize git diff
-----------------------------------
-$ git diff HEAD~5 | hyle --task "Summarize these changes for a changelog.
-  Group by type: features, fixes, refactoring. Use bullet points."
+Example 4: PR description
+Prompt: "Analyze this diff and write a PR description. Include: Summary (2-3
+sentences), Changes (bullet list of what changed), Test Plan (checkboxes for
+reviewer). Use markdown. Be specific about what changed, not vague."
 
-Example 5: Diagnose from logs
-----------------------------------
-$ tail -200 /var/log/app.log | hyle --task "Analyze these logs for errors.
-  Identify the root cause, suggest a fix, and show me the relevant source."
+Example 5: Log diagnosis
+Prompt: "Analyze these logs. Find errors, correlate timestamps, identify patterns.
+Determine root cause. Point to specific source file:line if possible. Suggest
+fix. Be concise - this is a production incident."
 
-Example 6: Port sync to async
-----------------------------------
-$ hyle --task "Convert this synchronous code to async using tokio.
-  Replace std::thread with tokio::spawn, add .await to I/O, update
-  function signatures to async fn." src/sync.rs
+Example 6: Async port
+Prompt: "Convert this synchronous Rust code to async using tokio. Replace:
+std::net with tokio::net, std::io with tokio::io, std::thread::spawn with
+tokio::spawn. Add async to function signatures, .await to I/O ops. Keep same
+public API shape."
 
-Example 7: Fix failing tests
-----------------------------------
-$ cargo test 2>&1 | hyle --task "Parse this test output. For each failure,
-  read the test file, understand the assertion, and fix the test or code."
+Example 7: Fix test failures
+Prompt: "Parse this test output. For each failure: 1) Read the test, 2) Understand
+what it asserts, 3) Determine if test is stale or code is wrong, 4) Fix the
+appropriate one. Don't just make tests pass - preserve test intent."
 
-Example 8: Batch processing with xargs
-----------------------------------
-$ find src -name "*.rs" | xargs -I{} hyle --task "Add unit tests for
-  all public functions. Use #[test] attribute. Include edge cases." {}
+Example 8: Batch test generation
+Prompt: "Generate unit tests for all public functions in this file. Use #[test]
+attribute. Test happy path and edge cases. Use descriptive test names. Put tests
+in a #[cfg(test)] mod tests block. Don't test trivial getters."
 
-Example 9: Heredoc to script
-----------------------------------
-$ hyle --task "Generate a bash script that sets up this project.
-  Include: dependency installation, config file creation, database
-  migration, and systemd service file." <<EOF
-Project needs: postgresql, redis, nodejs
-Config template in config.example.json
-EOF
+Example 9: Deploy script
+Prompt: "Generate a deployment script for these requirements. Use set -e for
+safety. Add echo statements showing progress. Include health check at end.
+Make it idempotent where possible."
 
-Example 10: Continuous monitoring
-----------------------------------
-$ watch -n 60 'hyle --task "Scan for: unwrap() in error paths,
-  missing error handling, potential panics. Report as JSON." src/ --json'
+Example 10: Watch audit
+Prompt: "Audit this code for quality. Score 0-100 on: safety (no panics, proper
+error handling), clarity (good names, simple logic), test_coverage (has tests).
+Return JSON: {safety: N, clarity: N, test_coverage: N, overall: N, issues: [...]}"
 
-Example 11: Explain diff
-----------------------------------
-$ diff -u old.rs new.rs | hyle --task "Explain these changes in plain
-  English. What was the intent? Are there any potential issues?"
+Example 11: Security review
+Prompt: "Security review this code against OWASP top 10. Check: injection,
+broken auth, sensitive data exposure, XXE, access control, misconfiguration,
+XSS, deserialization, known vulns, logging. Rate: PASS/WARN/FAIL per issue."
 
-Example 12: Generate build system
-----------------------------------
-$ hyle --task "Analyze this Rust project and generate a Makefile with:
-  build (release), test, lint, fmt, clean, and deploy targets.
-  Use cargo for Rust commands." src/
+Example 12: Makefile generation
+Prompt: "Analyze this Rust project and generate a Makefile. Include targets:
+build, test, lint (clippy + fmt), bench, doc, release (optimized + stripped),
+clean. Use .PHONY. Add helpful comments. Match project structure."
 
 ============================================================================
 -->
@@ -536,41 +816,400 @@ $ hyle --task "Analyze this Rust project and generate a Makefile with:
 </div>
 
 <script>
+  // File contents for preview
+  const files = {
+    lexer_lib: `//! Lexer library for parsing source code into tokens.
+
+use crate::token::{Token, TokenKind};
+use crate::scanner::Scanner;
+
+/// Creates a new lexer from source code.
+///
+/// The lexer tokenizes input lazily, producing tokens on demand.
+pub fn lex(source: &str) -> Lexer {
+    Lexer::new(source)
+}
+
+/// Main lexer struct that produces tokens from source.
+pub struct Lexer<'a> {
+    scanner: Scanner<'a>,
+    peeked: Option<Token>,
+}
+
+impl<'a> Lexer<'a> {
+    /// Create a new lexer from source string.
+    pub fn new(source: &'a str) -> Self {
+        Self {
+            scanner: Scanner::new(source),
+            peeked: None,
+        }
+    }
+
+    /// Peek at the next token without consuming it.
+    pub fn peek(&mut self) -> Option<&Token> {
+        if self.peeked.is_none() {
+            self.peeked = self.scanner.next_token();
+        }
+        self.peeked.as_ref()
+    }
+
+    /// Consume and return the next token.
+    pub fn next(&mut self) -> Option<Token> {
+        self.peeked.take().or_else(|| self.scanner.next_token())
+    }
+}`,
+
+    lexer_token: `//! Token types produced by the lexer.
+
+/// A token with its kind, span, and literal value.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub span: Span,
+    pub literal: Option<String>,
+}
+
+/// Source location span.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+    pub line: u32,
+}
+
+/// All possible token types.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TokenKind {
+    // Literals
+    Ident,
+    Number,
+    String,
+
+    // Keywords
+    Let,
+    Fn,
+    If,
+    Else,
+    Return,
+
+    // Operators
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Eq,
+    EqEq,
+    Bang,
+    BangEq,
+
+    // Delimiters
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    Comma,
+    Semi,
+
+    // Special
+    Eof,
+    Error,
+}`,
+
+    lexer_scanner: `//! Low-level character scanner for the lexer.
+
+/// Scanner that reads characters and produces tokens.
+pub struct Scanner<'a> {
+    source: &'a str,
+    chars: std::iter::Peekable<std::str::CharIndices<'a>>,
+    line: u32,
+}
+
+impl<'a> Scanner<'a> {
+    /// Create a new scanner from source.
+    pub fn new(source: &'a str) -> Self {
+        Self {
+            source,
+            chars: source.char_indices().peekable(),
+            line: 1,
+        }
+    }
+
+    /// Scan the next token from input.
+    pub fn next_token(&mut self) -> Option<Token> {
+        self.skip_whitespace();
+        let (start, ch) = self.chars.next()?;
+
+        let kind = match ch {
+            '+' => TokenKind::Plus,
+            '-' => TokenKind::Minus,
+            '*' => TokenKind::Star,
+            '/' => self.scan_slash_or_comment(),
+            '=' => self.scan_eq_or_eqeq(),
+            '!' => self.scan_bang_or_bangeq(),
+            '(' => TokenKind::LParen,
+            ')' => TokenKind::RParen,
+            '{' => TokenKind::LBrace,
+            '}' => TokenKind::RBrace,
+            ',' => TokenKind::Comma,
+            ';' => TokenKind::Semi,
+            '"' => return Some(self.scan_string(start)),
+            c if c.is_ascii_digit() => return Some(self.scan_number(start)),
+            c if c.is_alphabetic() || c == '_' => return Some(self.scan_ident(start)),
+            _ => TokenKind::Error,
+        };
+
+        Some(Token { kind, span: Span { start, end: start + 1, line: self.line }, literal: None })
+    }
+
+    fn skip_whitespace(&mut self) {
+        while let Some(&(_, ch)) = self.chars.peek() {
+            if ch == '\\n' { self.line += 1; }
+            if !ch.is_whitespace() { break; }
+            self.chars.next();
+        }
+    }
+}`,
+
+    orderbook: `//! Order matching engine for the trading system.
+
+use crate::db::Pool;
+use crate::models::{Order, Fill, Side};
+use std::collections::BTreeMap;
+
+/// Matches incoming orders against the book.
+pub struct MatchingEngine {
+    bids: BTreeMap<Price, Vec<Order>>,
+    asks: BTreeMap<Price, Vec<Order>>,
+    pool: Pool,
+}
+
+impl MatchingEngine {
+    /// Process a new order, generating fills.
+    pub async fn process_order(&mut self, order: Order) -> Vec<Fill> {
+        let mut fills = Vec::new();
+        let opposite_book = match order.side {
+            Side::Buy => &mut self.asks,
+            Side::Sell => &mut self.bids,
+        };
+
+        let mut remaining = order.quantity;
+
+        // BUG: Connection acquired here, held until function returns
+        let conn = self.pool.get().await.unwrap(); // line 342
+
+        while remaining > 0 {
+            let best_price = match order.side {
+                Side::Buy => opposite_book.keys().next().copied(),
+                Side::Sell => opposite_book.keys().next_back().copied(),
+            };
+
+            let Some(price) = best_price else { break };
+
+            if !order.price_matches(price) { break }
+
+            let queue = opposite_book.get_mut(&price).unwrap();
+            while remaining > 0 && !queue.is_empty() {
+                let maker = &mut queue[0];
+                let fill_qty = remaining.min(maker.quantity);
+
+                fills.push(Fill {
+                    maker_id: maker.id,
+                    taker_id: order.id,
+                    price,
+                    quantity: fill_qty,
+                });
+
+                // Each fill written separately - connection still held
+                conn.execute("INSERT INTO fills ...", &[]).await.unwrap();
+
+                maker.quantity -= fill_qty;
+                remaining -= fill_qty;
+
+                if maker.quantity == 0 {
+                    queue.remove(0);
+                }
+            }
+
+            if queue.is_empty() {
+                opposite_book.remove(&price);
+            }
+        }
+
+        fills
+    }
+}`,
+
+    parser_tests: `#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_expression() {
+        let input = "1 + 2 * 3";
+        let ast = parse(input).unwrap();
+
+        // After precedence fix, this correctly parses as 1 + (2 * 3)
+        assert!(matches!(ast, Expr::Binary { op: Op::Add, .. }));
+
+        if let Expr::Binary { right, .. } = ast {
+            assert!(matches!(*right, Expr::Binary { op: Op::Mul, .. }));
+        }
+    }
+
+    #[test]
+    fn test_parse_function_call() {
+        let input = "foo(a, b, c)";
+        let ast = parse(input).unwrap();
+
+        if let Expr::Call { args, .. } = ast {
+            assert_eq!(args.len(), 3);
+        } else {
+            panic!("expected function call");
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_calls() {
+        let input = "outer(inner(x), y)";
+        let ast = parse(input).unwrap();
+
+        if let Expr::Call { args, .. } = ast {
+            assert_eq!(args.len(), 2);
+            assert!(matches!(args[0], Expr::Call { .. }));
+        }
+    }
+}`,
+
+    parser: `//! Recursive descent parser for expressions.
+
+use crate::lexer::{Lexer, Token, TokenKind};
+use crate::ast::{Expr, Op};
+
+pub struct Parser<'a> {
+    lexer: Lexer<'a>,
+}
+
+impl<'a> Parser<'a> {
+    pub fn new(source: &'a str) -> Self {
+        Self { lexer: Lexer::new(source) }
+    }
+
+    pub fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+        self.parse_additive()
+    }
+
+    fn parse_additive(&mut self) -> Result<Expr, ParseError> {
+        let mut left = self.parse_multiplicative()?;
+        while matches!(self.lexer.peek(), Some(t) if t.kind == TokenKind::Plus || t.kind == TokenKind::Minus) {
+            let op = if self.lexer.next().unwrap().kind == TokenKind::Plus { Op::Add } else { Op::Sub };
+            let right = self.parse_multiplicative()?;
+            left = Expr::Binary { left: Box::new(left), op, right: Box::new(right) };
+        }
+        Ok(left)
+    }
+
+    fn parse_call(&mut self, callee: Expr) -> Result<Expr, ParseError> {
+        let mut args = Vec::new();
+
+        if !matches!(self.lexer.peek(), Some(t) if t.kind == TokenKind::RParen) {
+            args.push(self.parse_expr()?);
+
+            while matches!(self.lexer.peek(), Some(t) if t.kind == TokenKind::Comma) {
+                self.lexer.next(); // consume comma
+
+                // Fixed: handle trailing comma by checking for RParen
+                if matches!(self.lexer.peek(), Some(t) if t.kind == TokenKind::RParen) {
+                    break;
+                }
+
+                args.push(self.parse_expr()?);
+            }
+        }
+
+        self.expect(TokenKind::RParen)?;
+        Ok(Expr::Call { callee: Box::new(callee), args })
+    }
+}`
+  };
+
+  // Prompts for copy functionality
+  const prompts = {
+    docstrings: `Add /// documentation comments to all public functions. Include parameter descriptions and return value. Keep each doc comment to 1-3 lines. Don't add docs to private functions or simple getters.`,
+
+    security_scan: `Find security issues: unwrap() in error paths, format! in SQL queries, hardcoded secrets, missing input validation. Return as JSON with fields: {issues: [{file, line, severity, msg, suggestion}]}`,
+
+    tracing: `Add tracing::info_span! to all public async handler functions. Include function name, relevant parameters (user_id, request_id). Use span.enter() guard. Don't modify private functions or non-handlers.`,
+
+    pr_description: `Analyze this diff and write a PR description. Include: Summary (2-3 sentences), Changes (bullet list of what changed), Test Plan (checkboxes for reviewer). Use markdown. Be specific about what changed, not vague.`,
+
+    diagnose: `Analyze these logs. Find errors, correlate timestamps, identify patterns. Determine root cause. Point to specific source file:line if possible. Suggest fix. Be concise - this is a production incident.`,
+
+    async_port: `Convert this synchronous Rust code to async using tokio. Replace: std::net with tokio::net, std::io with tokio::io, std::thread::spawn with tokio::spawn. Add async to function signatures, .await to I/O ops. Keep same public API shape.`,
+
+    fix_tests: `Parse this test output. For each failure: 1) Read the test, 2) Understand what it asserts, 3) Determine if test is stale or code is wrong, 4) Fix the appropriate one. Don't just make tests pass - preserve test intent.`,
+
+    batch_tests: `Generate unit tests for all public functions in this file. Use #[test] attribute. Test happy path and edge cases. Use descriptive test names. Put tests in a #[cfg(test)] mod tests block. Don't test trivial getters.`,
+
+    deploy_script: `Generate a deployment script for these requirements. Use set -e for safety. Add echo statements showing progress. Include health check at end. Make it idempotent where possible.`,
+
+    watch_audit: `Audit this code for quality. Score 0-100 on: safety (no panics, proper error handling), clarity (good names, simple logic), test_coverage (has tests). Return JSON: {safety: N, clarity: N, test_coverage: N, overall: N, issues: [...]}`,
+
+    security_review: `Security review this code against OWASP top 10. Check: injection, broken auth, sensitive data exposure, XXE, access control, misconfiguration, XSS, deserialization, known vulns, logging. Rate: PASS/WARN/FAIL per issue.`,
+
+    makefile: `Analyze this Rust project and generate a Makefile. Include targets: build, test, lint (clippy + fmt), bench, doc, release (optimized + stripped), clean. Use .PHONY. Add helpful comments. Match project structure.`
+  };
+
   // Terminal replay demos - Unix pipe style
   const demos = [
     {
       lines: [
-        { text: '$ find src/ -name "*.rs" | wc -l', type: 'cmd' },
-        { text: '23', type: 'out' },
-        { text: '$ find src/ -name "*.rs" | hyle --task "add docstrings"', type: 'cmd' },
-        { text: '[reading 23 files...]', type: 'dim' },
-        { text: '[patching src/lib.rs...]', type: 'dim' },
-        { text: '[patching src/parser.rs...]', type: 'dim' },
-        { text: '[patching src/tools.rs...]', type: 'dim' },
-        { text: '23 files updated, 127 docstrings added', type: 'bright' },
+        { text: '$ find ~/code/lexer -name "*.rs" | wc -l', type: 'cmd' },
+        { text: '14', type: 'out' },
+        { text: '$ find ~/code/lexer -name "*.rs" | hyle --task "add docstrings"', type: 'cmd' },
+        { text: '[reading 14 files...]', type: 'dim' },
+        { text: '[patching src/lib.rs: 8 docstrings]', type: 'dim' },
+        { text: '[patching src/token.rs: 12 docstrings]', type: 'dim' },
+        { text: '[patching src/scanner.rs: 15 docstrings]', type: 'dim' },
+        { text: '14 files, 47 docstrings added', type: 'bright' },
       ]
     },
     {
       lines: [
         { text: '$ git diff HEAD~3 | hyle --task "changelog entry"', type: 'cmd' },
-        { text: '[analyzing diff...]', type: 'dim' },
+        { text: '[analyzing 847 lines of diff...]', type: 'dim' },
         { text: '', type: 'out' },
-        { text: '## v0.3.3 (2026-01-10)', type: 'bright' },
-        { text: '- Fixed OpenAI tool call parsing', type: 'out' },
-        { text: '- Added input field text wrapping', type: 'out' },
-        { text: '- Improved context tracking', type: 'out' },
+        { text: '## v0.4.2 (2026-01-10)', type: 'bright' },
+        { text: '- Added rate limiting to public API endpoints', type: 'out' },
+        { text: '- Fixed connection pool exhaustion under load', type: 'out' },
+        { text: '- Improved orderbook matching performance 3x', type: 'out' },
       ]
     },
     {
       lines: [
         { text: '$ cargo test 2>&1 | hyle --task "fix failures"', type: 'cmd' },
         { text: '[parsing test output...]', type: 'dim' },
-        { text: '[found 2 failures in tests/api.rs...]', type: 'dim' },
-        { text: '[reading tests/api.rs...]', type: 'dim' },
-        { text: '[patching...]', type: 'dim' },
+        { text: '[found 7 failures in tests/parser_tests.rs]', type: 'dim' },
+        { text: '[reading tests/parser_tests.rs...]', type: 'dim' },
+        { text: '[analyzing: test_parse_expression - stale expectation]', type: 'dim' },
+        { text: '[patching tests/parser_tests.rs]', type: 'dim' },
+        { text: '[analyzing: test_parse_function_call - parser bug]', type: 'dim' },
+        { text: '[patching src/parser.rs:178]', type: 'dim' },
         { text: '', type: 'out' },
         { text: '$ cargo test', type: 'cmd' },
-        { text: 'test result: ok. 47 passed', type: 'bright' },
+        { text: 'test result: ok. 42 passed; 0 failed', type: 'bright' },
+      ]
+    },
+    {
+      lines: [
+        { text: '$ journalctl -u trading-engine --since "10 min ago" | \\', type: 'cmd' },
+        { text: '    hyle --task "diagnose root cause"', type: 'cmd' },
+        { text: '[analyzing 847 log lines...]', type: 'dim' },
+        { text: '[found 23 ERROR entries]', type: 'dim' },
+        { text: '[correlating timestamps...]', type: 'dim' },
+        { text: '', type: 'out' },
+        { text: 'Root cause: Connection pool exhaustion', type: 'bright' },
+        { text: 'File: src/matching/engine.rs:342', type: 'out' },
+        { text: 'Fix: Release conn after each fill, not batch end', type: 'out' },
       ]
     }
   ];
@@ -645,6 +1284,47 @@ $ hyle --task "Analyze this Rust project and generate a Makefile with:
     });
     el.classList.toggle('open');
   }
+
+  function showFile(fileKey) {
+    const content = files[fileKey];
+    if (!content) return;
+
+    const lines = content.split('\n');
+    const numbered = lines.map((line, i) =>
+      `<span class="line-num">${String(i + 1).padStart(3)}</span>${escapeHtml(line)}`
+    ).join('\n');
+
+    document.getElementById('modalTitle').textContent = fileKey.replace(/_/g, '/') + '.rs';
+    document.getElementById('modalBody').innerHTML = `<pre>${numbered}</pre>`;
+    document.getElementById('modal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function copyPrompt(key) {
+    const prompt = prompts[key];
+    if (!prompt) return;
+
+    navigator.clipboard.writeText(prompt).then(() => {
+      event.target.textContent = 'copied!';
+      event.target.classList.add('copied');
+      setTimeout(() => {
+        event.target.textContent = 'copy prompt';
+        event.target.classList.remove('copied');
+      }, 1500);
+    });
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+  });
 
   // Auto-start
   window.addEventListener('load', () => setTimeout(startReplay, 500));
