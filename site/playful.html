@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle ~</title>
+  <style>
+    @keyframes drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+    @keyframes type { from { width: 0; } to { width: 100%; } }
+
+    :root {
+      --bg: #1a1625;
+      --fg: #e0def4;
+      --rose: #eb6f92;
+      --gold: #f6c177;
+      --iris: #c4a7e7;
+      --foam: #9ccfd8;
+      --pine: #31748f;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Space Mono', 'Fira Code', monospace;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .dot {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      animation: drift 8s ease-in-out infinite;
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: clamp(3rem, 12vw, 8rem);
+      font-weight: 400;
+      letter-spacing: 0.2em;
+      margin-bottom: 1rem;
+    }
+    h1 span:nth-child(1) { color: var(--rose); }
+    h1 span:nth-child(2) { color: var(--gold); }
+    h1 span:nth-child(3) { color: var(--iris); }
+    h1 span:nth-child(4) { color: var(--foam); }
+
+    .tagline {
+      font-size: 1.2rem;
+      color: var(--pine);
+      margin-bottom: 3rem;
+      opacity: 0.8;
+    }
+
+    .prompt {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--pine);
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 500px;
+      width: 100%;
+      text-align: left;
+    }
+    .prompt-line {
+      display: flex;
+      align-items: center;
+      margin: 0.5rem 0;
+    }
+    .prompt-char {
+      color: var(--rose);
+      margin-right: 0.5rem;
+    }
+    .prompt-text {
+      color: var(--fg);
+    }
+    .prompt-comment {
+      color: var(--pine);
+      font-style: italic;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+
+    .ideas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      margin: 3rem 0;
+      max-width: 600px;
+    }
+    .idea {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid transparent;
+      border-radius: 20px;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      transition: all 0.3s;
+      cursor: default;
+    }
+    .idea:nth-child(1) { border-color: var(--rose); color: var(--rose); }
+    .idea:nth-child(2) { border-color: var(--gold); color: var(--gold); }
+    .idea:nth-child(3) { border-color: var(--iris); color: var(--iris); }
+    .idea:nth-child(4) { border-color: var(--foam); color: var(--foam); }
+    .idea:nth-child(5) { border-color: var(--pine); color: var(--pine); }
+    .idea:nth-child(6) { border-color: var(--rose); color: var(--rose); }
+    .idea:hover {
+      transform: scale(1.05);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .cta {
+      margin-top: 2rem;
+    }
+    .cta a {
+      display: inline-block;
+      padding: 1rem 2rem;
+      background: transparent;
+      border: 2px solid var(--iris);
+      color: var(--iris);
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.3s;
+    }
+    .cta a:hover {
+      background: var(--iris);
+      color: var(--bg);
+    }
+
+    footer {
+      position: fixed;
+      bottom: 1rem;
+      left: 1rem;
+      font-size: 0.75rem;
+      color: var(--pine);
+      opacity: 0.6;
+    }
+    footer a { color: var(--pine); }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: transparent; border: 1px solid var(--pine);
+      color: var(--pine); cursor: pointer; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.3s;
+    }
+    .switcher-toggle:hover { border-color: var(--iris); color: var(--iris); }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 34px; right: 0;
+      background: var(--bg); border: 1px solid var(--pine); padding: 0.5rem;
+      min-width: 140px; border-radius: 8px;
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.4rem 0.75rem; color: var(--pine);
+      font-size: 11px; text-decoration: none; border-radius: 4px;
+    }
+    .switcher-item:hover { color: var(--fg); background: rgba(255,255,255,0.05); }
+    .switcher-item.active { color: var(--iris); }
+  </style>
+</head>
+<body>
+  <div class="canvas" id="canvas"></div>
+
+  <main>
+    <h1><span>h</span><span>y</span><span>l</span><span>e</span></h1>
+    <p class="tagline">describe it. watch it emerge.</p>
+
+    <div class="prompt">
+      <div class="prompt-line">
+        <span class="prompt-char">></span>
+        <span class="prompt-text">make me a particle system</span>
+      </div>
+      <div class="prompt-line">
+        <span class="prompt-char">></span>
+        <span class="prompt-text">that responds to sound</span>
+      </div>
+      <div class="prompt-line">
+        <span class="prompt-char">></span>
+        <span class="prompt-text">with physics</span>
+      </div>
+      <p class="prompt-comment">// hyle reads, writes, iterates</p>
+    </div>
+
+    <div class="ideas">
+      <span class="idea">generative art</span>
+      <span class="idea">shaders</span>
+      <span class="idea">interactive</span>
+      <span class="idea">procedural</span>
+      <span class="idea">audio reactive</span>
+      <span class="idea">experiments</span>
+    </div>
+
+    <div class="cta">
+      <a href="https://github.com/uprootiny/hyle">explore</a>
+    </div>
+  </main>
+
+  <footer>
+    <a href="https://github.com/uprootiny/hyle">github</a> &middot; mit license
+  </footer>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">*</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item active" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+
+  <script>
+    // Floating dots
+    const canvas = document.getElementById('canvas');
+    const colors = ['#eb6f92', '#f6c177', '#c4a7e7', '#9ccfd8', '#31748f'];
+    for (let i = 0; i < 30; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      dot.style.left = Math.random() * 100 + '%';
+      dot.style.top = Math.random() * 100 + '%';
+      dot.style.background = colors[Math.floor(Math.random() * colors.length)];
+      dot.style.animationDelay = Math.random() * 8 + 's';
+      dot.style.opacity = 0.3 + Math.random() * 0.4;
+      canvas.appendChild(dot);
+    }
+  </script>
+</body>
+</html>

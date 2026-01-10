@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Your Code, Your Rules</title>
+  <style>
+    :root {
+      --bg: #1c1c1c;
+      --fg: #f0f0f0;
+      --accent: #ffd700;
+      --dim: #888;
+      --panel: #262626;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+    }
+    .container { max-width: 700px; margin: 0 auto; padding: 4rem 2rem; }
+
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      color: var(--dim);
+      font-size: 1.2rem;
+      margin-bottom: 3rem;
+    }
+
+    .value-prop {
+      display: grid;
+      gap: 2rem;
+      margin-bottom: 4rem;
+    }
+    .value {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .value-icon {
+      font-size: 1.5rem;
+      width: 40px;
+      flex-shrink: 0;
+    }
+    .value h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.25rem;
+    }
+    .value p {
+      color: var(--dim);
+      font-size: 0.95rem;
+    }
+
+    .cost-comparison {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 3rem;
+    }
+    .cost-comparison h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .cost-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid #333;
+    }
+    .cost-row:last-child { border-bottom: none; }
+    .cost-label { color: var(--dim); }
+    .cost-value { font-weight: 600; }
+    .cost-free { color: var(--accent); }
+
+    .install {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 1.5rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.9rem;
+      margin-bottom: 3rem;
+    }
+    .install-line {
+      margin: 0.25rem 0;
+    }
+    .install-prompt { color: var(--accent); }
+    .install-comment { color: var(--dim); }
+
+    .cta {
+      text-align: center;
+    }
+    .cta a {
+      display: inline-block;
+      padding: 1rem 2.5rem;
+      background: var(--accent);
+      color: var(--bg);
+      text-decoration: none;
+      font-weight: 600;
+      border-radius: 8px;
+      transition: transform 0.1s;
+    }
+    .cta a:hover { transform: translateY(-2px); }
+
+    footer {
+      margin-top: 4rem;
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--dim); }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--panel); border: 1px solid #333;
+      color: var(--dim); cursor: pointer; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .switcher-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 34px; right: 0;
+      background: var(--panel); border: 1px solid #333; padding: 0.5rem;
+      min-width: 140px; border-radius: 8px;
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.4rem 0.75rem; color: var(--dim);
+      font-size: 11px; text-decoration: none; border-radius: 4px;
+    }
+    .switcher-item:hover { color: var(--fg); background: #333; }
+    .switcher-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Your code.<br><span>Your rules.</span></h1>
+    <p class="subtitle">An AI assistant that runs on your machine, uses your API key, and doesn't phone home.</p>
+
+    <div class="value-prop">
+      <div class="value">
+        <div class="value-icon">$</div>
+        <div>
+          <h3>Pay only what you use</h3>
+          <p>Direct API access. No subscription. Free models available. Your OpenRouter key, your billing.</p>
+        </div>
+      </div>
+      <div class="value">
+        <div class="value-icon">~</div>
+        <div>
+          <h3>No vendor lock-in</h3>
+          <p>Switch models anytime. Export sessions. Code is open source. Walk away whenever.</p>
+        </div>
+      </div>
+      <div class="value">
+        <div class="value-icon">.</div>
+        <div>
+          <h3>Your local environment</h3>
+          <p>Runs in your terminal. Reads your files. Uses your tools. Integrates with your workflow.</p>
+        </div>
+      </div>
+      <div class="value">
+        <div class="value-icon">/</div>
+        <div>
+          <h3>Offline slash commands</h3>
+          <p>/build /test /commit — 20+ commands that work without any API call. Speed when you need it.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="cost-comparison">
+      <h2>Cost Comparison (typical month)</h2>
+      <div class="cost-row">
+        <span class="cost-label">Subscription AI tools</span>
+        <span class="cost-value">$20-200/mo</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">hyle + free models</span>
+        <span class="cost-value cost-free">$0</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">hyle + paid models (light use)</span>
+        <span class="cost-value">$2-5/mo</span>
+      </div>
+    </div>
+
+    <div class="install">
+      <div class="install-line"><span class="install-prompt">$</span> cargo install --git https://github.com/uprootiny/hyle</div>
+      <div class="install-line"><span class="install-prompt">$</span> hyle config set key YOUR_KEY</div>
+      <div class="install-line"><span class="install-prompt">$</span> hyle --free</div>
+      <div class="install-line install-comment"># that's it. start building.</div>
+    </div>
+
+    <div class="cta">
+      <a href="https://github.com/uprootiny/hyle">Get Started</a>
+    </div>
+
+    <footer>
+      MIT License &middot; <a href="https://github.com/uprootiny/hyle">Source</a> &middot; No telemetry
+    </footer>
+  </div>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">~</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item active" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+</body>
+</html>

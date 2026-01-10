@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Open Source</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #24292f;
+      --accent: #0969da;
+      --green: #1a7f37;
+      --border: #d0d7de;
+      --muted: #656d76;
+      --subtle: #f6f8fa;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 0 2rem; }
+
+    header {
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--fg);
+      text-decoration: none;
+    }
+    nav { display: flex; gap: 1.5rem; }
+    nav a {
+      color: var(--fg);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    nav a:hover { text-decoration: underline; }
+
+    .hero {
+      padding: 4rem 0;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .hero p {
+      color: var(--muted);
+      font-size: 1.2rem;
+      max-width: 600px;
+      margin: 0 auto 2rem;
+    }
+    .badges {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      background: var(--subtle);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .badge-green {
+      background: #dafbe1;
+      border-color: #1a7f37;
+      color: var(--green);
+    }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 4rem;
+      padding: 2rem 0;
+      margin-bottom: 2rem;
+    }
+    .stat {
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 600;
+    }
+    .stat-label {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .section {
+      padding: 3rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .section h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .contribute-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+    .contribute-card {
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--subtle);
+    }
+    .contribute-card h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .contribute-card p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .contribute-card a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+    .contribute-card a:hover { text-decoration: underline; }
+
+    .code-block {
+      background: var(--subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    .maintainers {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .maintainer {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--subtle);
+      border-radius: 20px;
+      font-size: 0.9rem;
+    }
+    .maintainer-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    footer {
+      padding: 2rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 28px; height: 28px; border-radius: 6px;
+      background: var(--subtle); border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .switcher-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 34px; right: 0;
+      background: var(--bg); border: 1px solid var(--border); padding: 0.5rem;
+      min-width: 150px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.4rem 0.75rem; color: var(--muted);
+      font-size: 12px; text-decoration: none; border-radius: 4px;
+    }
+    .switcher-item:hover { color: var(--fg); background: var(--subtle); }
+    .switcher-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="header-inner">
+        <a href="/" class="logo">hyle</a>
+        <nav>
+          <a href="https://github.com/uprootiny/hyle">Code</a>
+          <a href="https://github.com/uprootiny/hyle/issues">Issues</a>
+          <a href="https://github.com/uprootiny/hyle/pulls">Pull Requests</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="badges">
+        <span class="badge badge-green">MIT License</span>
+        <span class="badge">Rust 1.75+</span>
+        <span class="badge">v0.3.3</span>
+      </div>
+      <h1>Build with us</h1>
+      <p>hyle is an open source code assistant. Every line is readable, testable, and yours to modify.</p>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value">364</div>
+          <div class="stat-label">Tests</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">26K</div>
+          <div class="stat-label">Lines</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">31</div>
+          <div class="stat-label">Modules</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Get Started</h2>
+      <div class="code-block">
+git clone https://github.com/uprootiny/hyle
+cd hyle
+cargo build --release
+cargo test
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Ways to Contribute</h2>
+      <div class="contribute-grid">
+        <div class="contribute-card">
+          <h3>Report Issues</h3>
+          <p>Found a bug? Have a feature request? Open an issue with reproduction steps.</p>
+          <a href="https://github.com/uprootiny/hyle/issues/new">New Issue</a>
+        </div>
+        <div class="contribute-card">
+          <h3>Fix TODOs</h3>
+          <p>Run <code>/analyze</code> to find TODO items. Each has a priority level.</p>
+          <a href="https://github.com/uprootiny/hyle/search?q=TODO">Browse TODOs</a>
+        </div>
+        <div class="contribute-card">
+          <h3>Add Tests</h3>
+          <p>Test coverage is at 364 tests. Each module can use more edge cases.</p>
+          <a href="https://github.com/uprootiny/hyle/tree/main/tests">Tests Directory</a>
+        </div>
+        <div class="contribute-card">
+          <h3>Improve Docs</h3>
+          <p>Documentation lives alongside code. Help keep README and docs/ current.</p>
+          <a href="https://github.com/uprootiny/hyle/tree/main/docs">Docs Directory</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Code Quality Standards</h2>
+      <ul style="margin-left: 1.5rem; color: var(--muted);">
+        <li>All PRs must pass <code>cargo test</code></li>
+        <li>New features need tests</li>
+        <li>Avoid <code>unwrap()</code> in library code — use <code>.context()</code></li>
+        <li>Keep modules under 1000 lines when possible</li>
+        <li>Document public APIs</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    MIT License &middot; <a href="https://github.com/uprootiny/hyle">Source</a> &middot; Contributions welcome
+  </footer>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">+</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item active" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+</body>
+</html>

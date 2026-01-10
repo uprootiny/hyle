@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Stay in Flow</title>
+  <style>
+    :root {
+      --bg: #1e1e2e;
+      --fg: #cdd6f4;
+      --surface: #313244;
+      --accent: #89b4fa;
+      --green: #a6e3a1;
+      --peach: #fab387;
+      --mauve: #cba6f7;
+      --dim: #6c7086;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    h1 span { color: var(--accent); }
+    .tagline {
+      font-size: 1.25rem;
+      color: var(--dim);
+    }
+
+    .shortcuts {
+      margin-bottom: 4rem;
+    }
+    .shortcuts h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1.5rem;
+      color: var(--mauve);
+    }
+    .shortcut-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    .shortcut {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--surface);
+      border-radius: 8px;
+    }
+    .key {
+      background: var(--bg);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-family: 'SF Mono', monospace;
+      font-size: 0.85rem;
+      border: 1px solid var(--dim);
+      min-width: 80px;
+      text-align: center;
+    }
+    .shortcut-desc {
+      font-size: 0.9rem;
+      color: var(--dim);
+    }
+
+    .commands {
+      margin-bottom: 4rem;
+    }
+    .commands h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1.5rem;
+      color: var(--green);
+    }
+    .command-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.75rem;
+    }
+    .command {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      background: var(--surface);
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    .command-name {
+      font-family: 'SF Mono', monospace;
+      color: var(--green);
+    }
+    .command-desc {
+      color: var(--dim);
+    }
+
+    .workflow {
+      margin-bottom: 4rem;
+    }
+    .workflow h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1.5rem;
+      color: var(--peach);
+    }
+    .workflow-demo {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem;
+      font-family: 'SF Mono', monospace;
+      font-size: 0.9rem;
+    }
+    .workflow-line {
+      margin: 0.5rem 0;
+    }
+    .workflow-prompt { color: var(--green); }
+    .workflow-output { color: var(--dim); }
+    .workflow-comment { color: var(--mauve); font-style: italic; }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+    @media (max-width: 700px) {
+      .features { grid-template-columns: 1fr; }
+    }
+    .feature {
+      text-align: center;
+      padding: 1.5rem;
+    }
+    .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+    .feature h3 {
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+    }
+    .feature p {
+      font-size: 0.85rem;
+      color: var(--dim);
+    }
+
+    .cta {
+      text-align: center;
+    }
+    .cta a {
+      display: inline-block;
+      padding: 1rem 2.5rem;
+      background: var(--accent);
+      color: var(--bg);
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    footer {
+      margin-top: 4rem;
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--dim); }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--surface); border: 1px solid var(--dim);
+      color: var(--dim); cursor: pointer; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .switcher-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 34px; right: 0;
+      background: var(--surface); border: 1px solid var(--dim); padding: 0.5rem;
+      min-width: 140px; border-radius: 8px;
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.4rem 0.75rem; color: var(--dim);
+      font-size: 11px; text-decoration: none; border-radius: 4px;
+    }
+    .switcher-item:hover { color: var(--fg); background: var(--bg); }
+    .switcher-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>Stay in <span>flow</span></h1>
+      <p class="tagline">Keyboard-driven. Session-persistent. Zero friction.</p>
+    </div>
+
+    <div class="shortcuts">
+      <h2>Keyboard Shortcuts</h2>
+      <div class="shortcut-grid">
+        <div class="shortcut">
+          <span class="key">Enter</span>
+          <span class="shortcut-desc">Send prompt</span>
+        </div>
+        <div class="shortcut">
+          <span class="key">↑ ↓</span>
+          <span class="shortcut-desc">Browse history</span>
+        </div>
+        <div class="shortcut">
+          <span class="key">Ctrl-A/E</span>
+          <span class="shortcut-desc">Line start/end</span>
+        </div>
+        <div class="shortcut">
+          <span class="key">Ctrl-K</span>
+          <span class="shortcut-desc">Kill to end</span>
+        </div>
+        <div class="shortcut">
+          <span class="key">/</span>
+          <span class="shortcut-desc">Search conversation</span>
+        </div>
+        <div class="shortcut">
+          <span class="key">n / N</span>
+          <span class="shortcut-desc">Next/prev match</span>
+        </div>
+        <div class="shortcut">
+          <span class="key">Tab</span>
+          <span class="shortcut-desc">Switch views</span>
+        </div>
+        <div class="shortcut">
+          <span class="key">k</span>
+          <span class="shortcut-desc">Kill operation</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="commands">
+      <h2>Instant Slash Commands (No LLM)</h2>
+      <div class="command-list">
+        <div class="command"><span class="command-name">/build</span><span class="command-desc">Build project</span></div>
+        <div class="command"><span class="command-name">/test</span><span class="command-desc">Run tests</span></div>
+        <div class="command"><span class="command-name">/check</span><span class="command-desc">Type check</span></div>
+        <div class="command"><span class="command-name">/diff</span><span class="command-desc">Git diff</span></div>
+        <div class="command"><span class="command-name">/commit</span><span class="command-desc">Git commit</span></div>
+        <div class="command"><span class="command-name">/status</span><span class="command-desc">Project status</span></div>
+        <div class="command"><span class="command-name">/ls</span><span class="command-desc">List files</span></div>
+        <div class="command"><span class="command-name">/grep</span><span class="command-desc">Search files</span></div>
+        <div class="command"><span class="command-name">/view</span><span class="command-desc">Read file</span></div>
+        <div class="command"><span class="command-name">/cost</span><span class="command-desc">Token usage</span></div>
+        <div class="command"><span class="command-name">/model</span><span class="command-desc">Current model</span></div>
+        <div class="command"><span class="command-name">/doctor</span><span class="command-desc">Health check</span></div>
+      </div>
+    </div>
+
+    <div class="workflow">
+      <h2>Typical Flow</h2>
+      <div class="workflow-demo">
+        <div class="workflow-line"><span class="workflow-prompt">$</span> hyle</div>
+        <div class="workflow-line"><span class="workflow-output">[Resumed session abc123]</span></div>
+        <div class="workflow-line"><span class="workflow-comment"># pick up where you left off</span></div>
+        <br>
+        <div class="workflow-line"><span class="workflow-prompt">></span> /status</div>
+        <div class="workflow-line"><span class="workflow-output">3 modified, 1 staged</span></div>
+        <br>
+        <div class="workflow-line"><span class="workflow-prompt">></span> add logging to the auth module</div>
+        <div class="workflow-line"><span class="workflow-output">[reading src/auth.rs...]</span></div>
+        <div class="workflow-line"><span class="workflow-output">[writing src/auth.rs...]</span></div>
+        <br>
+        <div class="workflow-line"><span class="workflow-prompt">></span> /test</div>
+        <div class="workflow-line"><span class="workflow-output">364 passed</span></div>
+        <br>
+        <div class="workflow-line"><span class="workflow-prompt">></span> /commit "add auth logging"</div>
+        <div class="workflow-line"><span class="workflow-output">[main 8f2a1b3] add auth logging</span></div>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <h3>20Hz Refresh</h3>
+        <p>TUI updates 20 times per second. No lag.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">💾</div>
+        <h3>Auto-Resume</h3>
+        <p>Sessions persist. Just type hyle to continue.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📝</div>
+        <h3>Queue Prompts</h3>
+        <p>Type while generating. Prompts queue up.</p>
+      </div>
+    </div>
+
+    <div class="cta">
+      <a href="https://github.com/uprootiny/hyle">Get Started</a>
+    </div>
+
+    <footer>
+      MIT License &middot; <a href="https://github.com/uprootiny/hyle">Source</a>
+    </footer>
+  </div>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">~</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item active" href="flow.html">Flow</a>
+    </div>
+  </div>
+</body>
+</html>

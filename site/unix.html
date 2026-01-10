@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: monospace;
+      background: #000;
+      color: #0f0;
+      padding: 2rem;
+      line-height: 1.5;
+      max-width: 80ch;
+      margin: 0 auto;
+    }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
+    a { color: #0ff; }
+    .dim { color: #060; }
+    .bright { color: #0f0; }
+    .cyan { color: #0ff; }
+    .yellow { color: #ff0; }
+    hr { border: none; border-top: 1px solid #030; margin: 1.5rem 0; }
+
+    /* Terminal Replay */
+    .replay-section {
+      margin: 2rem 0;
+      border: 1px solid #030;
+      padding: 1rem;
+      background: #010;
+    }
+    .replay-title {
+      color: #060;
+      margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .replay-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .replay-btn {
+      background: none;
+      border: 1px solid #030;
+      color: #060;
+      font-family: monospace;
+      font-size: 0.8rem;
+      padding: 0.15rem 0.5rem;
+      cursor: pointer;
+    }
+    .replay-btn:hover { color: #0f0; border-color: #060; }
+    .replay-btn.active { color: #0ff; border-color: #0ff; }
+    .replay-body {
+      min-height: 10em;
+      position: relative;
+    }
+    .replay-line {
+      opacity: 0;
+      animation: typeIn 0.1s ease forwards;
+    }
+    @keyframes typeIn { to { opacity: 1; } }
+    .cursor-blink {
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Examples Accordion */
+    .examples-section {
+      margin: 2rem 0;
+    }
+    .example-item {
+      border: 1px solid #030;
+      margin-bottom: 0.5rem;
+    }
+    .example-header {
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #010;
+    }
+    .example-header:hover { background: #020; }
+    .example-tag {
+      color: #060;
+      font-size: 0.8rem;
+    }
+    .example-tag.easy { color: #0f0; }
+    .example-tag.pipe { color: #0ff; }
+    .example-tag.wow { color: #ff0; }
+    .example-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+      background: #000;
+    }
+    .example-item.open .example-body {
+      max-height: 300px;
+    }
+    .example-content {
+      padding: 1rem;
+      border-top: 1px solid #030;
+    }
+
+    /* Variant Switcher */
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #111; border: 1px solid #030;
+      color: #060; cursor: pointer; font-size: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .switcher-toggle:hover { color: #0f0; border-color: #060; }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 30px; right: 0;
+      background: #000; border: 1px solid #030; padding: 0.5rem;
+      min-width: 140px;
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.25rem 0.5rem; color: #060;
+      font-size: 11px; text-decoration: none;
+    }
+    .switcher-item:hover { color: #0f0; background: #020; }
+    .switcher-item.active { color: #0ff; }
+  </style>
+</head>
+<body>
+<pre>
+<span class="bright">HYLE(1)</span>                      User Commands                      <span class="bright">HYLE(1)</span>
+
+<span class="bright">NAME</span>
+       hyle - autonomous code assistant
+
+<span class="bright">SYNOPSIS</span>
+       <span class="bright">hyle</span> [--free] [--model ID] [--task "..."] [PATHS...]
+
+<span class="bright">DESCRIPTION</span>
+       Read code. Write code. Execute tools. Text in, text out.
+
+       Single binary. No runtime dependencies. Composes with
+       existing tools: pipes, redirects, scripts.
+
+<span class="bright">PHILOSOPHY</span>
+       <span class="dim">"Make each program do one thing well."</span>
+
+       hyle does one thing: translate natural language intent
+       into file operations and shell commands.
+
+       Output is text. Input is text. Context is JSON.
+       Integrates with grep, sed, awk, git, make.
+
+<span class="bright">TOOLS</span>
+       read     Read file contents with line numbers
+       write    Write content to file (atomic, with backup)
+       patch    Apply unified diff
+       grep     Search files with regex
+       glob     Find files by pattern
+       bash     Execute shell command
+</pre>
+
+<!-- Interactive Terminal Replay -->
+<div class="replay-section">
+  <div class="replay-title">
+    <span>LIVE DEMO</span>
+    <div class="replay-controls">
+      <button class="replay-btn" id="playBtn" onclick="toggleReplay()">play</button>
+      <button class="replay-btn" onclick="restartReplay()">restart</button>
+      <button class="replay-btn" onclick="cycleDemo()">next</button>
+    </div>
+  </div>
+  <div class="replay-body" id="replayBody"></div>
+</div>
+
+<pre>
+<span class="bright">COMPOSABILITY</span>
+</pre>
+
+<!-- Expandable Examples -->
+<div class="examples-section">
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ find . -name "*.rs" | hyle --task "add docstrings"</span>
+      <span class="example-tag easy">[easy]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># Pipe file list, get docstrings added to all.
+# hyle reads stdin, processes each file, writes in place.
+
+$ find src/ -name "*.rs" | hyle --task "add /// docstrings to public fns"
+[reading src/lib.rs...]
+[patching src/lib.rs...]
+[reading src/parser.rs...]
+[patching src/parser.rs...]
+<span class="bright">4 files updated</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ hyle --task "list todos" --json | jq '.items[]'</span>
+      <span class="example-tag pipe">[pipe]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># JSON output mode for scripting.
+# Pipe to jq, awk, or your own tools.
+
+$ hyle --task "find all TODO comments" --json | jq -r '.items[].file'
+src/agent.rs
+src/tools.rs
+tests/integration.rs
+<span class="bright"># integrate with CI, editors, dashboards</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ hyle --task "add logging" src/ | patch -p1</span>
+      <span class="example-tag pipe">[pipe]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># Generate diff, review it, then apply with patch.
+# Full control over what gets written.
+
+$ hyle --task "add tracing::info to all handlers" src/api/ > changes.patch
+$ cat changes.patch   # review
+$ patch -p1 < changes.patch
+<span class="bright">patching file src/api/users.rs</span>
+<span class="bright">patching file src/api/auth.rs</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ git diff HEAD~5 | hyle --task "summarize changes"</span>
+      <span class="example-tag pipe">[pipe]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># Feed diffs directly, get summaries.
+# Great for commit messages, changelogs.
+
+$ git diff HEAD~5 | hyle --task "write changelog entry"
+## v0.3.3
+- Fixed tool call parsing for OpenAI format
+- Added input field wrap support
+- Improved context tracking accuracy
+<span class="bright"># copy to CHANGELOG.md</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ cat error.log | hyle --task "diagnose and fix"</span>
+      <span class="example-tag easy">[easy]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># Pipe logs, get diagnosis and fixes.
+# hyle finds the source, applies the fix.
+
+$ tail -100 /var/log/myapp/error.log | hyle --task "find root cause"
+[analyzing stack traces...]
+[reading src/cache.rs...]
+<span class="bright">Root cause: HashMap::get().unwrap() at line 142</span>
+<span class="bright">The cache key isn't guaranteed to exist after TTL</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ hyle --task "port to async" src/sync.rs | tee async.rs</span>
+      <span class="example-tag wow">[wow]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># Generate new files without clobbering.
+# Use tee, redirect, whatever you want.
+
+$ hyle --task "convert to async with tokio" src/sync.rs | tee src/async.rs
+[analyzing blocking calls...]
+[converting std::thread to tokio::spawn...]
+[adding .await to I/O operations...]
+<span class="bright">wrote 247 lines to stdout</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ make test 2>&1 | hyle --task "fix failing tests"</span>
+      <span class="example-tag easy">[easy]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># Pipe test output, get fixes applied.
+# Iterate until green.
+
+$ cargo test 2>&1 | hyle --task "fix the failures"
+[parsing test output...]
+[3 failures in tests/api_test.rs...]
+[patching tests/api_test.rs...]
+<span class="bright">cargo test: 47 passed</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ ls src/**/*.rs | xargs -I{} hyle --task "add tests" {}</span>
+      <span class="example-tag pipe">[pipe]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># xargs integration for batch processing.
+# Each file gets its own hyle session.
+
+$ find src -name "*.rs" | xargs -I{} hyle --task "add unit tests" {}
+[processing src/lib.rs...]
+[processing src/parser.rs...]
+[processing src/tools.rs...]
+<span class="bright">12 files processed, 89 tests added</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ hyle &lt;&lt;EOF ... EOF | sh</span>
+      <span class="example-tag wow">[wow]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># Heredoc input, execute output.
+# Generate scripts, run them.
+
+$ hyle --task "create setup script" &lt;&lt;EOF | sh
+Need to: install deps, create config, start service
+EOF
+[writing setup.sh...]
+<span class="bright">+ apt-get install -y postgresql redis</span>
+<span class="bright">+ cp config.example.json config.json</span>
+<span class="bright">+ systemctl start myapp</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ watch -n 60 'hyle --task "check for issues" src/'</span>
+      <span class="example-tag pipe">[pipe]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># Continuous monitoring with watch.
+# Lint, audit, suggest improvements.
+
+$ watch -n 60 'hyle --task "report any code smells" src/ --json | jq .'
+{
+  "issues": [
+    {"file": "src/cache.rs", "line": 42, "msg": "unwrap in error path"}
+  ],
+  "suggestions": [...]
+}
+<span class="bright"># integrate with alerting</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ diff -u old.rs new.rs | hyle --task "explain changes"</span>
+      <span class="example-tag easy">[easy]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># Understand diffs from anywhere.
+# Code review helper.
+
+$ diff -u main.rs.bak main.rs | hyle --task "explain what changed"
+<span class="bright">The changes add rate limiting to the API handler:</span>
+<span class="bright">1. New TokenBucket struct for request limiting</span>
+<span class="bright">2. Middleware that checks bucket before handling</span>
+<span class="bright">3. 429 response when rate exceeded</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-item" onclick="toggleEx(this)">
+    <div class="example-header">
+      <span>$ hyle --task "generate makefile" src/ > Makefile</span>
+      <span class="example-tag wow">[wow]</span>
+    </div>
+    <div class="example-body">
+      <div class="example-content">
+<pre class="dim"># Analyze project, generate build system.
+# Works with make, just, cargo-make.
+
+$ hyle --task "create Makefile with build, test, deploy targets" src/ > Makefile
+$ cat Makefile
+.PHONY: build test deploy
+build:
+	cargo build --release
+test:
+	cargo test
+deploy:
+	scp target/release/app server:/opt/
+<span class="bright"># or generate justfile, taskfile.yml, etc.</span></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<pre>
+<span class="bright">INSTALL</span>
+       $ cargo install --git https://github.com/uprootiny/hyle
+       $ hyle config set key YOUR_KEY
+
+<span class="bright">FILES</span>
+       ~/.config/hyle/config.json    Configuration
+       ~/.cache/hyle/models.json     Model cache
+       ~/.local/state/hyle/sessions/ Session persistence
+
+<span class="bright">SEE ALSO</span>
+       <a href="https://github.com/uprootiny/hyle">github.com/uprootiny/hyle</a>
+
+<span class="bright">AUTHOR</span>
+       MIT License. Contributions welcome.
+
+hyle 0.3.3                     2026-01                         <span class="bright">HYLE(1)</span>
+</pre>
+
+<!--
+============================================================================
+HIDDEN PROMPTSETS - Composability examples with actual prompts
+============================================================================
+
+Example 1: Add docstrings via pipe
+----------------------------------
+$ find src/ -name "*.rs" | hyle --task "Add /// documentation comments
+  to all public functions. Include @param and @returns where applicable.
+  Keep comments concise, one line where possible."
+
+Example 2: JSON output for scripting
+----------------------------------
+$ hyle --task "Find all TODO, FIXME, and HACK comments in the codebase.
+  Return as JSON with file, line, and text fields." --json | jq '.'
+
+Example 3: Generate diff for review
+----------------------------------
+$ hyle --task "Add tracing::info! calls at the entry and exit of each
+  public function in the API module. Include function name and arguments."
+  src/api/ --diff-only
+
+Example 4: Summarize git diff
+----------------------------------
+$ git diff HEAD~5 | hyle --task "Summarize these changes for a changelog.
+  Group by type: features, fixes, refactoring. Use bullet points."
+
+Example 5: Diagnose from logs
+----------------------------------
+$ tail -200 /var/log/app.log | hyle --task "Analyze these logs for errors.
+  Identify the root cause, suggest a fix, and show me the relevant source."
+
+Example 6: Port sync to async
+----------------------------------
+$ hyle --task "Convert this synchronous code to async using tokio.
+  Replace std::thread with tokio::spawn, add .await to I/O, update
+  function signatures to async fn." src/sync.rs
+
+Example 7: Fix failing tests
+----------------------------------
+$ cargo test 2>&1 | hyle --task "Parse this test output. For each failure,
+  read the test file, understand the assertion, and fix the test or code."
+
+Example 8: Batch processing with xargs
+----------------------------------
+$ find src -name "*.rs" | xargs -I{} hyle --task "Add unit tests for
+  all public functions. Use #[test] attribute. Include edge cases." {}
+
+Example 9: Heredoc to script
+----------------------------------
+$ hyle --task "Generate a bash script that sets up this project.
+  Include: dependency installation, config file creation, database
+  migration, and systemd service file." <<EOF
+Project needs: postgresql, redis, nodejs
+Config template in config.example.json
+EOF
+
+Example 10: Continuous monitoring
+----------------------------------
+$ watch -n 60 'hyle --task "Scan for: unwrap() in error paths,
+  missing error handling, potential panics. Report as JSON." src/ --json'
+
+Example 11: Explain diff
+----------------------------------
+$ diff -u old.rs new.rs | hyle --task "Explain these changes in plain
+  English. What was the intent? Are there any potential issues?"
+
+Example 12: Generate build system
+----------------------------------
+$ hyle --task "Analyze this Rust project and generate a Makefile with:
+  build (release), test, lint, fmt, clean, and deploy targets.
+  Use cargo for Rust commands." src/
+
+============================================================================
+-->
+
+<div class="variant-switcher">
+  <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">*</div>
+  <div class="switcher-panel" id="sp">
+    <a class="switcher-item" href="index.html">Default</a>
+    <a class="switcher-item active" href="unix.html">Composable</a>
+    <a class="switcher-item" href="velocity.html">Velocity</a>
+    <a class="switcher-item" href="reliable.html">Reliable</a>
+    <a class="switcher-item" href="depth.html">Depth</a>
+    <a class="switcher-item" href="playful.html">Playful</a>
+    <a class="switcher-item" href="observable.html">Observable</a>
+    <a class="switcher-item" href="community.html">Community</a>
+    <a class="switcher-item" href="indie.html">Independent</a>
+    <a class="switcher-item" href="learn.html">Learning</a>
+    <a class="switcher-item" href="control.html">Control</a>
+    <a class="switcher-item" href="secure.html">Secure</a>
+    <a class="switcher-item" href="flow.html">Flow</a>
+  </div>
+</div>
+
+<script>
+  // Terminal replay demos - Unix pipe style
+  const demos = [
+    {
+      lines: [
+        { text: '$ find src/ -name "*.rs" | wc -l', type: 'cmd' },
+        { text: '23', type: 'out' },
+        { text: '$ find src/ -name "*.rs" | hyle --task "add docstrings"', type: 'cmd' },
+        { text: '[reading 23 files...]', type: 'dim' },
+        { text: '[patching src/lib.rs...]', type: 'dim' },
+        { text: '[patching src/parser.rs...]', type: 'dim' },
+        { text: '[patching src/tools.rs...]', type: 'dim' },
+        { text: '23 files updated, 127 docstrings added', type: 'bright' },
+      ]
+    },
+    {
+      lines: [
+        { text: '$ git diff HEAD~3 | hyle --task "changelog entry"', type: 'cmd' },
+        { text: '[analyzing diff...]', type: 'dim' },
+        { text: '', type: 'out' },
+        { text: '## v0.3.3 (2026-01-10)', type: 'bright' },
+        { text: '- Fixed OpenAI tool call parsing', type: 'out' },
+        { text: '- Added input field text wrapping', type: 'out' },
+        { text: '- Improved context tracking', type: 'out' },
+      ]
+    },
+    {
+      lines: [
+        { text: '$ cargo test 2>&1 | hyle --task "fix failures"', type: 'cmd' },
+        { text: '[parsing test output...]', type: 'dim' },
+        { text: '[found 2 failures in tests/api.rs...]', type: 'dim' },
+        { text: '[reading tests/api.rs...]', type: 'dim' },
+        { text: '[patching...]', type: 'dim' },
+        { text: '', type: 'out' },
+        { text: '$ cargo test', type: 'cmd' },
+        { text: 'test result: ok. 47 passed', type: 'bright' },
+      ]
+    }
+  ];
+
+  let currentDemo = 0;
+  let currentLine = 0;
+  let isPlaying = false;
+  let interval = null;
+
+  function renderLine(line) {
+    const div = document.createElement('div');
+    div.className = 'replay-line';
+    if (line.type === 'cmd') {
+      div.innerHTML = `<span class="bright">${line.text}</span>`;
+    } else if (line.type === 'dim') {
+      div.innerHTML = `<span class="dim">${line.text}</span>`;
+    } else if (line.type === 'bright') {
+      div.innerHTML = `<span class="bright">${line.text}</span>`;
+    } else {
+      div.textContent = line.text || ' ';
+    }
+    return div;
+  }
+
+  function playNext() {
+    const demo = demos[currentDemo];
+    const body = document.getElementById('replayBody');
+    if (currentLine < demo.lines.length) {
+      body.appendChild(renderLine(demo.lines[currentLine]));
+      currentLine++;
+    } else {
+      stopReplay();
+    }
+  }
+
+  function startReplay() {
+    isPlaying = true;
+    document.getElementById('playBtn').textContent = 'pause';
+    document.getElementById('playBtn').classList.add('active');
+    interval = setInterval(playNext, 350);
+  }
+
+  function stopReplay() {
+    isPlaying = false;
+    document.getElementById('playBtn').textContent = 'play';
+    document.getElementById('playBtn').classList.remove('active');
+    if (interval) { clearInterval(interval); interval = null; }
+  }
+
+  function toggleReplay() {
+    if (isPlaying) stopReplay(); else startReplay();
+  }
+
+  function restartReplay() {
+    stopReplay();
+    currentLine = 0;
+    document.getElementById('replayBody').innerHTML = '';
+    startReplay();
+  }
+
+  function cycleDemo() {
+    stopReplay();
+    currentDemo = (currentDemo + 1) % demos.length;
+    currentLine = 0;
+    document.getElementById('replayBody').innerHTML = '';
+    startReplay();
+  }
+
+  function toggleEx(el) {
+    document.querySelectorAll('.example-item.open').forEach(e => {
+      if (e !== el) e.classList.remove('open');
+    });
+    el.classList.toggle('open');
+  }
+
+  // Auto-start
+  window.addEventListener('load', () => setTimeout(startReplay, 500));
+</script>
+</body>
+</html>

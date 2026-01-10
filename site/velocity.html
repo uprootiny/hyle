@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - ship faster</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --fg: #fff;
+      --accent: #ff6b6b;
+      --dim: #666;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100vh;
+    }
+    .hero {
+      min-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: clamp(4rem, 15vw, 10rem);
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      background: linear-gradient(135deg, #fff 0%, #888 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .tagline {
+      font-size: 1.5rem;
+      color: var(--dim);
+      margin: 1rem 0 3rem;
+      font-weight: 300;
+    }
+    .terminal {
+      background: #111;
+      border-radius: 8px;
+      padding: 1.5rem 2rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.9rem;
+      text-align: left;
+      max-width: 600px;
+      width: 100%;
+      border: 1px solid #222;
+    }
+    .terminal .line { margin: 0.25rem 0; }
+    .terminal .prompt { color: var(--accent); }
+    .terminal .dim { color: #444; }
+    .stats {
+      display: flex;
+      gap: 3rem;
+      margin: 3rem 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .stat {
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .stat-label {
+      color: var(--dim);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .cta {
+      margin-top: 2rem;
+    }
+    .cta a {
+      display: inline-block;
+      padding: 1rem 2.5rem;
+      background: var(--fg);
+      color: var(--bg);
+      text-decoration: none;
+      font-weight: 600;
+      border-radius: 4px;
+      transition: transform 0.1s;
+    }
+    .cta a:hover { transform: scale(1.02); }
+    .features {
+      padding: 4rem 2rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .features h2 {
+      text-align: center;
+      margin-bottom: 3rem;
+      font-weight: 300;
+      color: var(--dim);
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+    }
+    .feature {
+      padding: 1.5rem;
+      background: #111;
+      border-radius: 8px;
+      border: 1px solid #222;
+    }
+    .feature h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .feature p {
+      color: var(--dim);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    footer {
+      padding: 2rem;
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.8rem;
+    }
+    footer a { color: var(--dim); }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: #111; border: 1px solid #222;
+      color: #444; cursor: pointer; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .switcher-toggle:hover { color: #fff; border-color: #333; }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 34px; right: 0;
+      background: #111; border: 1px solid #222; padding: 0.5rem;
+      min-width: 150px; border-radius: 6px;
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.4rem 0.75rem; color: #666;
+      font-size: 12px; text-decoration: none; border-radius: 4px;
+    }
+    .switcher-item:hover { color: #fff; background: #1a1a1a; }
+    .switcher-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <h1>hyle</h1>
+    <p class="tagline">paste sketch. get project.</p>
+
+    <div class="terminal">
+      <div class="line"><span class="prompt">$</span> hyle --free</div>
+      <div class="line"><span class="dim"># describe what you want</span></div>
+      <div class="line"><span class="dim"># watch it build</span></div>
+      <div class="line"><span class="dim"># ship it</span></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">35+</div>
+        <div class="stat-label">Free Models</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Setup Time</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">1</div>
+        <div class="stat-label">Binary</div>
+      </div>
+    </div>
+
+    <div class="cta">
+      <a href="https://github.com/uprootiny/hyle">Get Started</a>
+    </div>
+  </div>
+
+  <div class="features">
+    <h2>What you get</h2>
+    <div class="feature-grid">
+      <div class="feature">
+        <h3>Agentic Execution</h3>
+        <p>Reads files. Writes files. Runs commands. Iterates until done. You describe, it builds.</p>
+      </div>
+      <div class="feature">
+        <h3>Zero Cost Start</h3>
+        <p>35+ free models via OpenRouter. DeepSeek, Qwen, Mistral. No credit card required.</p>
+      </div>
+      <div class="feature">
+        <h3>No JS Runtime</h3>
+        <p>Single Rust binary. No node_modules. No npm. No npx. Compiles to 10MB.</p>
+      </div>
+      <div class="feature">
+        <h3>Session Persistence</h3>
+        <p>Pick up where you left off. Context preserved. Decisions remembered.</p>
+      </div>
+      <div class="feature">
+        <h3>Guardrails Built In</h3>
+        <p>Blocks destructive commands. Atomic writes. Auto-backups. Safe by default.</p>
+      </div>
+      <div class="feature">
+        <h3>Slash Commands</h3>
+        <p>/build /test /commit - run locally, no LLM latency. 20+ commands included.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    MIT License &middot; <a href="https://github.com/uprootiny/hyle">GitHub</a>
+  </footer>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">~</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item active" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+</body>
+</html>

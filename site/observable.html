@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Observability</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --fg: #e6e1cf;
+      --green: #b8cc52;
+      --orange: #ff8f40;
+      --red: #f07178;
+      --blue: #59c2ff;
+      --purple: #d2a6ff;
+      --dim: #5c6773;
+      --panel: #1a1f26;
+      --border: #2d343d;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      background: var(--bg);
+      color: var(--fg);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      min-height: 100vh;
+    }
+    @media (max-width: 800px) {
+      .dashboard { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--panel);
+      padding: 1rem;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--dim);
+    }
+    .panel-status {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+    }
+    .status-ok { background: var(--green); color: var(--bg); }
+    .status-warn { background: var(--orange); color: var(--bg); }
+
+    .header-panel {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    .logo span { color: var(--green); }
+    .header-stats {
+      display: flex;
+      gap: 2rem;
+    }
+    .header-stat {
+      text-align: right;
+    }
+    .header-stat-value {
+      font-size: 1.2rem;
+      color: var(--green);
+    }
+    .header-stat-label {
+      font-size: 0.7rem;
+      color: var(--dim);
+      text-transform: uppercase;
+    }
+
+    /* Sparkline */
+    .sparkline {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 40px;
+      margin: 1rem 0;
+    }
+    .spark-bar {
+      flex: 1;
+      background: var(--blue);
+      border-radius: 2px 2px 0 0;
+      min-width: 4px;
+      transition: height 0.3s;
+    }
+
+    /* Metrics table */
+    .metrics-table {
+      width: 100%;
+      font-size: 0.85rem;
+    }
+    .metrics-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .metrics-row:last-child { border-bottom: none; }
+    .metrics-label { color: var(--dim); }
+    .metrics-value { font-weight: 500; }
+    .value-green { color: var(--green); }
+    .value-orange { color: var(--orange); }
+    .value-red { color: var(--red); }
+
+    /* Event log */
+    .event-log {
+      font-size: 0.8rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .event {
+      padding: 0.4rem 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 1rem;
+    }
+    .event-time { color: var(--dim); min-width: 60px; }
+    .event-type { min-width: 60px; }
+    .event-type.tool { color: var(--blue); }
+    .event-type.api { color: var(--purple); }
+    .event-type.error { color: var(--red); }
+    .event-msg { color: var(--fg); }
+
+    /* Architecture */
+    .arch {
+      font-size: 0.75rem;
+      line-height: 1.3;
+      color: var(--dim);
+    }
+    .arch pre {
+      margin: 0.5rem 0;
+      color: var(--fg);
+    }
+
+    footer {
+      grid-column: 1 / -1;
+      padding: 1rem 2rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--dim);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--blue); text-decoration: none; }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; z-index: 100; }
+    .switcher-toggle {
+      width: 24px; height: 24px; border-radius: 4px;
+      background: var(--panel); border: 1px solid var(--border);
+      color: var(--dim); cursor: pointer; font-size: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .switcher-toggle:hover { border-color: var(--blue); color: var(--blue); }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 30px; right: 0;
+      background: var(--panel); border: 1px solid var(--border); padding: 0.5rem;
+      min-width: 140px; border-radius: 4px;
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.3rem 0.6rem; color: var(--dim);
+      font-size: 10px; text-decoration: none;
+    }
+    .switcher-item:hover { color: var(--fg); background: var(--bg); }
+    .switcher-item.active { color: var(--green); }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <div class="panel header-panel">
+      <div class="logo"><span>></span> hyle</div>
+      <div class="header-stats">
+        <div class="header-stat">
+          <div class="header-stat-value">364</div>
+          <div class="header-stat-label">Tests</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-value">20Hz</div>
+          <div class="header-stat-label">TUI Refresh</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-value">35+</div>
+          <div class="header-stat-label">Models</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Token Usage (last 24h)</span>
+        <span class="panel-status status-ok">healthy</span>
+      </div>
+      <div class="sparkline" id="sparkline"></div>
+      <div class="metrics-table">
+        <div class="metrics-row">
+          <span class="metrics-label">Prompt tokens</span>
+          <span class="metrics-value">124,892</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metrics-label">Completion tokens</span>
+          <span class="metrics-value">48,231</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metrics-label">Context efficiency</span>
+          <span class="metrics-value value-green">78%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Latency</span>
+        <span class="panel-status status-ok">p99 &lt;2s</span>
+      </div>
+      <div class="metrics-table">
+        <div class="metrics-row">
+          <span class="metrics-label">TTFT (p50)</span>
+          <span class="metrics-value value-green">340ms</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metrics-label">TTFT (p99)</span>
+          <span class="metrics-value value-orange">1.2s</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metrics-label">Total (p50)</span>
+          <span class="metrics-value">2.8s</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metrics-label">Tokens/sec</span>
+          <span class="metrics-value value-green">42</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Event Log</span>
+      </div>
+      <div class="event-log">
+        <div class="event">
+          <span class="event-time">14:23:01</span>
+          <span class="event-type tool">TOOL</span>
+          <span class="event-msg">read src/agent.rs</span>
+        </div>
+        <div class="event">
+          <span class="event-time">14:23:02</span>
+          <span class="event-type api">API</span>
+          <span class="event-msg">stream_completion 1847 tokens</span>
+        </div>
+        <div class="event">
+          <span class="event-time">14:23:05</span>
+          <span class="event-type tool">TOOL</span>
+          <span class="event-msg">write src/agent.rs (atomic)</span>
+        </div>
+        <div class="event">
+          <span class="event-time">14:23:05</span>
+          <span class="event-type tool">TOOL</span>
+          <span class="event-msg">bash cargo test</span>
+        </div>
+        <div class="event">
+          <span class="event-time">14:23:12</span>
+          <span class="event-type api">API</span>
+          <span class="event-msg">rate_limit detected, switching model</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Thread Architecture</span>
+      </div>
+      <div class="arch">
+        <pre>
+TUI Event Loop (50ms, ~20Hz)
+├── telemetry_rx.try_recv() ← OS thread
+├── process_bg_responses()  ← BgWorker
+├── rx.try_recv()           ← API stream
+├── event::poll()           ← Keyboard
+└── render_tui()            ← Pure CPU
+        </pre>
+        <p>Non-blocking I/O throughout. All file operations via spawn_blocking.</p>
+      </div>
+    </div>
+
+    <footer>
+      <a href="https://github.com/uprootiny/hyle">github.com/uprootiny/hyle</a> &middot; MIT License &middot; v0.3.3
+    </footer>
+  </div>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">:</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item active" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+
+  <script>
+    // Generate sparkline
+    const sparkline = document.getElementById('sparkline');
+    const values = [40, 55, 30, 70, 85, 60, 45, 90, 75, 50, 65, 80, 55, 70, 40, 85, 60, 75, 90, 65];
+    values.forEach(v => {
+      const bar = document.createElement('div');
+      bar.className = 'spark-bar';
+      bar.style.height = v + '%';
+      sparkline.appendChild(bar);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Rust-native code assistant</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>></text></svg>">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --fg: #c9d1d9;
+      --dim: #6e7681;
+      --accent: #7aa2f7;
+      --green: #9ece6a;
+      --yellow: #e0af68;
+      --red: #f7768e;
+      --mono: 'Berkeley Mono', 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--mono);
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+
+    /* Header */
+    header { padding: 4rem 0 2rem; text-align: center; }
+    h1 { font-size: 3rem; font-weight: 400; letter-spacing: -0.02em; }
+    h1 span { color: var(--accent); }
+    .tagline { color: var(--dim); margin-top: 0.5rem; font-size: 1.1rem; }
+
+    /* Animated Terminal */
+    .terminal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      margin: 2rem 0;
+      overflow: hidden;
+    }
+    .terminal-header {
+      background: #21262d;
+      padding: 0.5rem 1rem;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+    .terminal-title { margin-left: auto; color: var(--dim); font-size: 0.75rem; }
+    .terminal-body {
+      padding: 1rem;
+      font-size: 0.9rem;
+      min-height: 200px;
+      position: relative;
+    }
+    .terminal-line { margin: 0.25rem 0; opacity: 0; animation: fadeIn 0.3s ease forwards; }
+    .terminal-line .prompt { color: var(--green); }
+    .terminal-line .cmd { color: var(--fg); }
+    .terminal-line .output { color: var(--dim); }
+    .terminal-line .success { color: var(--green); }
+    .terminal-line .info { color: var(--accent); }
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 16px;
+      background: var(--fg);
+      animation: blink 1s step-end infinite;
+      vertical-align: text-bottom;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+    @keyframes fadeIn { to { opacity: 1; } }
+
+    /* Replay controls */
+    .terminal-controls {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: #21262d;
+      border-top: 1px solid #30363d;
+    }
+    .terminal-btn {
+      padding: 0.25rem 0.75rem;
+      background: #30363d;
+      border: 1px solid #484f58;
+      border-radius: 4px;
+      color: var(--dim);
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .terminal-btn:hover { background: #484f58; color: var(--fg); }
+    .terminal-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .terminal-progress {
+      flex: 1;
+      height: 4px;
+      background: #30363d;
+      border-radius: 2px;
+      margin: auto 0.5rem;
+      overflow: hidden;
+    }
+    .terminal-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.3s linear;
+    }
+
+    /* Features Grid */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin: 3rem 0;
+    }
+    .feature {
+      padding: 1.5rem;
+      background: #161b22;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .feature:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .feature h3 { color: var(--accent); margin-bottom: 0.5rem; font-weight: 500; }
+    .feature p { color: var(--dim); font-size: 0.9rem; }
+
+    /* Examples Section */
+    .examples-section { margin: 4rem 0; }
+    .examples-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      cursor: pointer;
+    }
+    .examples-header h2 { font-size: 1.25rem; font-weight: 500; }
+    .examples-toggle {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: var(--dim);
+      transition: all 0.2s;
+    }
+    .examples-toggle:hover { color: var(--fg); background: #21262d; }
+    .examples-toggle svg { transition: transform 0.3s; }
+    .examples-toggle.open svg { transform: rotate(180deg); }
+
+    .examples-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.5s ease-out;
+    }
+    .examples-grid.open { max-height: 2000px; }
+
+    .example-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .example-card:hover { border-color: var(--accent); }
+    .example-card.expanded { grid-column: 1 / -1; }
+    .example-header {
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .example-icon { font-size: 1.5rem; }
+    .example-title { font-weight: 500; font-size: 0.9rem; }
+    .example-tag {
+      margin-left: auto;
+      padding: 0.15rem 0.5rem;
+      background: #21262d;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      color: var(--dim);
+    }
+    .example-tag.easy { color: var(--green); }
+    .example-tag.creative { color: var(--yellow); }
+    .example-tag.wow { color: var(--red); }
+    .example-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    .example-card.expanded .example-body { max-height: 500px; }
+    .example-content {
+      padding: 0 1rem 1rem;
+      font-size: 0.85rem;
+      color: var(--dim);
+    }
+    .example-terminal {
+      background: #0d1117;
+      padding: 0.75rem;
+      border-radius: 4px;
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      overflow-x: auto;
+    }
+
+    /* Links & CTA */
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .cta { text-align: center; margin: 3rem 0; }
+    .cta-button {
+      display: inline-block;
+      padding: 1rem 2rem;
+      background: var(--accent);
+      color: var(--bg);
+      border-radius: 6px;
+      font-weight: 500;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .cta-button:hover { opacity: 0.9; text-decoration: none; transform: translateY(-2px); }
+
+    /* Footer */
+    footer {
+      padding: 2rem;
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.8rem;
+      border-top: 1px solid #21262d;
+    }
+    footer a { color: var(--dim); }
+    footer a:hover { color: var(--accent); }
+
+    /* Variant Switcher */
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; z-index: 1000; }
+    .switcher-toggle {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: #21262d; border: 1px solid #30363d;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      color: var(--dim); font-size: 14px; transition: all 0.2s;
+    }
+    .switcher-toggle:hover { background: #30363d; color: var(--fg); }
+    .switcher-panel {
+      position: absolute; bottom: 40px; right: 0;
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      padding: 0.5rem; display: none; min-width: 180px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.5rem 0.75rem; color: var(--dim);
+      font-size: 0.75rem; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+    }
+    .switcher-item:hover { background: #21262d; color: var(--fg); text-decoration: none; }
+    .switcher-item.active { color: var(--accent); background: #21262d; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><span>></span> hyle</h1>
+      <p class="tagline">Rust-native autonomous code assistant</p>
+    </header>
+
+    <!-- Animated Terminal Replay -->
+    <div class="terminal" id="mainTerminal">
+      <div class="terminal-header">
+        <span class="terminal-dot dot-red"></span>
+        <span class="terminal-dot dot-yellow"></span>
+        <span class="terminal-dot dot-green"></span>
+        <span class="terminal-title">~/projects/myapp</span>
+      </div>
+      <div class="terminal-body" id="terminalBody"></div>
+      <div class="terminal-controls">
+        <button class="terminal-btn" id="playBtn" onclick="toggleReplay()">Play</button>
+        <button class="terminal-btn" onclick="restartReplay()">Restart</button>
+        <div class="terminal-progress"><div class="terminal-progress-bar" id="progressBar"></div></div>
+        <button class="terminal-btn" onclick="cycleDemo()">Next Demo</button>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <h3>Agentic Loop</h3>
+        <p>Autonomous tool execution. Read, write, patch, grep, bash. Iterates until done.</p>
+      </div>
+      <div class="feature">
+        <h3>35+ Free Models</h3>
+        <p>OpenRouter access to DeepSeek, Qwen, Mistral. Zero cost to experiment.</p>
+      </div>
+      <div class="feature">
+        <h3>Session Persistence</h3>
+        <p>Resume conversations across restarts. Context preserved, decisions remembered.</p>
+      </div>
+      <div class="feature">
+        <h3>Guardrails</h3>
+        <p>Blocks rm -rf. Atomic writes. Backups. Rate limit handling. Safe by default.</p>
+      </div>
+      <div class="feature">
+        <h3>Slash Commands</h3>
+        <p>/build /test /diff /commit - 20+ commands that run locally, no LLM needed.</p>
+      </div>
+      <div class="feature">
+        <h3>Telemetry</h3>
+        <p>Token usage, latency traces, context budget. Know what you're spending.</p>
+      </div>
+    </div>
+
+    <!-- Examples Section with Unfolding Cards -->
+    <div class="examples-section">
+      <div class="examples-header" onclick="toggleExamples()">
+        <h2>What you can build</h2>
+        <div class="examples-toggle" id="examplesToggle">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="examples-grid" id="examplesGrid">
+        <!-- Easy wins -->
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">📝</span>
+            <span class="example-title">Convert CSV to typed structs</span>
+            <span class="example-tag easy">easy win</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Paste a CSV header, get Rust structs with serde derives. No manual typing, no schema mismatches.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> here's my CSV: id,name,email,created_at<br>
+                <span style="color:var(--dim)">[writing src/models.rs...]</span><br>
+                <span style="color:var(--accent)">#[derive(Serialize, Deserialize)]</span><br>
+                <span style="color:var(--accent)">pub struct Record { ... }</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">🔧</span>
+            <span class="example-title">Fix that async lifetime error</span>
+            <span class="example-tag easy">easy win</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Paste the compiler error, hyle reads the relevant files, applies the fix, verifies it compiles.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> getting this error: lifetime may not live long enough...<br>
+                <span style="color:var(--dim)">[reading src/handler.rs...]</span><br>
+                <span style="color:var(--dim)">[patching with 'static bound...]</span><br>
+                <span style="color:var(--green)">cargo check: ok</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">📦</span>
+            <span class="example-title">Add auth to existing API</span>
+            <span class="example-tag easy">easy win</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Point at routes, say "add JWT auth". Gets middleware, error handling, all the boilerplate right.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> add JWT middleware to src/routes/*.rs<br>
+                <span style="color:var(--dim)">[reading 4 files...]</span><br>
+                <span style="color:var(--dim)">[adding auth_middleware.rs...]</span><br>
+                <span style="color:var(--green)">cargo test: 47 passed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">🧪</span>
+            <span class="example-title">Generate tests from impl</span>
+            <span class="example-tag easy">easy win</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Point at a module, get comprehensive tests. Edge cases, error paths, property tests.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> write tests for src/parser.rs<br>
+                <span style="color:var(--dim)">[analyzing public API...]</span><br>
+                <span style="color:var(--dim)">[writing tests/parser_test.rs...]</span><br>
+                <span style="color:var(--green)">23 tests generated, all passing</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Creative uses -->
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">🎨</span>
+            <span class="example-title">Sketch to working app</span>
+            <span class="example-tag creative">creative</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Describe a UI in words or paste ASCII art. Get a full Leptos/Yew component with state management.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> make a kanban board with 3 columns, drag-drop<br>
+                <span style="color:var(--dim)">[creating src/components/kanban.rs...]</span><br>
+                <span style="color:var(--dim)">[adding drag handlers, state...]</span><br>
+                <span style="color:var(--green)">trunk serve: running at :8080</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">🔀</span>
+            <span class="example-title">Port Python to Rust</span>
+            <span class="example-tag creative">creative</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Paste Python code, get idiomatic Rust. Handles async, error types, ownership patterns.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> port this async def fetch_users()...<br>
+                <span style="color:var(--dim)">[analyzing Python semantics...]</span><br>
+                <span style="color:var(--dim)">[writing rust with reqwest + anyhow...]</span><br>
+                <span style="color:var(--green)">cargo clippy: no warnings</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">📊</span>
+            <span class="example-title">JSON API to GraphQL</span>
+            <span class="example-tag creative">creative</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Point at OpenAPI spec or REST handlers, get a complete async-graphql schema with resolvers.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> wrap src/api/*.rs in graphql<br>
+                <span style="color:var(--dim)">[reading 12 handlers...]</span><br>
+                <span style="color:var(--dim)">[generating schema, mutations...]</span><br>
+                <span style="color:var(--green)">GraphQL playground: :8080/graphql</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">🔌</span>
+            <span class="example-title">CLI from library</span>
+            <span class="example-tag creative">creative</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Point at lib.rs, get a full clap CLI with subcommands, completions, man pages.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> make a CLI for src/lib.rs<br>
+                <span style="color:var(--dim)">[analyzing public functions...]</span><br>
+                <span style="color:var(--dim)">[generating main.rs with clap...]</span><br>
+                <span style="color:var(--green)">./target/release/mycli --help</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wow factor -->
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">🚀</span>
+            <span class="example-title">Full CRUD in 2 minutes</span>
+            <span class="example-tag wow">wow</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Describe an entity, get: Diesel/SQLx migrations, models, handlers, tests, OpenAPI docs. All wired up.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> entity: Product with name, price, stock<br>
+                <span style="color:var(--dim)">[creating migration...]</span><br>
+                <span style="color:var(--dim)">[writing model, handlers, tests...]</span><br>
+                <span style="color:var(--green)">17 files, 847 lines, compiles + tests pass</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">🔄</span>
+            <span class="example-title">Refactor entire module</span>
+            <span class="example-tag wow">wow</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>"Split this 2000-line file into modules" - hyle creates directory structure, fixes imports, updates Cargo.toml.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> split src/monolith.rs into modules<br>
+                <span style="color:var(--dim)">[analyzing dependencies...]</span><br>
+                <span style="color:var(--dim)">[creating src/monolith/...]</span><br>
+                <span style="color:var(--green)">8 modules, all imports fixed, tests pass</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">🐛</span>
+            <span class="example-title">Debug production crash</span>
+            <span class="example-tag wow">wow</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Paste stack trace + panic message. hyle finds the bug, explains it, fixes it, adds a regression test.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> seeing this in prod: thread 'main' panicked...<br>
+                <span style="color:var(--dim)">[correlating with src/cache.rs:142...]</span><br>
+                <span style="color:var(--dim)">[root cause: unwrap on None...]</span><br>
+                <span style="color:var(--green)">fixed + regression test added</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="example-card" onclick="toggleExample(this)">
+          <div class="example-header">
+            <span class="example-icon">📱</span>
+            <span class="example-title">Design doc to implementation</span>
+            <span class="example-tag wow">wow</span>
+          </div>
+          <div class="example-body">
+            <div class="example-content">
+              <p>Paste a markdown spec, watch hyle implement it file by file, running tests after each step.</p>
+              <div class="example-terminal">
+                <span style="color:var(--green)">></span> implement this spec: ## Rate Limiter...<br>
+                <span style="color:var(--dim)">[step 1/5: token bucket struct...]</span><br>
+                <span style="color:var(--dim)">[step 2/5: refill logic...]</span><br>
+                <span style="color:var(--green)">5 steps complete, 34 tests, docs generated</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta">
+      <a href="https://github.com/uprootiny/hyle" class="cta-button">View on GitHub</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MIT License &middot; <a href="https://github.com/uprootiny/hyle">Source</a> &middot; <a href="https://openrouter.ai/keys">Get API Key</a></p>
+  </footer>
+
+  <!-- Variant Switcher -->
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="toggleSwitcher()" title="Page variants">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v10M1 12h6m6 0h10"/>
+      </svg>
+    </div>
+    <div class="switcher-panel" id="switcherPanel">
+      <a class="switcher-item active" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+
+  <!--
+  ============================================================================
+  HIDDEN PROMPTSETS - Examples of prompts that generate the showcased results
+  ============================================================================
+
+  Example 1: CSV to typed structs
+  --------------------------------
+  Prompt: "I have a CSV with these columns: id,name,email,created_at,is_active
+           Generate Rust structs with serde derives that can deserialize this.
+           Include a reader function that loads from a file path."
+
+  Example 2: Fix async lifetime error
+  --------------------------------
+  Prompt: "I'm getting this error:
+           error[E0597]: `data` does not live long enough
+           --> src/handler.rs:42:18
+           Here's the file. Fix it and make sure cargo check passes."
+
+  Example 3: Add auth to existing API
+  --------------------------------
+  Prompt: "Add JWT authentication to all routes in src/routes/.
+           Use jsonwebtoken crate. Create middleware that extracts user from token.
+           Return 401 for missing/invalid tokens. Add tests."
+
+  Example 4: Generate tests from impl
+  --------------------------------
+  Prompt: "Write comprehensive tests for src/parser.rs.
+           Cover all public functions, edge cases, and error paths.
+           Use proptest for any string parsing functions."
+
+  Example 5: Sketch to working app
+  --------------------------------
+  Prompt: "Create a kanban board component in Leptos with:
+           - 3 columns: Todo, In Progress, Done
+           - Cards that can be dragged between columns
+           - Add new card button per column
+           - LocalStorage persistence"
+
+  Example 6: Port Python to Rust
+  --------------------------------
+  Prompt: "Port this Python code to idiomatic Rust:
+           [paste Python code]
+           Use reqwest for HTTP, anyhow for errors, tokio for async."
+
+  Example 7: JSON API to GraphQL
+  --------------------------------
+  Prompt: "Create a GraphQL API using async-graphql that wraps all the REST
+           handlers in src/api/. Generate schema from the existing types.
+           Include mutations for all POST/PUT/DELETE endpoints."
+
+  Example 8: CLI from library
+  --------------------------------
+  Prompt: "Generate a CLI for src/lib.rs using clap derive.
+           Each public function becomes a subcommand.
+           Add shell completions for bash/zsh/fish.
+           Include a man page."
+
+  Example 9: Full CRUD in 2 minutes
+  --------------------------------
+  Prompt: "Create a full CRUD API for a Product entity with fields:
+           - id: UUID
+           - name: String
+           - price: Decimal
+           - stock: i32
+           - created_at: DateTime
+           Use SQLx with Postgres. Include migrations, handlers, tests, OpenAPI docs."
+
+  Example 10: Refactor entire module
+  --------------------------------
+  Prompt: "src/monolith.rs is 2000 lines. Split it into logical modules under
+           src/monolith/. Fix all imports. Update mod.rs. Make sure tests still pass."
+
+  Example 11: Debug production crash
+  --------------------------------
+  Prompt: "We're seeing this panic in production:
+           thread 'tokio-runtime-worker' panicked at 'called `Option::unwrap()`
+           on a `None` value', src/cache.rs:142:35
+           Find the bug, fix it, and add a test that would have caught this."
+
+  Example 12: Design doc to implementation
+  --------------------------------
+  Prompt: "Implement this spec:
+           ## Token Bucket Rate Limiter
+           - Configurable capacity and refill rate
+           - Thread-safe
+           - Returns remaining tokens on check
+           - Supports multiple named buckets
+           Run tests after each step."
+
+  ============================================================================
+  -->
+
+  <script>
+    // Terminal replay demos
+    const demos = [
+      {
+        title: "~/projects/myapp",
+        lines: [
+          { type: 'cmd', prompt: '$', text: 'hyle' },
+          { type: 'output', text: '[Resumed session 7f3a2b1]' },
+          { type: 'output', text: '' },
+          { type: 'cmd', prompt: '>', text: 'add error handling to src/api.rs' },
+          { type: 'output', text: '' },
+          { type: 'info', text: '[reading src/api.rs...]' },
+          { type: 'info', text: '[found 12 unwrap() calls]' },
+          { type: 'info', text: '[patching with Result + anyhow...]' },
+          { type: 'output', text: '' },
+          { type: 'success', text: 'cargo check: ok' },
+          { type: 'success', text: 'cargo test: 47 passed' },
+        ]
+      },
+      {
+        title: "~/projects/webapp",
+        lines: [
+          { type: 'cmd', prompt: '$', text: 'hyle --free' },
+          { type: 'output', text: '[Using deepseek/deepseek-chat-v3-0324:free]' },
+          { type: 'output', text: '' },
+          { type: 'cmd', prompt: '>', text: 'make a todo app with local storage' },
+          { type: 'output', text: '' },
+          { type: 'info', text: '[creating src/main.rs...]' },
+          { type: 'info', text: '[creating src/storage.rs...]' },
+          { type: 'info', text: '[creating src/ui.rs...]' },
+          { type: 'output', text: '' },
+          { type: 'cmd', prompt: '>', text: '/build' },
+          { type: 'success', text: 'Compiled in 2.3s' },
+        ]
+      },
+      {
+        title: "~/rust/parser",
+        lines: [
+          { type: 'cmd', prompt: '$', text: 'hyle' },
+          { type: 'output', text: '' },
+          { type: 'cmd', prompt: '>', text: "why isn't this parsing correctly?" },
+          { type: 'output', text: '' },
+          { type: 'info', text: '[reading src/parser.rs...]' },
+          { type: 'info', text: '[reading tests/fixtures/...]' },
+          { type: 'output', text: '' },
+          { type: 'output', text: 'The regex at line 47 doesn\'t handle escaped quotes.' },
+          { type: 'output', text: 'Here\'s the fix:' },
+          { type: 'info', text: '[patching src/parser.rs:47...]' },
+          { type: 'success', text: 'All 23 tests passing now.' },
+        ]
+      }
+    ];
+
+    let currentDemo = 0;
+    let currentLine = 0;
+    let isPlaying = false;
+    let playInterval = null;
+
+    function renderLine(line) {
+      const div = document.createElement('div');
+      div.className = 'terminal-line';
+      div.style.animationDelay = '0s';
+
+      if (line.type === 'cmd') {
+        div.innerHTML = `<span class="prompt">${line.prompt}</span> <span class="cmd">${line.text}</span>`;
+      } else if (line.type === 'output') {
+        div.innerHTML = `<span class="output">${line.text || '&nbsp;'}</span>`;
+      } else if (line.type === 'info') {
+        div.innerHTML = `<span class="info">${line.text}</span>`;
+      } else if (line.type === 'success') {
+        div.innerHTML = `<span class="success">${line.text}</span>`;
+      }
+
+      return div;
+    }
+
+    function updateProgress() {
+      const progress = demos[currentDemo].lines.length > 0
+        ? (currentLine / demos[currentDemo].lines.length) * 100
+        : 0;
+      document.getElementById('progressBar').style.width = progress + '%';
+    }
+
+    function playNextLine() {
+      const demo = demos[currentDemo];
+      const body = document.getElementById('terminalBody');
+
+      if (currentLine < demo.lines.length) {
+        body.appendChild(renderLine(demo.lines[currentLine]));
+        currentLine++;
+        updateProgress();
+      } else {
+        stopReplay();
+      }
+    }
+
+    function startReplay() {
+      isPlaying = true;
+      document.getElementById('playBtn').textContent = 'Pause';
+      document.getElementById('playBtn').classList.add('active');
+      playInterval = setInterval(playNextLine, 400);
+    }
+
+    function stopReplay() {
+      isPlaying = false;
+      document.getElementById('playBtn').textContent = 'Play';
+      document.getElementById('playBtn').classList.remove('active');
+      if (playInterval) {
+        clearInterval(playInterval);
+        playInterval = null;
+      }
+    }
+
+    function toggleReplay() {
+      if (isPlaying) {
+        stopReplay();
+      } else {
+        startReplay();
+      }
+    }
+
+    function restartReplay() {
+      stopReplay();
+      currentLine = 0;
+      document.getElementById('terminalBody').innerHTML = '';
+      updateProgress();
+      startReplay();
+    }
+
+    function cycleDemo() {
+      stopReplay();
+      currentDemo = (currentDemo + 1) % demos.length;
+      currentLine = 0;
+      document.getElementById('terminalBody').innerHTML = '';
+      document.querySelector('.terminal-title').textContent = demos[currentDemo].title;
+      updateProgress();
+      startReplay();
+    }
+
+    // Examples section
+    function toggleExamples() {
+      const grid = document.getElementById('examplesGrid');
+      const toggle = document.getElementById('examplesToggle');
+      grid.classList.toggle('open');
+      toggle.classList.toggle('open');
+    }
+
+    function toggleExample(card) {
+      // Close other expanded cards
+      document.querySelectorAll('.example-card.expanded').forEach(c => {
+        if (c !== card) c.classList.remove('expanded');
+      });
+      card.classList.toggle('expanded');
+    }
+
+    // Switcher
+    function toggleSwitcher() {
+      document.getElementById('switcherPanel').classList.toggle('open');
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.variant-switcher')) {
+        document.getElementById('switcherPanel').classList.remove('open');
+      }
+    });
+
+    // Auto-start terminal on load
+    window.addEventListener('load', () => {
+      setTimeout(startReplay, 500);
+    });
+  </script>
+</body>
+</html>

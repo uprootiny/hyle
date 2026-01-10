@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Learn by Building</title>
+  <style>
+    :root {
+      --bg: #fefefe;
+      --fg: #333;
+      --accent: #6366f1;
+      --accent-light: #e0e7ff;
+      --green: #22c55e;
+      --border: #e5e5e5;
+      --muted: #666;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Nunito', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.7;
+    }
+    .container { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; }
+
+    .hero {
+      text-align: center;
+      padding: 3rem 0;
+    }
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      color: var(--accent);
+    }
+    .hero p {
+      font-size: 1.2rem;
+      color: var(--muted);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    .step {
+      display: flex;
+      gap: 2rem;
+      padding: 2rem 0;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+    }
+    @media (max-width: 600px) {
+      .step { flex-direction: column; gap: 1rem; }
+    }
+    .step-number {
+      width: 48px;
+      height: 48px;
+      background: var(--accent);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+    .step-content h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+    .step-content p {
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+    .step-code {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 1rem;
+      border-radius: 8px;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.85rem;
+      overflow-x: auto;
+    }
+    .step-code .prompt { color: #6a9955; }
+    .step-code .comment { color: #6a9955; }
+
+    .concepts {
+      padding: 3rem 0;
+    }
+    .concepts h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    .concept-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .concept {
+      padding: 1.5rem;
+      background: var(--accent-light);
+      border-radius: 12px;
+      text-align: center;
+    }
+    .concept h4 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent);
+    }
+    .concept p {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .try-it {
+      background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+      color: white;
+      padding: 3rem;
+      border-radius: 16px;
+      text-align: center;
+      margin: 3rem 0;
+    }
+    .try-it h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .try-it p {
+      opacity: 0.9;
+      margin-bottom: 1.5rem;
+    }
+    .try-it a {
+      display: inline-block;
+      padding: 0.75rem 2rem;
+      background: white;
+      color: var(--accent);
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--accent); border: none;
+      color: white; cursor: pointer; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .switcher-toggle:hover { opacity: 0.9; }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 38px; right: 0;
+      background: white; border: 1px solid var(--border); padding: 0.5rem;
+      min-width: 150px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.4rem 0.75rem; color: var(--muted);
+      font-size: 12px; text-decoration: none; border-radius: 4px;
+    }
+    .switcher-item:hover { color: var(--fg); background: var(--accent-light); }
+    .switcher-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>Learn by building</h1>
+      <p>An AI coding assistant that explains what it's doing. Perfect for learning new languages, frameworks, and patterns.</p>
+    </div>
+
+    <div class="step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <h3>Install in one command</h3>
+        <p>Just Rust and a free API key. No complex setup.</p>
+        <div class="step-code">
+          <div><span class="prompt">$</span> cargo install --git https://github.com/uprootiny/hyle</div>
+          <div><span class="prompt">$</span> hyle config set key YOUR_FREE_KEY</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <h3>Describe what you want to build</h3>
+        <p>Use natural language. hyle understands context.</p>
+        <div class="step-code">
+          <div><span class="prompt">></span> make a simple todo app in rust</div>
+          <div><span class="prompt">></span> explain each step as you go</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <h3>Watch and learn</h3>
+        <p>hyle reads files, writes code, runs tests. Every action is visible.</p>
+        <div class="step-code">
+          <div><span class="comment"># hyle shows each tool call:</span></div>
+          <div>read(path="src/main.rs")</div>
+          <div>write(path="src/todo.rs", ...)</div>
+          <div>bash(command="cargo test")</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <h3>Ask questions anytime</h3>
+        <p>Stuck? Ask why. The conversation continues.</p>
+        <div class="step-code">
+          <div><span class="prompt">></span> why did you use a Vec instead of an array?</div>
+          <div><span class="prompt">></span> show me another way to do the error handling</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="concepts">
+      <h2>What you'll learn</h2>
+      <div class="concept-grid">
+        <div class="concept">
+          <h4>File Operations</h4>
+          <p>See how tools read, write, and patch files</p>
+        </div>
+        <div class="concept">
+          <h4>Shell Commands</h4>
+          <p>Watch build, test, and deploy commands</p>
+        </div>
+        <div class="concept">
+          <h4>Code Patterns</h4>
+          <p>Learn idioms by seeing them applied</p>
+        </div>
+        <div class="concept">
+          <h4>Debugging</h4>
+          <p>Follow error resolution in real time</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="try-it">
+      <h2>Ready to start?</h2>
+      <p>Get a free API key from OpenRouter and start building.</p>
+      <a href="https://openrouter.ai/keys">Get Free Key</a>
+    </div>
+
+    <footer>
+      MIT License &middot; <a href="https://github.com/uprootiny/hyle">Source Code</a> &middot; 35+ free models available
+    </footer>
+  </div>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">?</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item active" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+</body>
+</html>

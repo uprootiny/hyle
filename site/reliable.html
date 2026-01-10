@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Reliable Code Assistance</title>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --fg: #1a1a1a;
+      --accent: #0066cc;
+      --border: #e5e5e5;
+      --muted: #666;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 0 2rem; }
+
+    header {
+      padding: 3rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--fg);
+      text-decoration: none;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      margin-left: 2rem;
+      font-size: 0.9rem;
+    }
+    nav a:hover { color: var(--fg); }
+
+    .hero {
+      padding: 5rem 0;
+      max-width: 640px;
+    }
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 600;
+      line-height: 1.2;
+      margin-bottom: 1.5rem;
+    }
+    .hero p {
+      color: var(--muted);
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+    }
+    .btn-primary {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      background: var(--accent);
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .btn-secondary {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      border: 1px solid var(--border);
+      color: var(--fg);
+      text-decoration: none;
+      border-radius: 4px;
+      margin-left: 1rem;
+    }
+
+    .features {
+      padding: 4rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .features h2 {
+      font-size: 1.75rem;
+      margin-bottom: 2rem;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+    }
+    @media (max-width: 640px) {
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+    .feature {
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: white;
+    }
+    .feature h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .feature p {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .safety {
+      padding: 4rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .safety h2 {
+      font-size: 1.75rem;
+      margin-bottom: 2rem;
+    }
+    .safety-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+    @media (max-width: 800px) {
+      .safety-grid { grid-template-columns: 1fr; }
+    }
+    .safety-item {
+      padding: 1rem;
+      border-left: 3px solid var(--accent);
+      background: white;
+    }
+    .safety-item h4 {
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+    }
+    .safety-item p {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .specs {
+      padding: 4rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .specs h2 {
+      font-size: 1.75rem;
+      margin-bottom: 2rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    th {
+      background: #f5f5f5;
+      font-weight: 600;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    footer {
+      padding: 2rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--muted); }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 28px; height: 28px; border-radius: 4px;
+      background: white; border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .switcher-toggle:hover { border-color: #ccc; }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 34px; right: 0;
+      background: white; border: 1px solid var(--border); padding: 0.5rem;
+      min-width: 150px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.4rem 0.75rem; color: var(--muted);
+      font-size: 12px; text-decoration: none; border-radius: 4px;
+    }
+    .switcher-item:hover { color: var(--fg); background: #f5f5f5; }
+    .switcher-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="header-inner">
+        <a href="/" class="logo">hyle</a>
+        <nav>
+          <a href="https://github.com/uprootiny/hyle">Documentation</a>
+          <a href="https://github.com/uprootiny/hyle">GitHub</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Code assistance with built-in safeguards</h1>
+      <p>Rust-native autonomous assistant with atomic writes, automatic backups, and guardrails against destructive operations. Designed for production environments.</p>
+      <a href="https://github.com/uprootiny/hyle" class="btn-primary">View Documentation</a>
+      <a href="https://github.com/uprootiny/hyle" class="btn-secondary">GitHub</a>
+    </section>
+
+    <section class="features">
+      <h2>Capabilities</h2>
+      <div class="feature-grid">
+        <div class="feature">
+          <h3>Autonomous Execution</h3>
+          <p>Reads, writes, and patches files. Executes shell commands. Iterates until task completion with configurable iteration limits.</p>
+        </div>
+        <div class="feature">
+          <h3>Session Persistence</h3>
+          <p>Conversations persist across restarts. Context preserved. Integrates with existing workflows via JSON export.</p>
+        </div>
+        <div class="feature">
+          <h3>Model Flexibility</h3>
+          <p>35+ models via OpenRouter. Rate limit detection with automatic fallback. Health tracking per model.</p>
+        </div>
+        <div class="feature">
+          <h3>Telemetry</h3>
+          <p>Token usage tracking. Latency traces. Context budget visibility. Cost estimation for paid models.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="safety">
+      <h2>Safety Features</h2>
+      <div class="safety-grid">
+        <div class="safety-item">
+          <h4>Destructive Command Blocking</h4>
+          <p>rm -rf and similar patterns blocked by default</p>
+        </div>
+        <div class="safety-item">
+          <h4>Atomic File Writes</h4>
+          <p>Write to temp, fsync, rename. No partial writes.</p>
+        </div>
+        <div class="safety-item">
+          <h4>Write Verification</h4>
+          <p>Read-back check after every file write</p>
+        </div>
+        <div class="safety-item">
+          <h4>Backup Rotation</h4>
+          <p>Timestamped backups, keeps last 3 versions</p>
+        </div>
+        <div class="safety-item">
+          <h4>Rate Limit Handling</h4>
+          <p>Auto-switches to fallback models on 429</p>
+        </div>
+        <div class="safety-item">
+          <h4>Session Auto-save</h4>
+          <p>Work preserved on Ctrl-C or crash</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="specs">
+      <h2>Specifications</h2>
+      <table>
+        <tr><th>Component</th><th>Detail</th></tr>
+        <tr><td>Language</td><td>Rust 1.75+</td></tr>
+        <tr><td>Binary Size</td><td>~10MB (release, stripped)</td></tr>
+        <tr><td>Dependencies</td><td>38 crates (audited)</td></tr>
+        <tr><td>Test Coverage</td><td>364 tests</td></tr>
+        <tr><td>License</td><td>MIT</td></tr>
+        <tr><td>Config Location</td><td>XDG directories (0600 permissions)</td></tr>
+      </table>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      MIT License &middot; <a href="https://github.com/uprootiny/hyle">Source Code</a>
+    </div>
+  </footer>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">:</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item active" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Architecture & Design</title>
+  <style>
+    :root {
+      --bg: #fffef9;
+      --fg: #2d2d2d;
+      --accent: #8b4513;
+      --border: #d4c4a8;
+      --muted: #6b6b6b;
+      --code-bg: #f5f2eb;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.8;
+      font-size: 17px;
+    }
+    .container { max-width: 720px; margin: 0 auto; padding: 3rem 2rem; }
+
+    header {
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 {
+      font-size: 2.5rem;
+      font-weight: normal;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      font-weight: normal;
+      margin: 3rem 0 1rem;
+      color: var(--accent);
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin: 2rem 0 0.5rem;
+    }
+
+    p { margin-bottom: 1rem; }
+
+    .abstract {
+      background: var(--code-bg);
+      padding: 1.5rem;
+      border-left: 3px solid var(--accent);
+      margin: 2rem 0;
+      font-style: italic;
+    }
+
+    pre, code {
+      font-family: 'Fira Code', 'SF Mono', monospace;
+      font-size: 0.85rem;
+    }
+    pre {
+      background: var(--code-bg);
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+      border-radius: 4px;
+    }
+    code {
+      background: var(--code-bg);
+      padding: 0.1rem 0.3rem;
+      border-radius: 2px;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.95rem;
+    }
+    th, td {
+      padding: 0.5rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { font-weight: 600; }
+
+    .diagram {
+      background: var(--code-bg);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      overflow-x: auto;
+    }
+
+    .references {
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+    }
+    .references h2 { margin-top: 0; }
+    .references ol {
+      padding-left: 1.5rem;
+      font-size: 0.9rem;
+    }
+    .references li { margin-bottom: 0.5rem; }
+    .references a { color: var(--accent); }
+
+    footer {
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--muted); }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--code-bg); border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer; font-size: 11px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: serif;
+    }
+    .switcher-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 30px; right: 0;
+      background: var(--bg); border: 1px solid var(--border); padding: 0.5rem;
+      min-width: 140px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.3rem 0.6rem; color: var(--muted);
+      font-size: 11px; text-decoration: none; font-family: sans-serif;
+    }
+    .switcher-item:hover { color: var(--fg); background: var(--code-bg); }
+    .switcher-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <article class="container">
+    <header>
+      <h1>hyle</h1>
+      <p class="subtitle">A Rust-native autonomous code assistant with multi-tier context management</p>
+    </header>
+
+    <div class="abstract">
+      <strong>Abstract.</strong> We present hyle, an autonomous code assistant implemented in Rust that addresses context window limitations through salience-aware tiered compression. The system employs a multi-model cognitive architecture where specialized models handle distinct phases of the execution loop. We describe the agentic execution model, safety mechanisms, and session persistence layer.
+    </div>
+
+    <h2>1. Introduction</h2>
+    <p>Large language models excel at code generation but struggle with extended development sessions. Context windows, while expanding, remain finite. Previous approaches either truncate history aggressively or maintain full context at prohibitive cost.</p>
+    <p>hyle addresses this through <em>salience-aware context management</em>: a four-tier system that prioritizes recent, error-containing, and task-relevant content while compressing or discarding peripheral information.</p>
+
+    <h2>2. Architecture</h2>
+
+    <h3>2.1 Module Structure</h3>
+    <div class="diagram">
+┌─────────────────────────────────────────────────────────────┐
+│                        main.rs                               │
+│                    CLI parsing, dispatch                     │
+└───────────────┬──────────────────────────────┬──────────────┘
+                │                              │
+    ┌───────────▼───────────┐      ┌──────────▼──────────┐
+    │       ui.rs           │      │      server.rs      │
+    │   TUI event loop      │      │    HTTP API         │
+    └───────────┬───────────┘      └──────────┬──────────┘
+                │                              │
+    ┌───────────▼──────────────────────────────▼──────────┐
+    │                    agent.rs                          │
+    │         Tool parsing, execution loop                 │
+    └───────────┬──────────────────────────────┬──────────┘
+                │                              │
+    ┌───────────▼───────────┐      ┌──────────▼──────────┐
+    │      tools.rs         │      │     client.rs       │
+    │  File ops, bash       │      │  OpenRouter SSE     │
+    └───────────────────────┘      └─────────────────────┘
+    </div>
+
+    <h3>2.2 Salience Tiers</h3>
+    <p>Context is allocated across four tiers based on computed salience scores:</p>
+
+    <table>
+      <tr><th>Tier</th><th>Budget</th><th>Content</th><th>Compression</th></tr>
+      <tr><td>Focus</td><td>40%</td><td>Current task, last tool results, errors</td><td>None</td></tr>
+      <tr><td>Recent</td><td>30%</td><td>Last 2-3 exchanges, active decisions</td><td>Light</td></tr>
+      <tr><td>Summary</td><td>20%</td><td>Older exchanges, key facts</td><td>Heavy</td></tr>
+      <tr><td>Background</td><td>10%</td><td>Project structure, conventions</td><td>Minimal</td></tr>
+    </table>
+
+    <p>Salience scoring considers recency (exponential decay), keyword overlap with current task, error presence (highly salient), and file focus (references to current working files).</p>
+
+    <h3>2.3 Cognitive Architecture</h3>
+    <p>The system employs multiple models for distinct purposes:</p>
+    <ul>
+      <li><strong>Executor:</strong> Primary model for reasoning and code generation</li>
+      <li><strong>Summarizer:</strong> Free model for context compression</li>
+      <li><strong>Validator:</strong> Free model for loop detection and sanity checks</li>
+    </ul>
+
+    <h2>3. Safety Mechanisms</h2>
+    <p>Given the autonomous nature of the system, safety is paramount:</p>
+
+    <pre>const BLOCKED_PATTERNS: &[&str] = &[
+    "rm -rf", "rm -r /", "rm --recursive",
+    ":(){ :|:& };:",     // fork bomb
+    "dd if=/dev/zero",   // disk overwrite
+    "curl | sh",         // RCE patterns
+];</pre>
+
+    <p>File writes use atomic semantics (write to temp, fsync, rename) with read-back verification and timestamped backup rotation.</p>
+
+    <h2>4. Evaluation</h2>
+    <table>
+      <tr><th>Metric</th><th>Value</th></tr>
+      <tr><td>Test coverage</td><td>364 tests</td></tr>
+      <tr><td>Binary size</td><td>~10MB</td></tr>
+      <tr><td>Startup time</td><td><250ms</td></tr>
+      <tr><td>TUI refresh rate</td><td>20Hz</td></tr>
+    </table>
+
+    <div class="references">
+      <h2>References</h2>
+      <ol>
+        <li>McIlroy, M.D. (1978). Unix Time-Sharing System: Foreword. <em>Bell System Technical Journal</em>.</li>
+        <li>OpenRouter API Documentation. <a href="https://openrouter.ai/docs">openrouter.ai/docs</a></li>
+        <li>hyle source repository. <a href="https://github.com/uprootiny/hyle">github.com/uprootiny/hyle</a></li>
+      </ol>
+    </div>
+
+    <footer>
+      MIT License &middot; <a href="https://github.com/uprootiny/hyle">Source</a>
+    </footer>
+  </article>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">&sect;</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item active" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+</body>
+</html>

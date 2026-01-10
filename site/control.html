@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Transparent AI</title>
+  <style>
+    :root {
+      --bg: #f5f5f5;
+      --fg: #222;
+      --accent: #d62828;
+      --border: #ddd;
+      --muted: #555;
+      --code-bg: #fff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+    }
+    .container { max-width: 800px; margin: 0 auto; padding: 4rem 2rem; }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    .subtitle {
+      font-size: 1.2rem;
+      color: var(--muted);
+      margin-bottom: 3rem;
+      max-width: 600px;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      margin: 3rem 0 1rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .principle {
+      margin: 2rem 0;
+    }
+    .principle h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .principle h3::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+    }
+    .principle p {
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .principle pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 1rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.85rem;
+      overflow-x: auto;
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin: 2rem 0;
+    }
+    @media (max-width: 600px) {
+      .comparison { grid-template-columns: 1fr; }
+    }
+    .comparison-col h4 {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+      color: var(--muted);
+    }
+    .comparison-col.bad h4 { color: var(--accent); }
+    .comparison-col ul {
+      list-style: none;
+      font-size: 0.95rem;
+    }
+    .comparison-col li {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .comparison-col li::before {
+      content: '×';
+      margin-right: 0.5rem;
+      color: var(--accent);
+    }
+    .comparison-col.good li::before {
+      content: '✓';
+      color: #22c55e;
+    }
+
+    .cta {
+      margin: 3rem 0;
+      padding: 2rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+    .cta p {
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .cta a {
+      display: inline-block;
+      padding: 0.75rem 2rem;
+      background: var(--fg);
+      color: var(--bg);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--muted); }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 28px; height: 28px; border-radius: 0;
+      background: var(--code-bg); border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .switcher-toggle:hover { border-color: var(--fg); color: var(--fg); }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 34px; right: 0;
+      background: var(--code-bg); border: 1px solid var(--border); padding: 0.5rem;
+      min-width: 150px;
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.4rem 0.75rem; color: var(--muted);
+      font-size: 11px; text-decoration: none;
+    }
+    .switcher-item:hover { color: var(--fg); background: var(--bg); }
+    .switcher-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>You should know what your tools do.</h1>
+    <p class="subtitle">hyle is an AI code assistant that shows every action, runs locally, and never hides what's happening.</p>
+
+    <h2>Transparency Principles</h2>
+
+    <div class="principle">
+      <h3>Every action is visible</h3>
+      <p>Tool calls are shown in real-time. No hidden operations.</p>
+      <pre>[Executing 3 tool(s)...]
+
+## read result:
+  1| fn main() {
+  2|     println!("hello");
+  3| }
+
+## write result:
+  Wrote 45 bytes to src/main.rs
+  Backup: src/main.rs.1704825600.bak
+
+## bash result:
+  cargo test
+  test result: ok. 3 passed</pre>
+    </div>
+
+    <div class="principle">
+      <h3>Code is open source</h3>
+      <p>Every line is readable. No obfuscation. MIT license.</p>
+      <pre>// src/tools.rs - what actually runs
+pub fn execute_bash(command: &str) -> Result<String> {
+    // Blocked patterns checked first
+    if BLOCKED_PATTERNS.iter().any(|p| command.contains(p)) {
+        return Err(anyhow!("Command blocked by safety filter"));
+    }
+    // Then executes via std::process::Command
+    ...
+}</pre>
+    </div>
+
+    <div class="principle">
+      <h3>No telemetry, no tracking</h3>
+      <p>Your prompts go to OpenRouter. That's it. Nothing stored elsewhere.</p>
+      <pre>Files written:
+  ~/.config/hyle/config.json    # Your API key (0600)
+  ~/.cache/hyle/models.json     # Model list cache
+  ~/.local/state/hyle/sessions/ # Your conversations
+
+Files NOT written:
+  - No analytics endpoints
+  - No crash reports
+  - No usage tracking</pre>
+    </div>
+
+    <h2>Comparison</h2>
+    <div class="comparison">
+      <div class="comparison-col bad">
+        <h4>Black box AI tools</h4>
+        <ul>
+          <li>Actions happen invisibly</li>
+          <li>Proprietary code</li>
+          <li>Telemetry by default</li>
+          <li>Cloud-dependent</li>
+          <li>Subscription lock-in</li>
+        </ul>
+      </div>
+      <div class="comparison-col good">
+        <h4>hyle</h4>
+        <ul>
+          <li>Every tool call displayed</li>
+          <li>MIT licensed source</li>
+          <li>Zero telemetry</li>
+          <li>Runs locally</li>
+          <li>Pay-per-use or free</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="cta">
+      <p>Read the source. Run the tests. Decide for yourself.</p>
+      <a href="https://github.com/uprootiny/hyle">View Source Code</a>
+    </div>
+
+    <footer>
+      MIT License &middot; <a href="https://github.com/uprootiny/hyle">GitHub</a> &middot; 364 tests
+    </footer>
+  </div>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">=</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item active" href="control.html">Control</a>
+      <a class="switcher-item" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Security-First Design</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --fg: #c9d1d9;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --blue: #58a6ff;
+      --border: #30363d;
+      --panel: #161b22;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      background: var(--bg);
+      color: var(--fg);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
+
+    header {
+      margin-bottom: 3rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 400;
+      margin-bottom: 0.5rem;
+    }
+    h1 span { color: var(--green); }
+    .subtitle {
+      color: #8b949e;
+      font-size: 0.9rem;
+    }
+
+    .security-grid {
+      display: grid;
+      gap: 1rem;
+      margin-bottom: 3rem;
+    }
+    .security-item {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+    }
+    .security-item h3 {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+    .status-icon {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .status-ok { background: var(--green); }
+    .status-warn { background: var(--yellow); }
+    .security-item p {
+      color: #8b949e;
+      font-size: 0.85rem;
+    }
+    .security-item code {
+      background: var(--bg);
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      font-size: 0.8rem;
+    }
+
+    h2 {
+      font-size: 1rem;
+      font-weight: 500;
+      margin: 2rem 0 1rem;
+      color: var(--blue);
+    }
+
+    .blocked-list {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      margin-bottom: 2rem;
+    }
+    .blocked-list h3 {
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      color: var(--red);
+    }
+    .blocked-pattern {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .blocked-pattern:last-child { border-bottom: none; }
+    .blocked-pattern .pattern { color: var(--red); }
+    .blocked-pattern .reason { color: #8b949e; }
+
+    .flow-diagram {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.5rem;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      margin-bottom: 2rem;
+    }
+    .flow-diagram pre {
+      color: var(--fg);
+    }
+
+    .audit-info {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+    }
+    .audit-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .audit-row:last-child { border-bottom: none; }
+    .audit-label { color: #8b949e; }
+    .audit-value { color: var(--green); }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: #8b949e;
+      font-size: 0.8rem;
+    }
+    footer a { color: var(--blue); text-decoration: none; }
+
+    .variant-switcher { position: fixed; bottom: 1rem; right: 1rem; }
+    .switcher-toggle {
+      width: 24px; height: 24px; border-radius: 4px;
+      background: var(--panel); border: 1px solid var(--border);
+      color: #8b949e; cursor: pointer; font-size: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .switcher-toggle:hover { border-color: var(--green); color: var(--green); }
+    .switcher-panel {
+      display: none; position: absolute; bottom: 30px; right: 0;
+      background: var(--panel); border: 1px solid var(--border); padding: 0.5rem;
+      min-width: 140px; border-radius: 4px;
+    }
+    .switcher-panel.open { display: block; }
+    .switcher-item {
+      display: block; padding: 0.3rem 0.6rem; color: #8b949e;
+      font-size: 10px; text-decoration: none;
+    }
+    .switcher-item:hover { color: var(--fg); background: var(--bg); }
+    .switcher-item.active { color: var(--green); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><span>[secure]</span> hyle</h1>
+      <p class="subtitle">Guardrails, audit trails, and defense in depth</p>
+    </header>
+
+    <div class="security-grid">
+      <div class="security-item">
+        <h3><span class="status-icon status-ok"></span> Destructive Command Blocking</h3>
+        <p>Pattern matching blocks <code>rm -rf</code>, fork bombs, disk overwrites before execution</p>
+      </div>
+      <div class="security-item">
+        <h3><span class="status-icon status-ok"></span> Atomic File Writes</h3>
+        <p>Write to temp file, fsync, rename. No partial writes. No corruption.</p>
+      </div>
+      <div class="security-item">
+        <h3><span class="status-icon status-ok"></span> Write Verification</h3>
+        <p>Read-back check after every write confirms content matches intent</p>
+      </div>
+      <div class="security-item">
+        <h3><span class="status-icon status-ok"></span> Backup Rotation</h3>
+        <p>Timestamped backups for every modified file. Last 3 versions kept.</p>
+      </div>
+      <div class="security-item">
+        <h3><span class="status-icon status-ok"></span> Secure Config Storage</h3>
+        <p>API key stored with <code>0600</code> permissions in XDG config directory</p>
+      </div>
+      <div class="security-item">
+        <h3><span class="status-icon status-ok"></span> Tool Timeout</h3>
+        <p>60s default timeout on all tool executions. Configurable.</p>
+      </div>
+    </div>
+
+    <h2>Blocked Patterns</h2>
+    <div class="blocked-list">
+      <h3>BLOCKED_PATTERNS in src/tools.rs</h3>
+      <div class="blocked-pattern">
+        <span class="pattern">rm -rf</span>
+        <span class="reason">Recursive force delete</span>
+      </div>
+      <div class="blocked-pattern">
+        <span class="pattern">rm -r /</span>
+        <span class="reason">Root directory delete</span>
+      </div>
+      <div class="blocked-pattern">
+        <span class="pattern">:(){ :|:& };</span>
+        <span class="reason">Fork bomb</span>
+      </div>
+      <div class="blocked-pattern">
+        <span class="pattern">dd if=/dev/zero</span>
+        <span class="reason">Disk overwrite</span>
+      </div>
+      <div class="blocked-pattern">
+        <span class="pattern">curl | sh</span>
+        <span class="reason">Remote code execution</span>
+      </div>
+      <div class="blocked-pattern">
+        <span class="pattern">wget | bash</span>
+        <span class="reason">Remote code execution</span>
+      </div>
+    </div>
+
+    <h2>Write Flow</h2>
+    <div class="flow-diagram">
+      <pre>
+write(path, content)
+    │
+    ├── 1. Check file size limit (10MB)
+    │
+    ├── 2. Create backup: path.{timestamp}.bak
+    │
+    ├── 3. Write to temp file: path.tmp.{random}
+    │
+    ├── 4. fsync() temp file
+    │
+    ├── 5. rename() temp → path (atomic)
+    │
+    └── 6. Read back and verify content matches
+      </pre>
+    </div>
+
+    <h2>Audit Information</h2>
+    <div class="audit-info">
+      <div class="audit-row">
+        <span class="audit-label">Test coverage</span>
+        <span class="audit-value">364 tests</span>
+      </div>
+      <div class="audit-row">
+        <span class="audit-label">Explicit panics</span>
+        <span class="audit-value">0</span>
+      </div>
+      <div class="audit-row">
+        <span class="audit-label">Dependencies</span>
+        <span class="audit-value">38 crates</span>
+      </div>
+      <div class="audit-row">
+        <span class="audit-label">License</span>
+        <span class="audit-value">MIT</span>
+      </div>
+      <div class="audit-row">
+        <span class="audit-label">Source available</span>
+        <span class="audit-value">Yes (GitHub)</span>
+      </div>
+    </div>
+
+    <footer>
+      <a href="https://github.com/uprootiny/hyle">Audit the source</a> &middot; MIT License
+    </footer>
+  </div>
+
+  <div class="variant-switcher">
+    <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">!</div>
+    <div class="switcher-panel" id="sp">
+      <a class="switcher-item" href="index.html">Default</a>
+      <a class="switcher-item" href="unix.html">Composable</a>
+      <a class="switcher-item" href="velocity.html">Velocity</a>
+      <a class="switcher-item" href="reliable.html">Reliable</a>
+      <a class="switcher-item" href="depth.html">Depth</a>
+      <a class="switcher-item" href="playful.html">Playful</a>
+      <a class="switcher-item" href="observable.html">Observable</a>
+      <a class="switcher-item" href="community.html">Community</a>
+      <a class="switcher-item" href="indie.html">Independent</a>
+      <a class="switcher-item" href="learn.html">Learning</a>
+      <a class="switcher-item" href="control.html">Control</a>
+      <a class="switcher-item active" href="secure.html">Secure</a>
+      <a class="switcher-item" href="flow.html">Flow</a>
+    </div>
+  </div>
+</body>
+</html>
