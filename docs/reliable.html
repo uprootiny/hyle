@@ -11,6 +11,8 @@
       --accent: #0066cc;
       --border: #e5e5e5;
       --muted: #666;
+      --success: #059669;
+      --warning: #d97706;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -22,7 +24,7 @@
     .container { max-width: 960px; margin: 0 auto; padding: 0 2rem; }
 
     header {
-      padding: 3rem 0;
+      padding: 2rem 0;
       border-bottom: 1px solid var(--border);
     }
     .header-inner {
@@ -45,7 +47,7 @@
     nav a:hover { color: var(--fg); }
 
     .hero {
-      padding: 5rem 0;
+      padding: 4rem 0;
       max-width: 640px;
     }
     .hero h1 {
@@ -78,49 +80,159 @@
       margin-left: 1rem;
     }
 
-    .features {
-      padding: 4rem 0;
+    /* Terminal Demo */
+    .terminal-section {
+      padding: 3rem 0;
       border-top: 1px solid var(--border);
     }
-    .features h2 {
-      font-size: 1.75rem;
-      margin-bottom: 2rem;
+    .terminal-section h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
     }
-    .feature-grid {
+    .terminal-section > p {
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+    .terminal {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      font-family: 'SF Mono', Menlo, monospace;
+      font-size: 0.85rem;
+      color: #e5e5e5;
+      min-height: 280px;
+    }
+    .terminal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid #333;
+    }
+    .terminal-title { color: #666; font-size: 0.75rem; }
+    .terminal-controls { display: flex; gap: 0.5rem; }
+    .terminal-btn {
+      background: none;
+      border: 1px solid #444;
+      color: #888;
+      font-family: monospace;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.6rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .terminal-btn:hover { color: #fff; border-color: #666; }
+    .terminal-btn.active { color: var(--accent); border-color: var(--accent); }
+    .terminal-body { min-height: 200px; }
+    .replay-line {
+      margin: 0.15rem 0;
+      opacity: 0;
+      animation: fadeIn 0.1s ease forwards;
+    }
+    @keyframes fadeIn { to { opacity: 1; } }
+    .prompt { color: var(--accent); }
+    .dim { color: #555; }
+    .success { color: var(--success); }
+    .warning { color: var(--warning); }
+
+    /* Use Cases */
+    .use-cases {
+      padding: 3rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .use-cases h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .use-cases > p {
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+    .case-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 2rem;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
     }
-    @media (max-width: 640px) {
-      .feature-grid { grid-template-columns: 1fr; }
-    }
-    .feature {
-      padding: 1.5rem;
+    .case-card {
       border: 1px solid var(--border);
       border-radius: 8px;
       background: white;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .feature h3 {
-      font-size: 1rem;
-      margin-bottom: 0.5rem;
+    .case-card:hover { border-color: #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .case-card.open { border-color: var(--accent); }
+    .case-header {
+      padding: 1rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    .feature p {
+    .case-title { font-weight: 600; font-size: 0.95rem; }
+    .case-tag {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: #f0f0f0;
+      color: var(--muted);
+    }
+    .case-tag.safety { background: #dcfce7; color: #166534; }
+    .case-tag.recovery { background: #fef3c7; color: #92400e; }
+    .case-tag.audit { background: #dbeafe; color: #1e40af; }
+    .case-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    .case-card.open .case-body { max-height: 500px; }
+    .case-content {
+      padding: 0 1.25rem 1.25rem;
+      border-top: 1px solid var(--border);
+    }
+    .case-desc {
       color: var(--muted);
       font-size: 0.9rem;
+      line-height: 1.6;
+      margin: 1rem 0;
     }
+    .case-code {
+      background: #f5f5f5;
+      padding: 1rem;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      margin-bottom: 1rem;
+    }
+    .case-actions { display: flex; gap: 0.5rem; }
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.75rem;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .copy-btn:hover { color: var(--fg); border-color: #ccc; }
+    .copy-btn.copied { color: var(--success); border-color: var(--success); }
 
+    /* Safety Features */
     .safety {
-      padding: 4rem 0;
+      padding: 3rem 0;
       border-top: 1px solid var(--border);
     }
     .safety h2 {
-      font-size: 1.75rem;
-      margin-bottom: 2rem;
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
     }
     .safety-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 1.5rem;
+      gap: 1rem;
     }
     @media (max-width: 800px) {
       .safety-grid { grid-template-columns: 1fr; }
@@ -129,6 +241,7 @@
       padding: 1rem;
       border-left: 3px solid var(--accent);
       background: white;
+      border-radius: 0 4px 4px 0;
     }
     .safety-item h4 {
       font-size: 0.9rem;
@@ -139,13 +252,14 @@
       font-size: 0.85rem;
     }
 
+    /* Specs */
     .specs {
-      padding: 4rem 0;
+      padding: 3rem 0;
       border-top: 1px solid var(--border);
     }
     .specs h2 {
-      font-size: 1.75rem;
-      margin-bottom: 2rem;
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
     }
     table {
       width: 100%;
@@ -166,6 +280,59 @@
       font-weight: 600;
     }
     tr:last-child td { border-bottom: none; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      max-width: 700px;
+      max-height: 80vh;
+      overflow: auto;
+      width: 90%;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-title { color: var(--accent); font-family: monospace; }
+    .modal-close {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.25rem 0.75rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .modal-close:hover { color: #dc2626; border-color: #dc2626; }
+    .modal-body {
+      font-family: monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .modal-body .line-num {
+      color: #ccc;
+      display: inline-block;
+      width: 3ch;
+      text-align: right;
+      margin-right: 1.5ch;
+      user-select: none;
+    }
 
     footer {
       padding: 2rem 0;
@@ -214,59 +381,286 @@
   <main class="container">
     <section class="hero">
       <h1>Code assistance with built-in safeguards</h1>
-      <p>Rust-native autonomous assistant with atomic writes, automatic backups, and guardrails against destructive operations. Designed for production environments.</p>
+      <p>Rust-native autonomous assistant with atomic writes, automatic backups, and guardrails against destructive operations. Designed for production environments where reliability is non-negotiable.</p>
       <a href="https://github.com/uprootiny/hyle" class="btn-primary">View Documentation</a>
       <a href="https://github.com/uprootiny/hyle" class="btn-secondary">GitHub</a>
     </section>
 
-    <section class="features">
-      <h2>Capabilities</h2>
-      <div class="feature-grid">
-        <div class="feature">
-          <h3>Autonomous Execution</h3>
-          <p>Reads, writes, and patches files. Executes shell commands. Iterates until task completion with configurable iteration limits.</p>
+    <section class="terminal-section">
+      <h2>Safety in action</h2>
+      <p>Watch hyle's guardrails protect your codebase in real-time.</p>
+      <div class="terminal">
+        <div class="terminal-header">
+          <span class="terminal-title">SAFETY DEMO</span>
+          <div class="terminal-controls">
+            <button class="terminal-btn" id="playBtn" onclick="toggleReplay()">play</button>
+            <button class="terminal-btn" onclick="restartReplay()">restart</button>
+            <button class="terminal-btn" onclick="cycleDemo()">next</button>
+          </div>
         </div>
-        <div class="feature">
-          <h3>Session Persistence</h3>
-          <p>Conversations persist across restarts. Context preserved. Integrates with existing workflows via JSON export.</p>
+        <div class="terminal-body" id="terminalBody"></div>
+      </div>
+    </section>
+
+    <section class="use-cases">
+      <h2>Enterprise use cases</h2>
+      <p>Real scenarios where hyle's reliability features matter. Click to see implementation details.</p>
+      <div class="case-grid">
+        <div class="case-card" onclick="toggleCard(this)">
+          <div class="case-header">
+            <span class="case-title">Database Migration Safety</span>
+            <span class="case-tag safety">safety</span>
+          </div>
+          <div class="case-body">
+            <div class="case-content">
+              <p class="case-desc">
+                Production database migrations are high-stakes. A wrong ALTER TABLE can
+                take down your service. hyle generates migrations with rollback scripts,
+                validates syntax before execution, and creates point-in-time backups of
+                affected schema. If migration fails, automatic rollback kicks in.
+              </p>
+              <div class="case-code">
+<span class="dim">-- Generated: migrations/20260110_add_audit_columns.sql</span>
+-- Rollback: migrations/20260110_add_audit_columns_rollback.sql
+
+BEGIN;
+-- Validate table exists
+DO $$ BEGIN
+  ASSERT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'orders');
+END $$;
+
+ALTER TABLE orders
+  ADD COLUMN created_by UUID REFERENCES users(id),
+  ADD COLUMN updated_by UUID REFERENCES users(id),
+  ADD COLUMN audit_log JSONB DEFAULT '[]';
+
+CREATE INDEX CONCURRENTLY idx_orders_audit
+  ON orders USING GIN (audit_log);
+
+COMMIT;</div>
+              <div class="case-actions">
+                <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('migration')">copy prompt</button>
+                <button class="copy-btn" onclick="event.stopPropagation(); showFile('migration')">view rollback</button>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="feature">
-          <h3>Model Flexibility</h3>
-          <p>35+ models via OpenRouter. Rate limit detection with automatic fallback. Health tracking per model.</p>
+
+        <div class="case-card" onclick="toggleCard(this)">
+          <div class="case-header">
+            <span class="case-title">Refactor with Backup Trail</span>
+            <span class="case-tag recovery">recovery</span>
+          </div>
+          <div class="case-body">
+            <div class="case-content">
+              <p class="case-desc">
+                Large refactors touch dozens of files. One wrong rename propagates errors
+                everywhere. hyle creates timestamped backups before every write. If the
+                refactor breaks the build, restore any file to its pre-refactor state.
+                Each backup includes the prompt that caused the change for audit trails.
+              </p>
+              <div class="case-code">
+$ ls ~/.local/state/hyle/backups/
+
+orders_service/
+  src/handlers/orders.rs.2026-01-10T14:23:15.bak
+  src/handlers/orders.rs.2026-01-10T14:23:47.bak
+  src/models/order.rs.2026-01-10T14:24:02.bak
+
+$ hyle restore src/handlers/orders.rs --version 2026-01-10T14:23:15
+<span class="success">Restored src/handlers/orders.rs from backup</span>
+
+$ cargo build
+<span class="success">Compiling orders_service v0.1.0</span></div>
+              <div class="case-actions">
+                <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('refactor')">copy prompt</button>
+                <button class="copy-btn" onclick="event.stopPropagation(); showFile('backup')">view backup metadata</button>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="feature">
-          <h3>Telemetry</h3>
-          <p>Token usage tracking. Latency traces. Context budget visibility. Cost estimation for paid models.</p>
+
+        <div class="case-card" onclick="toggleCard(this)">
+          <div class="case-header">
+            <span class="case-title">Audit-Ready Code Changes</span>
+            <span class="case-tag audit">audit</span>
+          </div>
+          <div class="case-body">
+            <div class="case-content">
+              <p class="case-desc">
+                Compliance requires knowing who changed what and why. hyle logs every
+                file operation with timestamps, diffs, and the prompts that triggered
+                them. Export to JSON for integration with your audit system. SOC2 and
+                ISO 27001 friendly.
+              </p>
+              <div class="case-code">
+$ hyle audit --since "2026-01-09" --format json | jq '.[0]'
+
+{
+  "timestamp": "2026-01-10T09:15:23Z",
+  "session_id": "sess_8f3a2b1c",
+  "operation": "write",
+  "file": "src/auth/jwt.rs",
+  "lines_changed": 47,
+  "prompt": "add token expiration validation",
+  "model": "deepseek-coder",
+  "checksum_before": "a1b2c3...",
+  "checksum_after": "d4e5f6...",
+  "backup_path": "~/.local/state/hyle/backups/..."
+}</div>
+              <div class="case-actions">
+                <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('audit')">copy prompt</button>
+                <button class="copy-btn" onclick="event.stopPropagation(); showFile('audit')">view full schema</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="case-card" onclick="toggleCard(this)">
+          <div class="case-header">
+            <span class="case-title">Atomic Config Updates</span>
+            <span class="case-tag safety">safety</span>
+          </div>
+          <div class="case-body">
+            <div class="case-content">
+              <p class="case-desc">
+                Config files are read at startup. Partial writes mean broken deployments.
+                hyle writes to a temp file, calls fsync, then atomically renames. If power
+                fails mid-write, you get the old config, never corruption. Kubernetes
+                ConfigMaps and secrets handled the same way.
+              </p>
+              <div class="case-code">
+<span class="dim">// How hyle writes files atomically</span>
+
+fn atomic_write(path: &Path, content: &[u8]) -> io::Result<()> {
+    let temp = path.with_extension("tmp");
+
+    // Write to temp file
+    let mut file = File::create(&temp)?;
+    file.write_all(content)?;
+    file.sync_all()?;  // Force to disk
+
+    // Atomic rename (POSIX guarantees)
+    fs::rename(&temp, path)?;
+
+    // Verify write succeeded
+    let readback = fs::read(path)?;
+    assert_eq!(readback, content);
+
+    Ok(())
+}</div>
+              <div class="case-actions">
+                <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('atomic')">copy prompt</button>
+                <button class="copy-btn" onclick="event.stopPropagation(); showFile('atomic')">view implementation</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="case-card" onclick="toggleCard(this)">
+          <div class="case-header">
+            <span class="case-title">Destructive Command Blocking</span>
+            <span class="case-tag safety">safety</span>
+          </div>
+          <div class="case-body">
+            <div class="case-content">
+              <p class="case-desc">
+                "Clean up the build artifacts" shouldn't mean "delete production data."
+                hyle maintains a blocklist of dangerous command patterns. rm -rf, DROP
+                DATABASE, kubectl delete --all - all blocked by default. Override with
+                explicit confirmation for legitimate use cases.
+              </p>
+              <div class="case-code">
+$ hyle
+> clean up old build files and temp directories
+
+<span class="warning">[BLOCKED] Command pattern matched blocklist:</span>
+  rm -rf target/ tmp/ .cache/
+
+This matches pattern: rm -rf *
+
+To proceed, run with explicit confirmation:
+  hyle --allow-destructive
+
+Or use safer alternatives:
+  cargo clean
+  git clean -xdf (interactive: git clean -xdfi)</div>
+              <div class="case-actions">
+                <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('blocklist')">copy prompt</button>
+                <button class="copy-btn" onclick="event.stopPropagation(); showFile('blocklist')">view blocklist</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="case-card" onclick="toggleCard(this)">
+          <div class="case-header">
+            <span class="case-title">Rate Limit Resilience</span>
+            <span class="case-tag recovery">recovery</span>
+          </div>
+          <div class="case-body">
+            <div class="case-content">
+              <p class="case-desc">
+                Long-running refactors can hit API rate limits. hyle tracks model health
+                in real-time. When one model returns 429, it automatically switches to a
+                fallback. Work continues without interruption. When the primary recovers,
+                it switches back automatically.
+              </p>
+              <div class="case-code">
+$ hyle status --models
+
+MODEL                    STATUS    LATENCY   RATE
+deepseek-chat            healthy   234ms     ok
+deepseek-coder           healthy   189ms     ok
+qwen/qwen-2.5-coder      limited   -         429 (retry: 45s)
+mistralai/codestral      healthy   312ms     ok
+
+Current model: deepseek-coder
+Fallback chain: qwen -> mistral -> deepseek-chat
+
+$ hyle config show rate-limit
+
+rate_limit:
+  detection: auto
+  fallback_delay: 5s
+  health_check_interval: 30s
+  max_retries: 3</div>
+              <div class="case-actions">
+                <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('ratelimit')">copy prompt</button>
+                <button class="copy-btn" onclick="event.stopPropagation(); showFile('ratelimit')">view config schema</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="safety">
-      <h2>Safety Features</h2>
+      <h2>Safety features</h2>
       <div class="safety-grid">
         <div class="safety-item">
           <h4>Destructive Command Blocking</h4>
-          <p>rm -rf and similar patterns blocked by default</p>
+          <p>rm -rf, DROP DATABASE, and similar patterns blocked by default</p>
         </div>
         <div class="safety-item">
           <h4>Atomic File Writes</h4>
-          <p>Write to temp, fsync, rename. No partial writes.</p>
+          <p>Write to temp, fsync, rename. No partial writes, ever.</p>
         </div>
         <div class="safety-item">
           <h4>Write Verification</h4>
-          <p>Read-back check after every file write</p>
+          <p>Read-back check after every file write confirms integrity</p>
         </div>
         <div class="safety-item">
           <h4>Backup Rotation</h4>
-          <p>Timestamped backups, keeps last 3 versions</p>
+          <p>Timestamped backups with configurable retention (default: 3)</p>
         </div>
         <div class="safety-item">
           <h4>Rate Limit Handling</h4>
-          <p>Auto-switches to fallback models on 429</p>
+          <p>Auto-switches to fallback models on 429 responses</p>
         </div>
         <div class="safety-item">
           <h4>Session Auto-save</h4>
-          <p>Work preserved on Ctrl-C or crash</p>
+          <p>Work preserved on Ctrl-C, crash, or power failure</p>
         </div>
       </div>
     </section>
@@ -275,12 +669,14 @@
       <h2>Specifications</h2>
       <table>
         <tr><th>Component</th><th>Detail</th></tr>
-        <tr><td>Language</td><td>Rust 1.75+</td></tr>
+        <tr><td>Language</td><td>Rust 1.75+ (MSRV)</td></tr>
         <tr><td>Binary Size</td><td>~10MB (release, stripped)</td></tr>
-        <tr><td>Dependencies</td><td>38 crates (audited)</td></tr>
-        <tr><td>Test Coverage</td><td>364 tests</td></tr>
+        <tr><td>Dependencies</td><td>38 crates (cargo-audit clean)</td></tr>
+        <tr><td>Test Coverage</td><td>364 tests (unit + integration)</td></tr>
         <tr><td>License</td><td>MIT</td></tr>
         <tr><td>Config Location</td><td>XDG directories (0600 permissions)</td></tr>
+        <tr><td>Backup Location</td><td>~/.local/state/hyle/backups/</td></tr>
+        <tr><td>Audit Log</td><td>~/.local/state/hyle/audit.jsonl</td></tr>
       </table>
     </section>
   </main>
@@ -290,6 +686,17 @@
       MIT License &middot; <a href="https://github.com/uprootiny/hyle">Source Code</a>
     </div>
   </footer>
+
+  <!-- File Preview Modal -->
+  <div class="modal-overlay" id="modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title" id="modalTitle">file</span>
+        <button class="modal-close" onclick="closeModal()">close</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
 
   <div class="variant-switcher">
     <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">:</div>
@@ -309,5 +716,503 @@
       <a class="switcher-item" href="flow.html">Flow</a>
     </div>
   </div>
+
+<script>
+  const files = {
+    migration: `-- Rollback script for 20260110_add_audit_columns
+-- Auto-generated by hyle
+
+BEGIN;
+
+-- Remove index first (created CONCURRENTLY, drop normally)
+DROP INDEX IF EXISTS idx_orders_audit;
+
+-- Remove columns
+ALTER TABLE orders
+  DROP COLUMN IF EXISTS audit_log,
+  DROP COLUMN IF EXISTS updated_by,
+  DROP COLUMN IF EXISTS created_by;
+
+COMMIT;
+
+-- Verification query
+-- SELECT column_name FROM information_schema.columns
+-- WHERE table_name = 'orders';`,
+
+    backup: `{
+  "file": "src/handlers/orders.rs",
+  "backup_path": "~/.local/state/hyle/backups/orders_service/src/handlers/orders.rs.2026-01-10T14:23:15.bak",
+  "created_at": "2026-01-10T14:23:15Z",
+  "session_id": "sess_8f3a2b1c",
+  "prompt": "refactor order handlers to use the new OrderService trait",
+  "original_checksum": "sha256:a1b2c3d4e5f6...",
+  "original_size_bytes": 4521,
+  "model_used": "deepseek-coder",
+  "retention_policy": {
+    "keep_count": 3,
+    "keep_days": 7,
+    "compress_after_days": 1
+  },
+  "restore_command": "hyle restore src/handlers/orders.rs --version 2026-01-10T14:23:15"
+}`,
+
+    audit: `// Audit log schema (JSONL format, one record per line)
+
+interface AuditRecord {
+  // Timing
+  timestamp: string;        // ISO 8601
+  duration_ms: number;      // Operation duration
+
+  // Session context
+  session_id: string;       // Unique session identifier
+  sequence: number;         // Operation sequence within session
+
+  // Operation details
+  operation: "read" | "write" | "patch" | "bash" | "glob" | "grep";
+  status: "success" | "blocked" | "error";
+
+  // File operations
+  file?: string;            // Affected file path
+  lines_changed?: number;   // For write/patch operations
+  checksum_before?: string; // SHA256 before change
+  checksum_after?: string;  // SHA256 after change
+  backup_path?: string;     // Path to backup file
+
+  // Command operations
+  command?: string;         // For bash operations
+  exit_code?: number;       // Command exit code
+  blocked_reason?: string;  // If operation was blocked
+
+  // AI context
+  prompt: string;           // User prompt that triggered this
+  model: string;            // Model used for generation
+  tokens_used?: number;     // Token count for this operation
+
+  // Compliance
+  user?: string;            // System user (from $USER)
+  hostname?: string;        // Machine hostname
+  cwd?: string;             // Working directory
+}
+
+// Example record:
+{
+  "timestamp": "2026-01-10T09:15:23.456Z",
+  "duration_ms": 234,
+  "session_id": "sess_8f3a2b1c",
+  "sequence": 12,
+  "operation": "write",
+  "status": "success",
+  "file": "src/auth/jwt.rs",
+  "lines_changed": 47,
+  "checksum_before": "sha256:a1b2c3d4...",
+  "checksum_after": "sha256:e5f6g7h8...",
+  "backup_path": "~/.local/state/hyle/backups/...",
+  "prompt": "add token expiration validation",
+  "model": "deepseek-coder",
+  "tokens_used": 1523,
+  "user": "deploy",
+  "hostname": "prod-api-01",
+  "cwd": "/opt/services/auth-service"
+}`,
+
+    atomic: `//! Atomic file operations with verification and backup.
+
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::Path;
+use sha2::{Sha256, Digest};
+
+/// Write content to file atomically with verification and backup.
+pub fn atomic_write_verified(
+    path: &Path,
+    content: &[u8],
+    backup_dir: Option<&Path>,
+) -> io::Result<WriteResult> {
+    // Create backup if file exists
+    let backup_path = if path.exists() {
+        backup_dir.map(|dir| create_backup(path, dir)).transpose()?
+    } else {
+        None
+    };
+
+    let checksum_before = path.exists()
+        .then(|| compute_checksum(&fs::read(path)?))
+        .flatten();
+
+    // Write to temp file in same directory (for same-filesystem rename)
+    let temp = path.with_extension(format!("tmp.{}", std::process::id()));
+
+    let write_result = (|| {
+        let mut file = File::create(&temp)?;
+        file.write_all(content)?;
+        file.sync_all()?;  // Force to disk before rename
+
+        // Atomic rename (POSIX guarantees atomicity on same filesystem)
+        fs::rename(&temp, path)?;
+
+        // Verify write succeeded by reading back
+        let readback = fs::read(path)?;
+        if readback != content {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Write verification failed: content mismatch"
+            ));
+        }
+
+        Ok(())
+    })();
+
+    // Clean up temp file on any error
+    if write_result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+
+    write_result?;
+
+    Ok(WriteResult {
+        path: path.to_owned(),
+        size_bytes: content.len(),
+        checksum: compute_checksum(content),
+        checksum_before,
+        backup_path,
+    })
+}
+
+fn create_backup(path: &Path, backup_dir: &Path) -> io::Result<PathBuf> {
+    let timestamp = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S");
+    let backup_name = format!(
+        "{}.{}.bak",
+        path.file_name().unwrap().to_string_lossy(),
+        timestamp
+    );
+    let backup_path = backup_dir.join(&backup_name);
+    fs::copy(path, &backup_path)?;
+    Ok(backup_path)
+}
+
+fn compute_checksum(content: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content);
+    format!("sha256:{:x}", hasher.finalize())
+}`,
+
+    blocklist: `# hyle destructive command blocklist
+# Located at: ~/.config/hyle/blocklist.toml
+
+# Patterns are matched against generated bash commands
+# Use regex syntax, case-insensitive matching
+
+[patterns]
+# File deletion
+dangerous_rm = [
+  "rm\\s+-rf\\s+/",           # rm -rf /anything
+  "rm\\s+-rf\\s+~",           # rm -rf ~/anything
+  "rm\\s+-rf\\s+\\.",         # rm -rf . or ./
+  "rm\\s+--no-preserve-root", # Explicit root deletion
+]
+
+# Database destruction
+dangerous_db = [
+  "DROP\\s+DATABASE",
+  "DROP\\s+SCHEMA.*CASCADE",
+  "TRUNCATE.*CASCADE",
+  "DELETE\\s+FROM\\s+\\w+\\s*;",  # DELETE without WHERE
+]
+
+# Kubernetes
+dangerous_k8s = [
+  "kubectl\\s+delete.*--all",
+  "kubectl\\s+delete\\s+namespace",
+  "helm\\s+uninstall.*--no-hooks",
+]
+
+# Git
+dangerous_git = [
+  "git\\s+push.*--force\\s+origin\\s+(main|master)",
+  "git\\s+reset\\s+--hard\\s+origin",
+]
+
+[overrides]
+# Commands that can override with --allow-destructive
+allow_with_flag = true
+
+# Commands that require interactive confirmation
+require_confirm = [
+  "git push --force",
+  "kubectl delete",
+]
+
+# Never allow, even with flags
+never_allow = [
+  "rm -rf /",
+  ":(){ :|:& };:",  # Fork bomb
+]`,
+
+    ratelimit: `# Rate limit configuration
+# Located at: ~/.config/hyle/config.toml
+
+[rate_limit]
+# Auto-detect 429 responses and switch models
+detection = "auto"
+
+# Wait before trying fallback after rate limit
+fallback_delay = "5s"
+
+# How often to check if rate-limited model recovered
+health_check_interval = "30s"
+
+# Max retries before giving up on a model
+max_retries = 3
+
+# Model priority and fallback chain
+[models]
+primary = "deepseek-coder"
+fallback = [
+  "qwen/qwen-2.5-coder-32b-instruct",
+  "mistralai/codestral-latest",
+  "deepseek-chat",
+]
+
+# Per-model rate limit hints (requests per minute)
+[models.limits]
+"deepseek-coder" = 60
+"qwen/qwen-2.5-coder-32b-instruct" = 30
+"mistralai/codestral-latest" = 20
+
+# Health tracking
+[health]
+# Mark model unhealthy after N consecutive failures
+failure_threshold = 3
+
+# Mark model healthy after N consecutive successes
+recovery_threshold = 2
+
+# Time window for tracking
+window = "5m"
+
+# Persist health state across sessions
+persist = true
+persist_path = "~/.local/state/hyle/model_health.json"`
+  };
+
+  const prompts = {
+    migration: `Generate a PostgreSQL migration to add audit columns to the orders table:
+- created_by: UUID foreign key to users
+- updated_by: UUID foreign key to users
+- audit_log: JSONB array for change history
+Include: transaction wrapping, existence check, concurrent index creation.
+Also generate the rollback script.`,
+
+    refactor: `Refactor order handlers to use the new OrderService trait.
+Update all handler functions to accept &dyn OrderService instead of &OrderRepository.
+Preserve existing behavior. Create backups before each file change.`,
+
+    audit: `Export audit log for compliance review. Include:
+- All file operations from the last 7 days
+- Session IDs, timestamps, prompts, checksums
+- Format as JSONL for ingestion into audit system
+- Filter to only write and patch operations`,
+
+    atomic: `Show me how hyle implements atomic file writes.
+I need to understand the write-temp-fsync-rename pattern
+and how verification works.`,
+
+    blocklist: `Show the default blocklist configuration for destructive commands.
+What patterns are blocked by default?
+How do I add custom patterns for our infrastructure?`,
+
+    ratelimit: `Configure rate limit handling for our CI environment.
+We hit limits on DeepSeek during large refactors.
+Set up automatic fallback to Qwen and Mistral.`
+  };
+
+  const demos = [
+    {
+      title: 'Atomic write with verification',
+      lines: [
+        { text: '$ hyle', type: 'prompt' },
+        { text: '> update the database config with new replica', type: 'input' },
+        { text: '', type: 'blank' },
+        { text: '[reading config/database.toml...]', type: 'dim' },
+        { text: '[creating backup: database.toml.2026-01-10T15:42:03.bak]', type: 'dim' },
+        { text: '[writing to config/database.toml.tmp.12847...]', type: 'dim' },
+        { text: '[fsync: forcing to disk...]', type: 'dim' },
+        { text: '[atomic rename: tmp -> database.toml]', type: 'dim' },
+        { text: '[verify: read-back matches written content]', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: 'Updated config/database.toml (backup available)', type: 'success' },
+      ]
+    },
+    {
+      title: 'Destructive command blocked',
+      lines: [
+        { text: '$ hyle', type: 'prompt' },
+        { text: '> clean up all the old build artifacts', type: 'input' },
+        { text: '', type: 'blank' },
+        { text: '[generating cleanup commands...]', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: '[BLOCKED] Command matches blocklist pattern:', type: 'warning' },
+        { text: '  rm -rf target/ .cache/ tmp/', type: 'warning' },
+        { text: '', type: 'blank' },
+        { text: 'Safer alternatives:', type: 'prompt' },
+        { text: '  cargo clean', type: 'dim' },
+        { text: '  git clean -xdfi (interactive)', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: 'To override: hyle --allow-destructive', type: 'dim' },
+      ]
+    },
+    {
+      title: 'Rate limit fallback',
+      lines: [
+        { text: '$ hyle', type: 'prompt' },
+        { text: '> refactor all handlers to use new error type', type: 'input' },
+        { text: '', type: 'blank' },
+        { text: '[reading 23 handler files...]', type: 'dim' },
+        { text: '[patching src/handlers/users.rs...]', type: 'dim' },
+        { text: '[patching src/handlers/orders.rs...]', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: '[RATE LIMITED] deepseek-coder returned 429', type: 'warning' },
+        { text: '[switching to fallback: qwen/qwen-2.5-coder]', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: '[patching src/handlers/products.rs...]', type: 'dim' },
+        { text: '[patching src/handlers/auth.rs...]', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: 'Refactored 23 files (fallback model used)', type: 'success' },
+      ]
+    }
+  ];
+
+  let currentDemo = 0;
+  let currentLine = 0;
+  let isPlaying = false;
+  let interval = null;
+
+  function renderLine(line) {
+    const div = document.createElement('div');
+    div.className = 'replay-line';
+    switch(line.type) {
+      case 'prompt':
+        div.innerHTML = `<span class="prompt">${line.text}</span>`;
+        break;
+      case 'input':
+        div.textContent = line.text;
+        break;
+      case 'dim':
+        div.innerHTML = `<span class="dim">${line.text}</span>`;
+        break;
+      case 'success':
+        div.innerHTML = `<span class="success">${line.text}</span>`;
+        break;
+      case 'warning':
+        div.innerHTML = `<span class="warning">${line.text}</span>`;
+        break;
+      default:
+        div.innerHTML = '&nbsp;';
+    }
+    return div;
+  }
+
+  function playNext() {
+    const demo = demos[currentDemo];
+    const body = document.getElementById('terminalBody');
+    if (currentLine < demo.lines.length) {
+      body.appendChild(renderLine(demo.lines[currentLine]));
+      currentLine++;
+    } else {
+      stopReplay();
+    }
+  }
+
+  function startReplay() {
+    isPlaying = true;
+    document.getElementById('playBtn').textContent = 'pause';
+    document.getElementById('playBtn').classList.add('active');
+    interval = setInterval(playNext, 280);
+  }
+
+  function stopReplay() {
+    isPlaying = false;
+    document.getElementById('playBtn').textContent = 'play';
+    document.getElementById('playBtn').classList.remove('active');
+    if (interval) { clearInterval(interval); interval = null; }
+  }
+
+  function toggleReplay() {
+    if (isPlaying) stopReplay(); else startReplay();
+  }
+
+  function restartReplay() {
+    stopReplay();
+    currentLine = 0;
+    document.getElementById('terminalBody').innerHTML = '';
+    startReplay();
+  }
+
+  function cycleDemo() {
+    stopReplay();
+    currentDemo = (currentDemo + 1) % demos.length;
+    currentLine = 0;
+    document.getElementById('terminalBody').innerHTML = '';
+    startReplay();
+  }
+
+  function toggleCard(el) {
+    document.querySelectorAll('.case-card.open').forEach(e => {
+      if (e !== el) e.classList.remove('open');
+    });
+    el.classList.toggle('open');
+  }
+
+  function showFile(key) {
+    const content = files[key];
+    if (!content) return;
+
+    const lines = content.split('\n');
+    const numbered = lines.map((line, i) =>
+      `<span class="line-num">${String(i + 1).padStart(3)}</span>${escapeHtml(line)}`
+    ).join('\n');
+
+    const titles = {
+      migration: 'migrations/rollback.sql',
+      backup: 'backup_metadata.json',
+      audit: 'audit_schema.ts',
+      atomic: 'src/fs/atomic.rs',
+      blocklist: 'blocklist.toml',
+      ratelimit: 'config.toml'
+    };
+
+    document.getElementById('modalTitle').textContent = titles[key] || key;
+    document.getElementById('modalBody').innerHTML = `<pre>${numbered}</pre>`;
+    document.getElementById('modal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function copyPrompt(key) {
+    const prompt = prompts[key];
+    if (!prompt) return;
+
+    navigator.clipboard.writeText(prompt).then(() => {
+      event.target.textContent = 'copied!';
+      event.target.classList.add('copied');
+      setTimeout(() => {
+        event.target.textContent = 'copy prompt';
+        event.target.classList.remove('copied');
+      }, 1500);
+    });
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  window.addEventListener('load', () => setTimeout(startReplay, 500));
+</script>
 </body>
 </html>
