@@ -10,6 +10,7 @@
       --fg: #fff;
       --accent: #ff6b6b;
       --dim: #666;
+      --green: #4ade80;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -19,7 +20,7 @@
       min-height: 100vh;
     }
     .hero {
-      min-height: 80vh;
+      min-height: 70vh;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -39,33 +40,70 @@
     .tagline {
       font-size: 1.5rem;
       color: var(--dim);
-      margin: 1rem 0 3rem;
+      margin: 1rem 0 2rem;
       font-weight: 300;
     }
+
+    /* Terminal Replay */
     .terminal {
       background: #111;
       border-radius: 8px;
-      padding: 1.5rem 2rem;
+      padding: 1rem 1.5rem;
       font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       text-align: left;
-      max-width: 600px;
+      max-width: 700px;
       width: 100%;
       border: 1px solid #222;
+      min-height: 280px;
     }
-    .terminal .line { margin: 0.25rem 0; }
-    .terminal .prompt { color: var(--accent); }
-    .terminal .dim { color: #444; }
+    .terminal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #222;
+    }
+    .terminal-title { color: var(--dim); font-size: 0.75rem; }
+    .terminal-controls { display: flex; gap: 0.5rem; }
+    .terminal-btn {
+      background: none;
+      border: 1px solid #333;
+      color: #666;
+      font-family: monospace;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.6rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .terminal-btn:hover { color: #fff; border-color: #555; }
+    .terminal-btn.active { color: var(--accent); border-color: var(--accent); }
+    .terminal-body { min-height: 200px; }
+    .replay-line {
+      margin: 0.2rem 0;
+      opacity: 0;
+      animation: fadeIn 0.15s ease forwards;
+    }
+    @keyframes fadeIn { to { opacity: 1; } }
+    .prompt { color: var(--accent); }
+    .dim { color: #444; }
+    .green { color: var(--green); }
+    .file-link {
+      color: #60a5fa;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .file-link:hover { color: #93c5fd; }
+
     .stats {
       display: flex;
       gap: 3rem;
-      margin: 3rem 0;
+      margin: 2.5rem 0;
       flex-wrap: wrap;
       justify-content: center;
     }
-    .stat {
-      text-align: center;
-    }
+    .stat { text-align: center; }
     .stat-value {
       font-size: 2.5rem;
       font-weight: 700;
@@ -77,9 +115,7 @@
       text-transform: uppercase;
       letter-spacing: 0.1em;
     }
-    .cta {
-      margin-top: 2rem;
-    }
+    .cta { margin-top: 1.5rem; }
     .cta a {
       display: inline-block;
       padding: 1rem 2.5rem;
@@ -91,21 +127,107 @@
       transition: transform 0.1s;
     }
     .cta a:hover { transform: scale(1.02); }
+
+    /* Velocity Examples */
+    .examples {
+      padding: 3rem 2rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .examples h2 {
+      text-align: center;
+      margin-bottom: 0.5rem;
+      font-weight: 700;
+      font-size: 2rem;
+    }
+    .examples-subtitle {
+      text-align: center;
+      color: var(--dim);
+      margin-bottom: 2rem;
+      font-size: 1rem;
+    }
+    .example-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+    .example-card {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .example-card:hover { border-color: #333; }
+    .example-card.open { border-color: var(--accent); }
+    .example-header {
+      padding: 1rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .example-title { font-weight: 600; font-size: 0.95rem; }
+    .example-time {
+      color: var(--green);
+      font-size: 0.75rem;
+      font-family: monospace;
+    }
+    .example-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    .example-card.open .example-body { max-height: 500px; }
+    .example-content {
+      padding: 0 1.25rem 1.25rem;
+      border-top: 1px solid #222;
+    }
+    .example-desc {
+      color: var(--dim);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      margin: 1rem 0;
+    }
+    .example-code {
+      background: #0a0a0a;
+      padding: 1rem;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      margin-bottom: 1rem;
+    }
+    .example-actions { display: flex; gap: 0.5rem; }
+    .copy-btn {
+      background: none;
+      border: 1px solid #333;
+      color: #666;
+      font-family: inherit;
+      font-size: 0.75rem;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .copy-btn:hover { color: #fff; border-color: #555; }
+    .copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+    /* Features */
     .features {
-      padding: 4rem 2rem;
+      padding: 3rem 2rem;
       max-width: 1000px;
       margin: 0 auto;
     }
     .features h2 {
       text-align: center;
-      margin-bottom: 3rem;
+      margin-bottom: 2rem;
       font-weight: 300;
       color: var(--dim);
     }
     .feature-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 2rem;
+      gap: 1.5rem;
     }
     .feature {
       padding: 1.5rem;
@@ -122,6 +244,61 @@
       font-size: 0.9rem;
       line-height: 1.5;
     }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-content {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 1.5rem;
+      max-width: 700px;
+      max-height: 80vh;
+      overflow: auto;
+      width: 90%;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid #222;
+    }
+    .modal-title { color: #60a5fa; font-family: monospace; }
+    .modal-close {
+      background: none;
+      border: 1px solid #333;
+      color: #666;
+      padding: 0.25rem 0.75rem;
+      cursor: pointer;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+    .modal-close:hover { color: #f87171; border-color: #f87171; }
+    .modal-body {
+      font-family: monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .modal-body .line-num {
+      color: #333;
+      display: inline-block;
+      width: 3ch;
+      text-align: right;
+      margin-right: 1.5ch;
+      user-select: none;
+    }
+
     footer {
       padding: 2rem;
       text-align: center;
@@ -158,10 +335,15 @@
     <p class="tagline">paste sketch. get project.</p>
 
     <div class="terminal">
-      <div class="line"><span class="prompt">$</span> hyle --free</div>
-      <div class="line"><span class="dim"># describe what you want</span></div>
-      <div class="line"><span class="dim"># watch it build</span></div>
-      <div class="line"><span class="dim"># ship it</span></div>
+      <div class="terminal-header">
+        <span class="terminal-title">LIVE BUILD</span>
+        <div class="terminal-controls">
+          <button class="terminal-btn" id="playBtn" onclick="toggleReplay()">play</button>
+          <button class="terminal-btn" onclick="restartReplay()">restart</button>
+          <button class="terminal-btn" onclick="cycleDemo()">next</button>
+        </div>
+      </div>
+      <div class="terminal-body" id="terminalBody"></div>
     </div>
 
     <div class="stats">
@@ -174,8 +356,8 @@
         <div class="stat-label">Setup Time</div>
       </div>
       <div class="stat">
-        <div class="stat-value">1</div>
-        <div class="stat-label">Binary</div>
+        <div class="stat-value">~10MB</div>
+        <div class="stat-label">Binary Size</div>
       </div>
     </div>
 
@@ -184,32 +366,311 @@
     </div>
   </div>
 
+  <div class="examples">
+    <h2>Ship in minutes, not days</h2>
+    <p class="examples-subtitle">Real projects built with hyle. Click to see prompts.</p>
+
+    <div class="example-grid">
+      <div class="example-card" onclick="toggleCard(this)">
+        <div class="example-header">
+          <span class="example-title">Stripe Webhook Handler</span>
+          <span class="example-time">~4 min</span>
+        </div>
+        <div class="example-body">
+          <div class="example-content">
+            <p class="example-desc">
+              Payment webhooks are tedious. Signature verification, event type switching,
+              idempotency handling. Instead of copying from Stripe docs and adapting,
+              describe what events you care about and let hyle generate the handler with
+              proper error handling and logging.
+            </p>
+            <div class="example-code">
+<span class="dim">// Generated: src/webhooks/stripe.rs</span>
+pub async fn handle_webhook(
+    State(state): State&lt;AppState&gt;,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result&lt;StatusCode, ApiError&gt; {
+    let sig = headers.get("stripe-signature")
+        .ok_or(ApiError::MissingSignature)?;
+
+    let event = Webhook::construct_event(
+        &amp;String::from_utf8_lossy(&amp;body),
+        sig.to_str()?,
+        &amp;state.stripe_webhook_secret,
+    )?;
+
+    match event.type_ {
+        EventType::CheckoutSessionCompleted =&gt; {
+            let session = event.data.object.into_checkout_session()?;
+            state.orders.fulfill(session.id).await?;
+        }
+        EventType::InvoicePaid =&gt; { /* ... */ }
+        _ =&gt; {}
+    }
+    Ok(StatusCode::OK)
+}</div>
+            <div class="example-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('stripe')">copy prompt</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); showFile('stripe')">view full code</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-card" onclick="toggleCard(this)">
+        <div class="example-header">
+          <span class="example-title">Auth with JWT + Refresh</span>
+          <span class="example-time">~6 min</span>
+        </div>
+        <div class="example-body">
+          <div class="example-content">
+            <p class="example-desc">
+              Every SaaS needs auth. JWT access tokens, refresh tokens, secure cookie
+              handling, logout that actually works. Getting it wrong means security bugs.
+              Describe your requirements once, get a complete auth system with proper
+              token rotation and blacklisting.
+            </p>
+            <div class="example-code">
+<span class="dim">// Generated: src/auth/mod.rs</span>
+pub async fn login(
+    State(state): State&lt;AppState&gt;,
+    Json(creds): Json&lt;LoginRequest&gt;,
+) -> Result&lt;impl IntoResponse, AuthError&gt; {
+    let user = state.users.verify(&amp;creds.email, &amp;creds.password).await?;
+
+    let access_token = create_jwt(&amp;user, Duration::minutes(15))?;
+    let refresh_token = create_refresh_token(&amp;user)?;
+
+    state.refresh_tokens.store(&amp;refresh_token, user.id).await?;
+
+    Ok((
+        StatusCode::OK,
+        set_refresh_cookie(&amp;refresh_token),
+        Json(AuthResponse { access_token, user: user.into() })
+    ))
+}</div>
+            <div class="example-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('auth')">copy prompt</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); showFile('auth')">view full code</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-card" onclick="toggleCard(this)">
+        <div class="example-header">
+          <span class="example-title">Real-time WebSocket Chat</span>
+          <span class="example-time">~8 min</span>
+        </div>
+        <div class="example-body">
+          <div class="example-content">
+            <p class="example-desc">
+              Building real-time features from scratch takes days. Connection management,
+              room subscriptions, message broadcasting, reconnection handling. Describe
+              the chat structure you need, get a production-ready WebSocket server with
+              proper state management and graceful shutdown.
+            </p>
+            <div class="example-code">
+<span class="dim">// Generated: src/ws/chat.rs</span>
+pub async fn handle_socket(
+    ws: WebSocket,
+    state: Arc&lt;ChatState&gt;,
+    user_id: Uuid,
+) {
+    let (mut sender, mut receiver) = ws.split();
+    let (tx, mut rx) = mpsc::channel(32);
+
+    state.connections.insert(user_id, tx);
+
+    let send_task = tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            if sender.send(Message::Text(msg)).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    while let Some(Ok(msg)) = receiver.next().await {
+        if let Message::Text(text) = msg {
+            let cmd: ChatCommand = serde_json::from_str(&amp;text)?;
+            state.handle_command(user_id, cmd).await;
+        }
+    }
+
+    state.connections.remove(&amp;user_id);
+}</div>
+            <div class="example-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('websocket')">copy prompt</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); showFile('websocket')">view full code</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-card" onclick="toggleCard(this)">
+        <div class="example-header">
+          <span class="example-title">Background Job Queue</span>
+          <span class="example-time">~5 min</span>
+        </div>
+        <div class="example-body">
+          <div class="example-content">
+            <p class="example-desc">
+              Email sending, PDF generation, data exports. You need async processing
+              but Sidekiq means Redis means ops burden. Describe your job types,
+              get a Postgres-backed job queue with retries, timeouts, and dead letter
+              handling. No new infrastructure.
+            </p>
+            <div class="example-code">
+<span class="dim">// Generated: src/jobs/queue.rs</span>
+#[derive(Serialize, Deserialize)]
+pub enum Job {
+    SendEmail { to: String, template: String, data: Value },
+    GeneratePdf { doc_id: Uuid },
+    ExportData { user_id: Uuid, format: ExportFormat },
+}
+
+impl JobQueue {
+    pub async fn enqueue(&amp;self, job: Job) -> Result&lt;Uuid&gt; {
+        let id = Uuid::new_v4();
+        sqlx::query!(
+            "INSERT INTO jobs (id, payload, status, run_at) VALUES ($1, $2, 'pending', now())",
+            id, serde_json::to_value(&amp;job)?
+        ).execute(&amp;self.pool).await?;
+        Ok(id)
+    }
+
+    pub async fn process_next(&amp;self) -> Result&lt;bool&gt; {
+        let job = sqlx::query_as!(/* ... */).fetch_optional(&amp;self.pool).await?;
+        // ... retry logic, timeout handling
+    }
+}</div>
+            <div class="example-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('jobs')">copy prompt</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); showFile('jobs')">view full code</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-card" onclick="toggleCard(this)">
+        <div class="example-header">
+          <span class="example-title">Rate Limiter Middleware</span>
+          <span class="example-time">~3 min</span>
+        </div>
+        <div class="example-body">
+          <div class="example-content">
+            <p class="example-desc">
+              API abuse protection is non-negotiable. Token bucket, sliding window,
+              per-user limits. Usually you grab a crate and hope it works. Instead,
+              describe your rate limiting strategy, get middleware that integrates
+              with your existing auth and returns proper 429s with Retry-After.
+            </p>
+            <div class="example-code">
+<span class="dim">// Generated: src/middleware/rate_limit.rs</span>
+pub struct RateLimiter {
+    limits: DashMap&lt;String, TokenBucket&gt;,
+    config: RateLimitConfig,
+}
+
+impl RateLimiter {
+    pub fn check(&amp;self, key: &amp;str) -> Result&lt;(), RateLimitError&gt; {
+        let mut bucket = self.limits
+            .entry(key.to_string())
+            .or_insert_with(|| TokenBucket::new(self.config.clone()));
+
+        if bucket.try_consume() {
+            Ok(())
+        } else {
+            Err(RateLimitError {
+                retry_after: bucket.time_until_refill(),
+            })
+        }
+    }
+}</div>
+            <div class="example-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('ratelimit')">copy prompt</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); showFile('ratelimit')">view full code</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-card" onclick="toggleCard(this)">
+        <div class="example-header">
+          <span class="example-title">Full CRUD API + Tests</span>
+          <span class="example-time">~7 min</span>
+        </div>
+        <div class="example-body">
+          <div class="example-content">
+            <p class="example-desc">
+              New resource? That's migrations, models, handlers, validation, tests.
+              Boilerplate that takes an hour if you're careful. Describe your entity
+              schema, get everything scaffolded correctly. Relations, pagination,
+              filtering. Even the integration tests.
+            </p>
+            <div class="example-code">
+<span class="dim">// Generated: src/handlers/products.rs</span>
+pub async fn list_products(
+    State(state): State&lt;AppState&gt;,
+    Query(params): Query&lt;ListParams&gt;,
+) -> Result&lt;Json&lt;PaginatedResponse&lt;Product&gt;&gt;, ApiError&gt; {
+    let products = state.products
+        .list(params.page, params.per_page, params.filter.as_deref())
+        .await?;
+
+    Ok(Json(PaginatedResponse {
+        items: products,
+        page: params.page,
+        total_pages: /* ... */,
+    }))
+}
+
+<span class="dim">// Generated: tests/products_test.rs</span>
+#[tokio::test]
+async fn test_create_product() {
+    let app = test_app().await;
+    let res = app.post("/api/products")
+        .json(&amp;json!({"name": "Widget", "price": 999}))
+        .send().await;
+    assert_eq!(res.status(), 201);
+}</div>
+            <div class="example-actions">
+              <button class="copy-btn" onclick="event.stopPropagation(); copyPrompt('crud')">copy prompt</button>
+              <button class="copy-btn" onclick="event.stopPropagation(); showFile('crud')">view full code</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="features">
-    <h2>What you get</h2>
+    <h2>Why teams ship faster with hyle</h2>
     <div class="feature-grid">
       <div class="feature">
         <h3>Agentic Execution</h3>
-        <p>Reads files. Writes files. Runs commands. Iterates until done. You describe, it builds.</p>
+        <p>Reads your codebase. Writes files. Runs commands. Iterates until done. You describe the feature, it builds it in context.</p>
       </div>
       <div class="feature">
         <h3>Zero Cost Start</h3>
-        <p>35+ free models via OpenRouter. DeepSeek, Qwen, Mistral. No credit card required.</p>
+        <p>35+ free models via OpenRouter. DeepSeek, Qwen, Mistral. Start building now, upgrade when you scale. No credit card required.</p>
       </div>
       <div class="feature">
         <h3>No JS Runtime</h3>
-        <p>Single Rust binary. No node_modules. No npm. No npx. Compiles to 10MB.</p>
+        <p>Single Rust binary. No node_modules. No npm. No npx. Compiles to ~10MB. Deploys anywhere. Starts instantly.</p>
       </div>
       <div class="feature">
         <h3>Session Persistence</h3>
-        <p>Pick up where you left off. Context preserved. Decisions remembered.</p>
+        <p>Pick up where you left off. Context preserved across sessions. Decisions remembered. No re-explaining your codebase.</p>
       </div>
       <div class="feature">
         <h3>Guardrails Built In</h3>
-        <p>Blocks destructive commands. Atomic writes. Auto-backups. Safe by default.</p>
+        <p>Blocks rm -rf. Atomic writes with backups. Confirms destructive ops. Safe enough to run unsupervised. Almost.</p>
       </div>
       <div class="feature">
         <h3>Slash Commands</h3>
-        <p>/build /test /commit - run locally, no LLM latency. 20+ commands included.</p>
+        <p>/build /test /commit /deploy - local execution, no LLM latency. 20+ commands included. Extensible with your own.</p>
       </div>
     </div>
   </div>
@@ -217,6 +678,17 @@
   <footer>
     MIT License &middot; <a href="https://github.com/uprootiny/hyle">GitHub</a>
   </footer>
+
+  <!-- File Preview Modal -->
+  <div class="modal-overlay" id="modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title" id="modalTitle">file.rs</span>
+        <button class="modal-close" onclick="closeModal()">close</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
 
   <div class="variant-switcher">
     <div class="switcher-toggle" onclick="document.getElementById('sp').classList.toggle('open')">~</div>
@@ -236,5 +708,810 @@
       <a class="switcher-item" href="flow.html">Flow</a>
     </div>
   </div>
+
+<script>
+  // File contents for preview
+  const files = {
+    stripe: `//! Stripe webhook handler with signature verification.
+
+use axum::{extract::State, http::{HeaderMap, StatusCode}, body::Bytes};
+use stripe::{Webhook, EventType};
+
+pub async fn handle_webhook(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<StatusCode, ApiError> {
+    let sig = headers.get("stripe-signature")
+        .ok_or(ApiError::MissingSignature)?;
+
+    let event = Webhook::construct_event(
+        &String::from_utf8_lossy(&body),
+        sig.to_str().map_err(|_| ApiError::InvalidSignature)?,
+        &state.stripe_webhook_secret,
+    ).map_err(|_| ApiError::InvalidSignature)?;
+
+    // Idempotency: check if we've processed this event
+    if state.processed_events.contains(&event.id).await {
+        return Ok(StatusCode::OK);
+    }
+
+    match event.type_ {
+        EventType::CheckoutSessionCompleted => {
+            let session = event.data.object
+                .into_checkout_session()
+                .map_err(|_| ApiError::InvalidEventData)?;
+
+            tracing::info!(session_id = %session.id, "Checkout completed");
+            state.orders.fulfill(session.id).await?;
+        }
+        EventType::InvoicePaid => {
+            let invoice = event.data.object.into_invoice()?;
+            state.subscriptions.extend(invoice.subscription.unwrap()).await?;
+        }
+        EventType::CustomerSubscriptionDeleted => {
+            let sub = event.data.object.into_subscription()?;
+            state.subscriptions.cancel(sub.id).await?;
+        }
+        _ => {
+            tracing::debug!(event_type = ?event.type_, "Unhandled event type");
+        }
+    }
+
+    state.processed_events.insert(event.id).await;
+    Ok(StatusCode::OK)
+}`,
+
+    auth: `//! JWT authentication with refresh token rotation.
+
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use chrono::Duration;
+use jsonwebtoken::{encode, Header, EncodingKey};
+
+#[derive(Deserialize)]
+pub struct LoginRequest {
+    email: String,
+    password: String,
+}
+
+#[derive(Serialize)]
+pub struct AuthResponse {
+    access_token: String,
+    user: UserDto,
+}
+
+pub async fn login(
+    State(state): State<AppState>,
+    Json(creds): Json<LoginRequest>,
+) -> Result<impl IntoResponse, AuthError> {
+    let user = state.users
+        .verify(&creds.email, &creds.password)
+        .await
+        .map_err(|_| AuthError::InvalidCredentials)?;
+
+    let access_token = create_jwt(&user, Duration::minutes(15))?;
+    let refresh_token = create_refresh_token(&user)?;
+
+    // Store refresh token with user binding
+    state.refresh_tokens.store(&refresh_token, user.id).await?;
+
+    Ok((
+        StatusCode::OK,
+        set_refresh_cookie(&refresh_token),
+        Json(AuthResponse {
+            access_token,
+            user: user.into()
+        })
+    ))
+}
+
+pub async fn refresh(
+    State(state): State<AppState>,
+    cookies: CookieJar,
+) -> Result<impl IntoResponse, AuthError> {
+    let token = cookies.get("refresh_token")
+        .ok_or(AuthError::MissingRefreshToken)?;
+
+    // Validate and rotate
+    let user_id = state.refresh_tokens
+        .validate_and_revoke(token.value())
+        .await?;
+
+    let user = state.users.find(user_id).await?;
+    let new_access = create_jwt(&user, Duration::minutes(15))?;
+    let new_refresh = create_refresh_token(&user)?;
+
+    state.refresh_tokens.store(&new_refresh, user.id).await?;
+
+    Ok((
+        StatusCode::OK,
+        set_refresh_cookie(&new_refresh),
+        Json(AuthResponse { access_token: new_access, user: user.into() })
+    ))
+}
+
+pub async fn logout(
+    State(state): State<AppState>,
+    cookies: CookieJar,
+) -> Result<impl IntoResponse, AuthError> {
+    if let Some(token) = cookies.get("refresh_token") {
+        state.refresh_tokens.revoke(token.value()).await?;
+    }
+    Ok((StatusCode::OK, remove_refresh_cookie()))
+}`,
+
+    websocket: `//! Real-time WebSocket chat with rooms and presence.
+
+use axum::extract::ws::{Message, WebSocket};
+use futures::{SinkExt, StreamExt};
+use tokio::sync::mpsc;
+use std::sync::Arc;
+
+pub struct ChatState {
+    connections: DashMap<Uuid, mpsc::Sender<String>>,
+    rooms: DashMap<String, HashSet<Uuid>>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+pub enum ChatCommand {
+    Join { room: String },
+    Leave { room: String },
+    Message { room: String, content: String },
+    Typing { room: String },
+}
+
+pub async fn handle_socket(
+    ws: WebSocket,
+    state: Arc<ChatState>,
+    user_id: Uuid,
+) {
+    let (mut sender, mut receiver) = ws.split();
+    let (tx, mut rx) = mpsc::channel::<String>(32);
+
+    // Register connection
+    state.connections.insert(user_id, tx);
+
+    // Outbound message task
+    let send_task = tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            if sender.send(Message::Text(msg)).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Inbound message loop
+    while let Some(Ok(msg)) = receiver.next().await {
+        if let Message::Text(text) = msg {
+            match serde_json::from_str::<ChatCommand>(&text) {
+                Ok(cmd) => state.handle_command(user_id, cmd).await,
+                Err(e) => tracing::warn!("Invalid command: {}", e),
+            }
+        }
+    }
+
+    // Cleanup on disconnect
+    state.connections.remove(&user_id);
+    for mut room in state.rooms.iter_mut() {
+        room.remove(&user_id);
+    }
+
+    send_task.abort();
+}
+
+impl ChatState {
+    async fn handle_command(&self, user_id: Uuid, cmd: ChatCommand) {
+        match cmd {
+            ChatCommand::Join { room } => {
+                self.rooms.entry(room.clone())
+                    .or_default()
+                    .insert(user_id);
+                self.broadcast(&room, json!({"type": "joined", "user_id": user_id})).await;
+            }
+            ChatCommand::Message { room, content } => {
+                self.broadcast(&room, json!({
+                    "type": "message",
+                    "user_id": user_id,
+                    "content": content,
+                    "timestamp": Utc::now()
+                })).await;
+            }
+            // ...
+        }
+    }
+
+    async fn broadcast(&self, room: &str, msg: Value) {
+        if let Some(members) = self.rooms.get(room) {
+            let text = msg.to_string();
+            for user_id in members.iter() {
+                if let Some(tx) = self.connections.get(user_id) {
+                    let _ = tx.send(text.clone()).await;
+                }
+            }
+        }
+    }
+}`,
+
+    jobs: `//! Postgres-backed job queue with retries and dead letter handling.
+
+use sqlx::PgPool;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum Job {
+    SendEmail { to: String, template: String, data: Value },
+    GeneratePdf { doc_id: Uuid },
+    ExportData { user_id: Uuid, format: ExportFormat },
+    ProcessWebhook { event_id: String, payload: Value },
+}
+
+pub struct JobQueue {
+    pool: PgPool,
+    max_retries: i32,
+    retry_delay: Duration,
+}
+
+impl JobQueue {
+    pub async fn enqueue(&self, job: Job) -> Result<Uuid> {
+        self.enqueue_at(job, Utc::now()).await
+    }
+
+    pub async fn enqueue_at(&self, job: Job, run_at: DateTime<Utc>) -> Result<Uuid> {
+        let id = Uuid::new_v4();
+        sqlx::query!(
+            r#"
+            INSERT INTO jobs (id, payload, status, run_at, created_at)
+            VALUES ($1, $2, 'pending', $3, now())
+            "#,
+            id,
+            serde_json::to_value(&job)?,
+            run_at
+        ).execute(&self.pool).await?;
+        Ok(id)
+    }
+
+    pub async fn process_next(&self) -> Result<bool> {
+        let mut tx = self.pool.begin().await?;
+
+        // Lock and fetch next job
+        let job = sqlx::query_as!(
+            JobRow,
+            r#"
+            SELECT id, payload, attempts
+            FROM jobs
+            WHERE status = 'pending' AND run_at <= now()
+            ORDER BY run_at
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+            "#
+        ).fetch_optional(&mut *tx).await?;
+
+        let Some(job) = job else {
+            return Ok(false);
+        };
+
+        // Mark as processing
+        sqlx::query!("UPDATE jobs SET status = 'processing' WHERE id = $1", job.id)
+            .execute(&mut *tx).await?;
+
+        tx.commit().await?;
+
+        // Execute job
+        let result = self.execute_job(&job).await;
+
+        match result {
+            Ok(()) => {
+                sqlx::query!("UPDATE jobs SET status = 'completed', completed_at = now() WHERE id = $1", job.id)
+                    .execute(&self.pool).await?;
+            }
+            Err(e) if job.attempts < self.max_retries => {
+                sqlx::query!(
+                    r#"
+                    UPDATE jobs SET
+                        status = 'pending',
+                        attempts = attempts + 1,
+                        run_at = now() + $2,
+                        last_error = $3
+                    WHERE id = $1
+                    "#,
+                    job.id,
+                    self.retry_delay * (job.attempts + 1) as i32,
+                    e.to_string()
+                ).execute(&self.pool).await?;
+            }
+            Err(e) => {
+                // Dead letter
+                sqlx::query!(
+                    "UPDATE jobs SET status = 'failed', last_error = $2 WHERE id = $1",
+                    job.id, e.to_string()
+                ).execute(&self.pool).await?;
+            }
+        }
+
+        Ok(true)
+    }
+}`,
+
+    ratelimit: `//! Token bucket rate limiter with per-key limits.
+
+use dashmap::DashMap;
+use std::time::{Duration, Instant};
+
+pub struct RateLimitConfig {
+    pub capacity: u32,
+    pub refill_rate: u32,  // tokens per second
+    pub refill_interval: Duration,
+}
+
+struct TokenBucket {
+    tokens: f64,
+    last_refill: Instant,
+    config: RateLimitConfig,
+}
+
+impl TokenBucket {
+    fn new(config: RateLimitConfig) -> Self {
+        Self {
+            tokens: config.capacity as f64,
+            last_refill: Instant::now(),
+            config,
+        }
+    }
+
+    fn refill(&mut self) {
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_refill);
+        let refill = elapsed.as_secs_f64() * self.config.refill_rate as f64;
+        self.tokens = (self.tokens + refill).min(self.config.capacity as f64);
+        self.last_refill = now;
+    }
+
+    fn try_consume(&mut self) -> bool {
+        self.refill();
+        if self.tokens >= 1.0 {
+            self.tokens -= 1.0;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn time_until_refill(&self) -> Duration {
+        let needed = 1.0 - self.tokens;
+        if needed <= 0.0 {
+            return Duration::ZERO;
+        }
+        Duration::from_secs_f64(needed / self.config.refill_rate as f64)
+    }
+}
+
+pub struct RateLimiter {
+    limits: DashMap<String, TokenBucket>,
+    config: RateLimitConfig,
+}
+
+#[derive(Debug)]
+pub struct RateLimitError {
+    pub retry_after: Duration,
+}
+
+impl RateLimiter {
+    pub fn new(config: RateLimitConfig) -> Self {
+        Self {
+            limits: DashMap::new(),
+            config,
+        }
+    }
+
+    pub fn check(&self, key: &str) -> Result<(), RateLimitError> {
+        let mut bucket = self.limits
+            .entry(key.to_string())
+            .or_insert_with(|| TokenBucket::new(self.config.clone()));
+
+        if bucket.try_consume() {
+            Ok(())
+        } else {
+            Err(RateLimitError {
+                retry_after: bucket.time_until_refill(),
+            })
+        }
+    }
+}
+
+// Axum middleware
+pub async fn rate_limit_middleware<B>(
+    State(limiter): State<Arc<RateLimiter>>,
+    req: Request<B>,
+    next: Next<B>,
+) -> Result<Response, (StatusCode, HeaderMap)> {
+    let key = extract_rate_limit_key(&req);
+
+    match limiter.check(&key) {
+        Ok(()) => Ok(next.run(req).await),
+        Err(e) => {
+            let mut headers = HeaderMap::new();
+            headers.insert("Retry-After", e.retry_after.as_secs().into());
+            Err((StatusCode::TOO_MANY_REQUESTS, headers))
+        }
+    }
+}`,
+
+    crud: `//! Complete CRUD for products with pagination, filtering, tests.
+
+use axum::{extract::{Path, Query, State}, http::StatusCode, Json};
+use sqlx::FromRow;
+use uuid::Uuid;
+
+#[derive(FromRow, Serialize)]
+pub struct Product {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub price_cents: i64,
+    pub stock: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateProduct {
+    pub name: String,
+    pub description: Option<String>,
+    pub price_cents: i64,
+    pub stock: Option<i32>,
+}
+
+#[derive(Deserialize)]
+pub struct ListParams {
+    pub page: Option<i64>,
+    pub per_page: Option<i64>,
+    pub filter: Option<String>,
+    pub sort: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct PaginatedResponse<T> {
+    pub items: Vec<T>,
+    pub page: i64,
+    pub per_page: i64,
+    pub total: i64,
+    pub total_pages: i64,
+}
+
+// Handlers
+pub async fn list_products(
+    State(state): State<AppState>,
+    Query(params): Query<ListParams>,
+) -> Result<Json<PaginatedResponse<Product>>, ApiError> {
+    let page = params.page.unwrap_or(1).max(1);
+    let per_page = params.per_page.unwrap_or(20).clamp(1, 100);
+    let offset = (page - 1) * per_page;
+
+    let total = sqlx::query_scalar!("SELECT COUNT(*) FROM products")
+        .fetch_one(&state.pool).await?
+        .unwrap_or(0);
+
+    let products = sqlx::query_as!(
+        Product,
+        r#"
+        SELECT id, name, description, price_cents, stock, created_at
+        FROM products
+        WHERE $1::text IS NULL OR name ILIKE '%' || $1 || '%'
+        ORDER BY created_at DESC
+        LIMIT $2 OFFSET $3
+        "#,
+        params.filter,
+        per_page,
+        offset
+    ).fetch_all(&state.pool).await?;
+
+    Ok(Json(PaginatedResponse {
+        items: products,
+        page,
+        per_page,
+        total,
+        total_pages: (total + per_page - 1) / per_page,
+    }))
+}
+
+pub async fn create_product(
+    State(state): State<AppState>,
+    Json(input): Json<CreateProduct>,
+) -> Result<(StatusCode, Json<Product>), ApiError> {
+    let product = sqlx::query_as!(
+        Product,
+        r#"
+        INSERT INTO products (id, name, description, price_cents, stock, created_at)
+        VALUES ($1, $2, $3, $4, $5, now())
+        RETURNING id, name, description, price_cents, stock, created_at
+        "#,
+        Uuid::new_v4(),
+        input.name,
+        input.description,
+        input.price_cents,
+        input.stock.unwrap_or(0)
+    ).fetch_one(&state.pool).await?;
+
+    Ok((StatusCode::CREATED, Json(product)))
+}
+
+// tests/products_test.rs
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_create_product() {
+        let app = test_app().await;
+        let res = app.post("/api/products")
+            .json(&json!({"name": "Widget", "price_cents": 999}))
+            .send().await;
+
+        assert_eq!(res.status(), 201);
+        let product: Product = res.json().await;
+        assert_eq!(product.name, "Widget");
+        assert_eq!(product.price_cents, 999);
+    }
+
+    #[tokio::test]
+    async fn test_list_products_pagination() {
+        let app = test_app().await;
+        // Create 25 products
+        for i in 0..25 {
+            app.post("/api/products")
+                .json(&json!({"name": format!("Product {}", i), "price_cents": 100}))
+                .send().await;
+        }
+
+        let res = app.get("/api/products?page=2&per_page=10").send().await;
+        let data: PaginatedResponse<Product> = res.json().await;
+
+        assert_eq!(data.items.len(), 10);
+        assert_eq!(data.page, 2);
+        assert_eq!(data.total, 25);
+    }
+}`
+  };
+
+  // Prompts for copy functionality
+  const prompts = {
+    stripe: `Create a Stripe webhook handler in Axum. Include:
+- Signature verification using stripe-signature header
+- Idempotency checking (store processed event IDs)
+- Handle: checkout.session.completed (fulfill order), invoice.paid (extend subscription), customer.subscription.deleted (cancel)
+- Proper error handling with tracing
+- Return 200 OK after processing`,
+
+    auth: `Create JWT authentication with refresh tokens in Axum. Include:
+- Login endpoint: verify credentials, create 15-min access token + 7-day refresh token
+- Store refresh tokens in DB with user binding
+- Set refresh token as httpOnly secure cookie
+- Refresh endpoint: validate refresh token, rotate to new tokens
+- Logout: revoke refresh token, clear cookie
+- Use jsonwebtoken crate, argon2 for passwords`,
+
+    websocket: `Create a WebSocket chat server in Axum. Include:
+- Connection handler with user authentication
+- Room-based messaging (join, leave, message commands)
+- Connection state in DashMap<Uuid, Sender>
+- Room membership tracking
+- Broadcast helper that sends to all room members
+- Graceful cleanup on disconnect
+- Use tokio channels for outbound messages`,
+
+    jobs: `Create a Postgres-backed job queue. Include:
+- Job enum with variants: SendEmail, GeneratePdf, ExportData
+- enqueue() and enqueue_at() methods
+- process_next() with row locking (FOR UPDATE SKIP LOCKED)
+- Retry logic with exponential backoff
+- Dead letter handling after max retries
+- Status tracking: pending, processing, completed, failed
+- Store last_error for debugging`,
+
+    ratelimit: `Create a token bucket rate limiter as Axum middleware. Include:
+- TokenBucket struct with capacity, refill rate, last_refill time
+- DashMap for per-key buckets
+- try_consume() that refills and checks
+- time_until_refill() for Retry-After header
+- Middleware that extracts key from request (IP or user ID)
+- Return 429 with Retry-After header when limited`,
+
+    crud: `Create complete CRUD for a Product resource in Axum. Include:
+- Product struct: id, name, description, price_cents, stock, created_at
+- List with pagination (page, per_page params) and ILIKE filtering
+- Create, Read, Update, Delete handlers
+- PaginatedResponse<T> wrapper
+- SQLx queries with query_as!
+- Integration tests using test app helper
+- Test create, list with pagination`
+  };
+
+  // Terminal replay demos
+  const demos = [
+    {
+      title: 'Building Stripe webhooks',
+      lines: [
+        { text: '$ hyle', type: 'prompt' },
+        { text: '> add stripe webhook handler for checkout completed', type: 'input' },
+        { text: '', type: 'blank' },
+        { text: '[reading Cargo.toml...]', type: 'dim' },
+        { text: '[reading src/main.rs...]', type: 'dim' },
+        { text: '[writing src/webhooks/stripe.rs...]', type: 'dim' },
+        { text: '[updating src/main.rs: adding route...]', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: '+ pub async fn handle_webhook(', type: 'green' },
+        { text: '+     State(state): State<AppState>,', type: 'green' },
+        { text: '+     headers: HeaderMap,', type: 'green' },
+        { text: '+ ) -> Result<StatusCode, ApiError>', type: 'green' },
+        { text: '', type: 'blank' },
+        { text: 'Created src/webhooks/stripe.rs (47 lines)', type: 'result' },
+      ]
+    },
+    {
+      title: 'Auth from scratch',
+      lines: [
+        { text: '$ hyle', type: 'prompt' },
+        { text: '> add jwt auth with refresh token rotation', type: 'input' },
+        { text: '', type: 'blank' },
+        { text: '[analyzing existing auth setup...]', type: 'dim' },
+        { text: '[writing src/auth/mod.rs...]', type: 'dim' },
+        { text: '[writing src/auth/jwt.rs...]', type: 'dim' },
+        { text: '[writing src/middleware/auth.rs...]', type: 'dim' },
+        { text: '[adding migration: refresh_tokens table...]', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: '+ login(): verify + issue tokens', type: 'green' },
+        { text: '+ refresh(): rotate tokens', type: 'green' },
+        { text: '+ logout(): revoke + clear cookie', type: 'green' },
+        { text: '', type: 'blank' },
+        { text: 'Created 4 files, 1 migration', type: 'result' },
+      ]
+    },
+    {
+      title: 'Full CRUD in one prompt',
+      lines: [
+        { text: '$ hyle', type: 'prompt' },
+        { text: '> crud for products: name, price, stock with tests', type: 'input' },
+        { text: '', type: 'blank' },
+        { text: '[creating migration: create_products...]', type: 'dim' },
+        { text: '[writing src/models/product.rs...]', type: 'dim' },
+        { text: '[writing src/handlers/products.rs...]', type: 'dim' },
+        { text: '[writing tests/products_test.rs...]', type: 'dim' },
+        { text: '[running migrations...]', type: 'dim' },
+        { text: '', type: 'blank' },
+        { text: '$ cargo test products', type: 'prompt' },
+        { text: 'test test_create_product ... ok', type: 'green' },
+        { text: 'test test_list_pagination ... ok', type: 'green' },
+        { text: 'test test_update_product ... ok', type: 'green' },
+        { text: '', type: 'blank' },
+        { text: 'All tests passing', type: 'result' },
+      ]
+    }
+  ];
+
+  let currentDemo = 0;
+  let currentLine = 0;
+  let isPlaying = false;
+  let interval = null;
+
+  function renderLine(line) {
+    const div = document.createElement('div');
+    div.className = 'replay-line';
+    switch(line.type) {
+      case 'prompt':
+        div.innerHTML = `<span class="prompt">${line.text}</span>`;
+        break;
+      case 'input':
+        div.textContent = line.text;
+        break;
+      case 'dim':
+        div.innerHTML = `<span class="dim">${line.text}</span>`;
+        break;
+      case 'green':
+        div.innerHTML = `<span class="green">${line.text}</span>`;
+        break;
+      case 'result':
+        div.innerHTML = `<strong>${line.text}</strong>`;
+        break;
+      default:
+        div.innerHTML = '&nbsp;';
+    }
+    return div;
+  }
+
+  function playNext() {
+    const demo = demos[currentDemo];
+    const body = document.getElementById('terminalBody');
+    if (currentLine < demo.lines.length) {
+      body.appendChild(renderLine(demo.lines[currentLine]));
+      currentLine++;
+    } else {
+      stopReplay();
+    }
+  }
+
+  function startReplay() {
+    isPlaying = true;
+    document.getElementById('playBtn').textContent = 'pause';
+    document.getElementById('playBtn').classList.add('active');
+    interval = setInterval(playNext, 250);
+  }
+
+  function stopReplay() {
+    isPlaying = false;
+    document.getElementById('playBtn').textContent = 'play';
+    document.getElementById('playBtn').classList.remove('active');
+    if (interval) { clearInterval(interval); interval = null; }
+  }
+
+  function toggleReplay() {
+    if (isPlaying) stopReplay(); else startReplay();
+  }
+
+  function restartReplay() {
+    stopReplay();
+    currentLine = 0;
+    document.getElementById('terminalBody').innerHTML = '';
+    startReplay();
+  }
+
+  function cycleDemo() {
+    stopReplay();
+    currentDemo = (currentDemo + 1) % demos.length;
+    currentLine = 0;
+    document.getElementById('terminalBody').innerHTML = '';
+    startReplay();
+  }
+
+  function toggleCard(el) {
+    document.querySelectorAll('.example-card.open').forEach(e => {
+      if (e !== el) e.classList.remove('open');
+    });
+    el.classList.toggle('open');
+  }
+
+  function showFile(key) {
+    const content = files[key];
+    if (!content) return;
+
+    const lines = content.split('\n');
+    const numbered = lines.map((line, i) =>
+      `<span class="line-num">${String(i + 1).padStart(3)}</span>${escapeHtml(line)}`
+    ).join('\n');
+
+    document.getElementById('modalTitle').textContent = `src/${key}.rs`;
+    document.getElementById('modalBody').innerHTML = `<pre>${numbered}</pre>`;
+    document.getElementById('modal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function copyPrompt(key) {
+    const prompt = prompts[key];
+    if (!prompt) return;
+
+    navigator.clipboard.writeText(prompt).then(() => {
+      event.target.textContent = 'copied!';
+      event.target.classList.add('copied');
+      setTimeout(() => {
+        event.target.textContent = 'copy prompt';
+        event.target.classList.remove('copied');
+      }, 1500);
+    });
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  window.addEventListener('load', () => setTimeout(startReplay, 500));
+</script>
 </body>
 </html>
