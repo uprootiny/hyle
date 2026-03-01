@@ -16,6 +16,8 @@
       --red: #f7768e;
       --surface: #161b22;
       --border: #30363d;
+      --bevel-hi: #2d333b;
+      --bevel-lo: #0a0d12;
       --mono: 'Berkeley Mono', 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -41,11 +43,23 @@
     }
 
     .terminal {
-      background: var(--surface);
+      background: linear-gradient(180deg, #1a2028 0%, #131922 100%);
       border: 1px solid var(--border);
       border-radius: 8px;
       margin: 2rem 0;
       overflow: hidden;
+      box-shadow:
+        inset 1px 1px 0 var(--bevel-hi),
+        inset -1px -1px 0 var(--bevel-lo),
+        0 16px 30px rgba(0, 0, 0, 0.28);
+      position: relative;
+    }
+    .terminal::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 22%);
     }
     .terminal-header {
       background: #21262d;
@@ -155,6 +169,127 @@
       overflow-x: auto;
       white-space: pre;
     }
+
+    /* ── Affordance Cascade ────────────────────────── */
+    .cascade { margin: 2rem 0; }
+    .cascade-level {
+      position: relative;
+      border-left: 2px solid var(--border);
+      margin-left: 1.2rem;
+      padding: 0 0 0.5rem 1.5rem;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .cascade-level.visible { opacity: 1; transform: translateY(0); }
+    .cascade-level:last-child { border-left-color: transparent; }
+    .cascade-level::before {
+      content: attr(data-level);
+      position: absolute;
+      left: -1.1rem;
+      top: 0;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      color: var(--dim);
+      font-weight: 600;
+      z-index: 1;
+      transition: all 0.3s;
+    }
+    .cascade-level.active::before {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: #161b22;
+      box-shadow: 0 0 12px rgba(122, 162, 247, 0.3);
+    }
+    .cascade-level.active { border-left-color: var(--accent); }
+    .cascade-head {
+      cursor: pointer;
+      padding: 0.6rem 0.9rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .cascade-head:hover { border-color: var(--dim); background: #1c2128; }
+    .cascade-level.active .cascade-head { border-color: var(--accent); }
+    .cascade-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .cascade-info { flex: 1; min-width: 0; }
+    .cascade-title {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--fg);
+      margin-bottom: 0.15rem;
+    }
+    .cascade-sub { font-size: 0.78rem; color: var(--dim); }
+    .cascade-tag {
+      font-size: 0.65rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+    .cascade-tag.ready { color: var(--green); border-color: rgba(158, 206, 106, 0.3); }
+    .cascade-tag.wip { color: var(--yellow); border-color: rgba(224, 175, 104, 0.3); }
+    .cascade-tag.new { color: var(--accent); border-color: rgba(122, 162, 247, 0.3); }
+    .cascade-chevron {
+      color: var(--dim);
+      font-size: 0.75rem;
+      transition: transform 0.3s;
+      flex-shrink: 0;
+    }
+    .cascade-level.active .cascade-chevron { transform: rotate(90deg); }
+    .cascade-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease, margin-top 0.3s ease;
+    }
+    .cascade-level.active .cascade-body {
+      max-height: 400px;
+      margin-top: 0.6rem;
+    }
+    .cascade-content {
+      padding: 0.75rem;
+      background: linear-gradient(180deg, #121820, #0f141b);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.8rem;
+    }
+    .cascade-content p { color: var(--dim); line-height: 1.7; margin-bottom: 0.6rem; }
+    .cascade-content pre {
+      background: var(--bg);
+      padding: 0.6rem 0.75rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      white-space: pre;
+      font-size: 0.78rem;
+      line-height: 1.5;
+    }
+    .cascade-flow {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+    .cascade-flow-step {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.55rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--dim);
+    }
+    .cascade-flow-arrow { color: var(--accent); font-size: 0.7rem; align-self: center; }
 
     .examples-grid {
       display: grid;
@@ -272,34 +407,15 @@
     .switcher-item:hover { background: #21262d; color: var(--fg); text-decoration: none; }
     .switcher-item.active { color: var(--accent); background: #21262d; }
 
-    .modal-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.8); display: none;
-      align-items: center; justify-content: center; z-index: 2000;
-    }
-    .modal-overlay.open { display: flex; }
-    .modal-content {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 8px; max-width: 700px; width: 90%; max-height: 80vh; overflow: hidden;
-    }
-    .modal-header {
-      padding: 1rem; background: #21262d;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .modal-title { font-size: 0.9rem; color: var(--yellow); }
-    .modal-close { background: none; border: none; color: var(--dim); font-size: 1.25rem; cursor: pointer; }
-    .modal-close:hover { color: var(--fg); }
-    .modal-body { padding: 1rem; max-height: 60vh; overflow-y: auto; font-size: 0.8rem; }
-    .line-number { color: var(--dim); user-select: none; padding-right: 1rem; }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
       <h1><span>></span> hyle</h1>
-      <p class="tagline">Rust-native autonomous code assistant</p>
+      <p class="tagline">Code assistant in a single Rust binary</p>
       <p class="tagline-detail">
-        A single binary that reads your codebase, understands what you want, and executes file operations and shell commands until the job is done. No JavaScript runtime, no electron wrapper, no daemon. Just <code>cargo install</code> and start building.
+        <code>cargo install</code>, set an OpenRouter key, start working. 7 tools the LLM calls directly (read, write, edit, grep, glob, bash, patch). 30+ slash commands that run locally with zero latency. Multi-model. Session persistence. Event-sourced everything.
       </p>
     </header>
 
@@ -308,113 +424,305 @@
         <span class="terminal-dot dot-red"></span>
         <span class="terminal-dot dot-yellow"></span>
         <span class="terminal-dot dot-green"></span>
-        <span class="terminal-title" id="terminalTitle">~/code/axum-sessions</span>
+        <span class="terminal-title" id="terminalTitle">~/project</span>
       </div>
       <div class="terminal-body" id="terminalBody"></div>
       <div class="terminal-controls">
-        <button class="terminal-btn" id="playBtn" onclick="toggleReplay()">Pause</button>
-        <button class="terminal-btn" onclick="restartReplay()">Restart</button>
         <div class="demo-selector">
-          <div class="demo-dot active" onclick="switchDemo(0)" title="Redis sessions"></div>
-          <div class="demo-dot" onclick="switchDemo(1)" title="N+1 fix"></div>
-          <div class="demo-dot" onclick="switchDemo(2)" title="Test failures"></div>
-          <div class="demo-dot" onclick="switchDemo(3)" title="Async refactor"></div>
+          <div class="demo-dot active" onclick="switchDemo(0)" title="Tool use loop"></div>
+          <div class="demo-dot" onclick="switchDemo(1)" title="Slash commands"></div>
+          <div class="demo-dot" onclick="switchDemo(2)" title="Agentic task"></div>
+          <div class="demo-dot" onclick="switchDemo(3)" title="Self-correction"></div>
         </div>
-        <span class="demo-label" id="demoLabel">Redis session storage</span>
+        <span class="demo-label" id="demoLabel">Tool use loop</span>
+        <button class="terminal-btn" onclick="switchDemo(currentDemo)" style="margin-left:auto">Replay</button>
       </div>
     </div>
 
     <div class="section-header">
-      <h2>Core capabilities</h2>
-      <p>What makes hyle different from chat-based assistants</p>
+      <h2>Affordance cascade</h2>
+      <p>Each layer builds on the previous. Click to expand.</p>
+    </div>
+
+    <div class="cascade" id="affordanceCascade">
+      <div class="cascade-level" data-level="0">
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+          <span class="cascade-icon">$</span>
+          <div class="cascade-info">
+            <div class="cascade-title">Install</div>
+            <div class="cascade-sub">Single binary, no runtime dependencies</div>
+          </div>
+          <span class="cascade-tag ready">ready</span>
+          <span class="cascade-chevron">&#x25B6;</span>
+        </div>
+        <div class="cascade-body">
+          <div class="cascade-content">
+            <pre><span style="color:var(--green)">$</span> cargo install --git https://github.com/uprootiny/hyle
+<span style="color:var(--green)">$</span> hyle doctor
+<span style="color:var(--green)">&#x2713;</span> API key configured
+<span style="color:var(--green)">&#x2713;</span> OpenRouter reachable
+<span style="color:var(--green)">&#x2713;</span> State directory ready</pre>
+            <div class="cascade-flow">
+              <span class="cascade-flow-step">cargo install</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">hyle doctor</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cascade-level" data-level="1">
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+          <span class="cascade-icon">></span>
+          <div class="cascade-info">
+            <div class="cascade-title">Chat</div>
+            <div class="cascade-sub">Streaming responses, multi-model, session persistence</div>
+          </div>
+          <span class="cascade-tag ready">ready</span>
+          <span class="cascade-chevron">&#x25B6;</span>
+        </div>
+        <div class="cascade-body">
+          <div class="cascade-content">
+            <p>Type a prompt, get a streaming response. Switch models with <code>/model</code>. Resume sessions across restarts. 35+ free models via OpenRouter.</p>
+            <pre><span style="color:var(--green)">></span> explain the borrow checker error on line 47
+<span style="color:var(--dim)">The value `connection` is moved into the async block...</span>
+
+<span style="color:var(--green)">></span> /model deepseek/deepseek-chat-v3-0324:free
+<span style="color:var(--yellow)">Switched to deepseek-chat-v3 (free)</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="cascade-level" data-level="2">
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+          <span class="cascade-icon">&#x2692;</span>
+          <div class="cascade-info">
+            <div class="cascade-title">Tool use</div>
+            <div class="cascade-sub">read, write, edit, bash, grep &mdash; executed directly</div>
+          </div>
+          <span class="cascade-tag ready">ready</span>
+          <span class="cascade-chevron">&#x25B6;</span>
+        </div>
+        <div class="cascade-body">
+          <div class="cascade-content">
+            <p>The LLM emits tool calls, hyle executes them. Atomic writes with backup rotation. Recursive grep. Search-and-replace edits. Compilation verification before commit.</p>
+            <pre><span style="color:var(--accent)">[read]</span>  src/routes/upload.rs (247 lines)
+<span style="color:var(--accent)">[grep]</span>  "rate_limit" in src/ (3 matches)
+<span style="color:var(--accent)">[edit]</span>  src/routes/upload.rs: +4 -1 lines
+<span style="color:var(--accent)">[bash]</span>  cargo check
+<span style="color:var(--green)">&#x2713;</span> compiles</pre>
+            <div class="cascade-flow">
+              <span class="cascade-flow-step">read</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">grep</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">edit</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">bash</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">verify</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cascade-level" data-level="3">
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+          <span class="cascade-icon">&#x21BB;</span>
+          <div class="cascade-info">
+            <div class="cascade-title">Agentic loop</div>
+            <div class="cascade-sub">Plan, execute, verify, iterate until done</div>
+          </div>
+          <span class="cascade-tag wip">experimental</span>
+          <span class="cascade-chevron">&#x25B6;</span>
+        </div>
+        <div class="cascade-body">
+          <div class="cascade-content">
+            <p>Multi-step autonomous execution with bounded context window (16-message cap with summarization). Intent detection prevents narration without action. Permission system gates destructive operations.</p>
+            <pre><span style="color:var(--green)">$</span> hyle --task "add JWT auth to all routes"
+<span style="color:var(--dim)">iteration 1:</span> <span style="color:var(--accent)">[read]</span> src/routes/*.rs
+<span style="color:var(--dim)">iteration 2:</span> <span style="color:var(--accent)">[write]</span> src/middleware/auth.rs
+<span style="color:var(--dim)">iteration 3:</span> <span style="color:var(--accent)">[edit]</span> src/routes/mod.rs
+<span style="color:var(--dim)">iteration 4:</span> <span style="color:var(--accent)">[bash]</span> cargo test
+<span style="color:var(--green)">&#x2713;</span> 47 tests passed (4 iterations, 12.3s)</pre>
+            <div class="cascade-flow">
+              <span class="cascade-flow-step">plan</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">execute</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">verify</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">iterate</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">done</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cascade-level" data-level="4">
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+          <span class="cascade-icon">&#x25C9;</span>
+          <div class="cascade-info">
+            <div class="cascade-title">Observability</div>
+            <div class="cascade-sub">JSONL event logs, UX metrics, token tracking, cost telemetry</div>
+          </div>
+          <span class="cascade-tag new">new</span>
+          <span class="cascade-chevron">&#x25B6;</span>
+        </div>
+        <div class="cascade-body">
+          <div class="cascade-content">
+            <p>Every agent run emits structured events to JSONL. UX metrics track responsiveness (time-to-first-token), smoothness (token rate variance), and autonomy (tasks completed vs stuck). Token usage and cost tracked per session.</p>
+            <pre><span style="color:var(--green)">></span> /cost
+<span style="color:var(--yellow)">Session:</span> a3f7c2d
+  Tokens in:  47,832  ($0.024)
+  Tokens out: 12,441  ($0.037)
+  UX score:   78/100
+
+<span style="color:var(--green)">$</span> cat ~/.local/share/hyle/run_a3f7c2d.jsonl
+<span style="color:var(--dim)">{"event":"tool_call","tool":"read","args":{"path":"src/lib.rs"}...}</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="cascade-level" data-level="5">
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+          <span class="cascade-icon">&#x2638;</span>
+          <div class="cascade-info">
+            <div class="cascade-title">Self-correction</div>
+            <div class="cascade-sub">Smoke tests, recentering prompts, homeostasis interrupts</div>
+          </div>
+          <span class="cascade-tag new">new</span>
+          <span class="cascade-chevron">&#x25B6;</span>
+        </div>
+        <div class="cascade-body">
+          <div class="cascade-content">
+            <p>13-tier recentering prompt system detects when the agent drifts (over-architecting, hallucinating APIs, ignoring tests) and injects corrective nudges. From gentle taps to hard resets. Automatic symptom-to-prompt classifier.</p>
+            <pre><span style="color:var(--green)">$</span> hyle smoke
+<span style="color:var(--green)">&#x2713;</span> recenter-list   4 prompts loaded
+<span style="color:var(--green)">&#x2713;</span> recenter-all    all prompts parseable
+<span style="color:var(--green)">&#x2713;</span> recenter-auto   classifier selects tier 3
+
+<span style="color:var(--green)">></span> /recenter auto
+<span style="color:var(--yellow)">[tier 3: Test-First Nudge]</span>
+<span style="color:var(--dim)">Before changing more code, run the existing tests...</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="cascade-level" data-level="6">
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+          <span class="cascade-icon">&#x2637;</span>
+          <div class="cascade-info">
+            <div class="cascade-title">Orchestration</div>
+            <div class="cascade-sub">Scenarios, timed prompt injection, multi-phase workflows</div>
+          </div>
+          <span class="cascade-tag wip">experimental</span>
+          <span class="cascade-chevron">&#x25B6;</span>
+        </div>
+        <div class="cascade-body">
+          <div class="cascade-content">
+            <p>Define scenario files with phased prompt injection. Triggers fire on iteration count, elapsed time, output patterns, or task completion. The scenario runner nudges the agent through multi-phase workflows without manual intervention.</p>
+            <pre><span style="color:var(--dim)">// scenario.json</span>
+{ "phases": [
+  { "trigger": "Immediate",
+    "prompt": "Read the codebase structure first" },
+  { "trigger": { "AfterIterations": 3 },
+    "prompt": "Now run the test suite" },
+  { "trigger": { "OnPattern": "test.*fail" },
+    "prompt": "Fix failing tests before proceeding" }
+]}</pre>
+            <div class="cascade-flow">
+              <span class="cascade-flow-step">scenario.json</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">phase triggers</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">prompt injection</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">agent adapts</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <h2>What actually works</h2>
+      <p>Honest inventory. Green = solid. Yellow = works but has rough edges.</p>
     </div>
 
     <div class="features">
       <div class="feature" onclick="toggleFeature(this)">
-        <h3>Agentic execution loop</h3>
-        <p>Unlike chat interfaces that show you code to copy-paste, hyle executes tools directly. It reads files, writes changes, runs your build, checks the output, and iterates until the task is complete.</p>
+        <h3><span style="color:var(--green)">&#x25CF;</span> 7 tools, executed directly</h3>
+        <p>read, write, edit, grep, glob, bash, patch. The LLM emits tool calls, hyle runs them. Atomic writes with backup rotation. Recursive grep. Compilation verification.</p>
         <div class="feature-detail">
-          <div class="feature-code"><span style="color:var(--green)">></span> add rate limiting to the /api/upload endpoint
-
-<span style="color:var(--accent)">[read]</span> src/routes/upload.rs (247 lines)
-<span style="color:var(--accent)">[read]</span> src/middleware/mod.rs (89 lines)
-<span style="color:var(--accent)">[write]</span> src/middleware/rate_limit.rs (63 lines)
-<span style="color:var(--accent)">[patch]</span> src/routes/upload.rs (+4 -1 lines)
-<span style="color:var(--accent)">[bash]</span> cargo check
-<span style="color:var(--green)">Done.</span> Token bucket at 100 req/min</div>
+          <div class="feature-code"><span style="color:var(--accent)">[read]</span>  src/lib.rs (312 lines)
+<span style="color:var(--accent)">[grep]</span>  "parse_token" in src/ (7 matches)
+<span style="color:var(--accent)">[edit]</span>  src/lib.rs: replace line 47
+<span style="color:var(--accent)">[bash]</span>  cargo check
+<span style="color:var(--green)">&#x2713;</span> compiles, backup at .bak.1</div>
         </div>
       </div>
 
       <div class="feature" onclick="toggleFeature(this)">
-        <h3>35+ free models via OpenRouter</h3>
-        <p>Access DeepSeek-V3, Qwen 32B, Mistral, Llama at zero cost. Or use Claude, GPT-4 when you need maximum capability. Switch models mid-session with <code>/model</code>.</p>
-        <div class="feature-detail">
-          <div class="feature-code"><span style="color:var(--green)">$</span> hyle --free
-<span style="color:var(--dim)">[Using deepseek/deepseek-chat-v3-0324:free]</span>
-
-<span style="color:var(--green)">></span> /models --free
-<span style="color:var(--yellow)">Free models:</span>
-  deepseek/deepseek-chat-v3-0324:free
-  qwen/qwen-2.5-coder-32b-instruct:free
-  meta-llama/llama-3.3-70b-instruct:free</div>
-        </div>
-      </div>
-
-      <div class="feature" onclick="toggleFeature(this)">
-        <h3>Session persistence</h3>
-        <p>Close your terminal, reboot, come back next week. Your conversation history, tool results, and context are preserved. Just run <code>hyle</code> again to continue.</p>
-        <div class="feature-detail">
-          <div class="feature-code"><span style="color:var(--green)">$</span> hyle
-<span style="color:var(--dim)">[Resumed session a3f7c2d from 3 days ago]</span>
-<span style="color:var(--dim)">[Context: OAuth2 flow for stripe-webhooks]</span>
-
-<span style="color:var(--green)">></span> where were we?
-
-We created <span style="color:var(--yellow)">src/auth/oauth.rs</span> with the
-provider config. Next: callback handler...</div>
-        </div>
-      </div>
-
-      <div class="feature" onclick="toggleFeature(this)">
-        <h3>Guardrails and safety</h3>
-        <p>Dangerous commands like <code>rm -rf</code> are blocked before execution. File writes are atomic with automatic backups. Rate limits handled with exponential backoff.</p>
-        <div class="feature-detail">
-          <div class="feature-code"><span style="color:var(--green)">></span> clean up the build artifacts
-<span style="color:var(--red)">[BLOCKED]</span> rm -rf / matches dangerous pattern
-<span style="color:var(--dim)">Refusing. Be more specific.</span>
-
-<span style="color:var(--green)">></span> delete the ./target directory
-<span style="color:var(--accent)">[bash]</span> rm -rf ./target
-<span style="color:var(--green)">Removed ./target (1.2 GB freed)</span></div>
-        </div>
-      </div>
-
-      <div class="feature" onclick="toggleFeature(this)">
-        <h3>Instant slash commands</h3>
-        <p>20+ commands that execute locally with zero latency. <code>/build</code> <code>/test</code> <code>/diff</code> <code>/commit</code> - no API calls needed.</p>
+        <h3><span style="color:var(--green)">&#x25CF;</span> 30+ slash commands</h3>
+        <p>Run locally, zero latency, no API call. <code>/build</code> <code>/test</code> <code>/diff</code> <code>/commit</code> <code>/status</code> <code>/cost</code> <code>/grep</code> <code>/doctor</code> <code>/recenter</code> and more.</p>
         <div class="feature-detail">
           <div class="feature-code"><span style="color:var(--green)">></span> /status
 <span style="color:var(--yellow)">Modified:</span> src/lib.rs, src/parser.rs
-<span style="color:var(--yellow)">Staged:</span> tests/integration.rs
-
 <span style="color:var(--green)">></span> /diff src/lib.rs
 <span style="color:var(--red)">-    let result = parse(input)?;</span>
 <span style="color:var(--green)">+    let result = parse(input)
-+        .map_err(|e| anyhow!("Parse: {}", e))?;</span></div>
++        .map_err(|e| anyhow!("Parse: {}", e))?;</span>
+<span style="color:var(--green)">></span> /commit "fix parse error handling"
+<span style="color:var(--green)">&#x2713;</span> [a3f7c2d] fix parse error handling</div>
         </div>
       </div>
 
       <div class="feature" onclick="toggleFeature(this)">
-        <h3>Cost and context telemetry</h3>
-        <p>Always know what you're spending. Token counts, latency traces, and context budget visible in the UI.</p>
+        <h3><span style="color:var(--green)">&#x25CF;</span> Multi-model via OpenRouter</h3>
+        <p>35+ free models. Switch mid-session with <code>/model</code>. DeepSeek, Qwen, Llama, Claude, GPT-4. Fuzzy search picker.</p>
         <div class="feature-detail">
-          <div class="feature-code"><span style="color:var(--green)">></span> /cost
-<span style="color:var(--yellow)">Session: a3f7c2d</span>
-  Tokens in:  47,832  ($0.024)
-  Tokens out: 12,441  ($0.037)
-  Total cost: $0.061
+          <div class="feature-code"><span style="color:var(--green)">$</span> hyle --free
+<span style="color:var(--dim)">[Using deepseek/deepseek-chat-v3-0324:free]</span>
+<span style="color:var(--green)">></span> /model qwen
+<span style="color:var(--yellow)">Switched:</span> qwen/qwen-2.5-coder-32b-instruct:free</div>
+        </div>
+      </div>
 
-<span style="color:var(--yellow)">Context:</span> 62,441 / 128,000 (48.8%)</div>
+      <div class="feature" onclick="toggleFeature(this)">
+        <h3><span style="color:var(--green)">&#x25CF;</span> Safety guardrails</h3>
+        <p>Destructive command blocking. Permission system (deny/ask/auto per tool category). Atomic writes never corrupt files.</p>
+        <div class="feature-detail">
+          <div class="feature-code"><span style="color:var(--red)">[BLOCKED]</span> rm -rf / matches dangerous pattern
+<span style="color:var(--yellow)">[ASK]</span> bash: cargo clean (destructive, confirm?)
+<span style="color:var(--green)">[AUTO]</span> read: src/lib.rs (safe, proceed)</div>
+        </div>
+      </div>
+
+      <div class="feature" onclick="toggleFeature(this)">
+        <h3><span style="color:var(--yellow)">&#x25CF;</span> Agentic loop (experimental)</h3>
+        <p>Multi-step autonomous execution. Context window capped at 16 messages with summarization. Intent detection prevents idle narration. Best on bounded tasks.</p>
+        <div class="feature-detail">
+          <div class="feature-code"><span style="color:var(--green)">$</span> hyle --task "add error handling to parse()"
+<span style="color:var(--dim)">iter 1:</span> [read] src/lib.rs
+<span style="color:var(--dim)">iter 2:</span> [edit] src/lib.rs (+12 -3)
+<span style="color:var(--dim)">iter 3:</span> [bash] cargo test
+<span style="color:var(--green)">&#x2713;</span> 3 iterations, all tests pass</div>
+        </div>
+      </div>
+
+      <div class="feature" onclick="toggleFeature(this)">
+        <h3><span style="color:var(--yellow)">&#x25CF;</span> Self-correction</h3>
+        <p>13-tier recentering prompt system. Detects when the agent drifts and injects corrective nudges. From gentle taps to hard resets. <code>/recenter auto</code>.</p>
+        <div class="feature-detail">
+          <div class="feature-code"><span style="color:var(--green)">$</span> hyle smoke
+<span style="color:var(--green)">&#x2713;</span> recenter-list  4 prompts loaded
+<span style="color:var(--green)">&#x2713;</span> recenter-auto  classifier: tier 3
+<span style="color:var(--green)">></span> /recenter auto
+<span style="color:var(--yellow)">[tier 3: Test-First Nudge]</span></div>
         </div>
       </div>
     </div>
@@ -451,7 +759,7 @@ provider config. Next: callback handler...</div>
  "data":{"object":{"id":"pi_xyz","amount":2000,
  "currency":"usd","customer":"cus_123"}}}
 
-<span style="color:var(--accent)">[write]</span> <span class="file" onclick="showFile(event,'stripe')">src/stripe/types.rs</span> (89 lines)
+<span style="color:var(--accent)">[write]</span> src/stripe/types.rs (89 lines)
 <span style="color:var(--accent)">[bash]</span> cargo check
 <span style="color:var(--green)">Compiles successfully</span>
               </div>
@@ -485,7 +793,7 @@ provider config. Next: callback handler...</div>
 error[E0597]: `connection` does not live long enough
   --> src/ws/handler.rs:47:23
 
-<span style="color:var(--accent)">[read]</span> <span class="file" onclick="showFile(event,'wshandler')">src/ws/handler.rs</span>
+<span style="color:var(--accent)">[read]</span> src/ws/handler.rs
 <span style="color:var(--dim)">The spawn requires 'static. Clone the Arc.</span>
 
 <span style="color:var(--accent)">[patch]</span> src/ws/handler.rs
@@ -519,7 +827,7 @@ error[E0597]: `connection` does not live long enough
               <div class="example-terminal-body">
 <span style="color:var(--green)">></span> write tests for src/parser/inline.rs
 
-<span style="color:var(--accent)">[read]</span> <span class="file" onclick="showFile(event,'parser')">src/parser/inline.rs</span> (312 lines)
+<span style="color:var(--accent)">[read]</span> src/parser/inline.rs (312 lines)
 <span style="color:var(--accent)">[write]</span> tests/parser_inline_tests.rs (247 lines)
 
 <span style="color:var(--dim)">Generated for:</span>
@@ -559,7 +867,7 @@ error[E0597]: `connection` does not live long enough
 <span style="color:var(--green)">></span> add JWT auth to src/routes/*, return 401 for invalid
 
 <span style="color:var(--accent)">[read]</span> src/routes/*.rs (4 files)
-<span style="color:var(--accent)">[write]</span> <span class="file" onclick="showFile(event,'auth')">src/middleware/auth.rs</span> (78 lines)
+<span style="color:var(--accent)">[write]</span> src/middleware/auth.rs (78 lines)
 <span style="color:var(--accent)">[write]</span> src/auth/claims.rs (34 lines)
 <span style="color:var(--accent)">[patch]</span> src/routes/mod.rs (+12 lines)
 <span style="color:var(--accent)">[patch]</span> Cargo.toml (jsonwebtoken = "9")
@@ -599,7 +907,7 @@ error[E0597]: `connection` does not live long enough
 - breadcrumb nav top
 - keyboard nav (j/k, enter to open)
 
-<span style="color:var(--accent)">[write]</span> <span class="file" onclick="showFile(event,'filebrowser')">src/components/file_browser.rs</span>
+<span style="color:var(--accent)">[write]</span> src/components/file_browser.rs
 <span style="color:var(--accent)">[write]</span> src/components/file_browser.css
 
 <span style="color:var(--dim)">Created with:</span>
@@ -647,7 +955,7 @@ async def process_batch(paths):
             except Exception as e:
                 await log.write(f"Failed: {e}\n")
 
-<span style="color:var(--accent)">[write]</span> <span class="file" onclick="showFile(event,'processor')">src/processor.rs</span> (67 lines)
+<span style="color:var(--accent)">[write]</span> src/processor.rs (67 lines)
 <span style="color:var(--accent)">[bash]</span> cargo clippy
 <span style="color:var(--green)">No warnings</span>
               </div>
@@ -686,7 +994,7 @@ async def process_batch(paths):
 - stripe_subscription_id: Option&lt;String&gt;
 
 <span style="color:var(--accent)">[write]</span> migrations/20260110_subscriptions.sql
-<span style="color:var(--accent)">[write]</span> <span class="file" onclick="showFile(event,'subscription')">src/models/subscription.rs</span>
+<span style="color:var(--accent)">[write]</span> src/models/subscription.rs
 <span style="color:var(--accent)">[write]</span> src/handlers/subscriptions.rs
 <span style="color:var(--accent)">[write]</span> tests/subscriptions_test.rs
 
@@ -764,7 +1072,7 @@ async def process_batch(paths):
 panicked at 'called `Option::unwrap()` on `None`',
 src/orderbook/matching.rs:142:35
 
-<span style="color:var(--accent)">[read]</span> <span class="file" onclick="showFile(event,'orderbook')">src/orderbook/matching.rs</span>
+<span style="color:var(--accent)">[read]</span> src/orderbook/matching.rs
 
 <span style="color:var(--dim)">Line 142: let price = self.best_bid.unwrap();</span>
 <span style="color:var(--dim)">Panics when orderbook empty (no bids).</span>
@@ -839,16 +1147,6 @@ src/orderbook/matching.rs:142:35
     <p>MIT License &middot; <a href="https://github.com/uprootiny/hyle">Source</a> &middot; <a href="https://openrouter.ai/keys">Get Free API Key</a></p>
   </footer>
 
-  <div class="modal-overlay" id="fileModal" onclick="closeModal(event)">
-    <div class="modal-content" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <span class="modal-title" id="modalTitle">src/example.rs</span>
-        <button class="modal-close" onclick="closeModal()">&times;</button>
-      </div>
-      <div class="modal-body" id="modalBody"></div>
-    </div>
-  </div>
-
   <div class="variant-switcher">
     <div class="switcher-toggle" onclick="toggleSwitcher()" title="Page variants">~</div>
     <div class="switcher-panel" id="switcherPanel">
@@ -869,286 +1167,63 @@ src/orderbook/matching.rs:142:35
   </div>
 
   <script>
-    const files = {
-      stripe: { title: 'src/stripe/types.rs', content: `use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct StripeEvent {
-    pub id: String,
-    #[serde(rename = "type")]
-    pub event_type: String,
-    pub data: EventData,
-    pub created: i64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct EventData {
-    pub object: PaymentIntent,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct PaymentIntent {
-    pub id: String,
-    pub amount: i64,
-    pub currency: String,
-    pub customer: Option<String>,
-    pub status: PaymentStatus,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PaymentStatus {
-    RequiresPaymentMethod,
-    RequiresConfirmation,
-    Succeeded,
-    Canceled,
-}` },
-      wshandler: { title: 'src/ws/handler.rs', content: `use std::sync::Arc;
-use tokio::sync::RwLock;
-
-pub struct Connection {
-    tx: tokio::sync::mpsc::Sender<Message>,
-}
-
-pub async fn handle_websocket(
-    ws: WebSocket,
-    connection: Arc<Connection>,
-) {
-    let (mut sink, mut stream) = ws.split();
-
-    // Clone Arc for spawned task
-    let conn = Arc::clone(&connection);
-    tokio::spawn(async move {
-        while let Some(msg) = stream.next().await {
-            if let Ok(msg) = msg {
-                conn.tx.send(msg).await.ok();
-            }
-        }
-    });
-}` },
-      parser: { title: 'src/parser/inline.rs', content: `//! Inline parser for markdown emphasis, links, code spans
-
-pub fn parse_emphasis(input: &str) -> IResult<&str, Inline> {
-    alt((parse_strong, parse_regular))(input)
-}
-
-pub fn parse_link(input: &str) -> IResult<&str, Inline> {
-    alt((parse_inline_link, parse_reference_link))(input)
-}
-
-pub fn parse_code_span(input: &str) -> IResult<&str, Inline> {
-    let (input, backticks) = take_while1(|c| c == '\`')(input)?;
-    let (input, content) = take_until(backticks)(input)?;
-    Ok((input, Inline::Code(content.to_string())))
-}` },
-      auth: { title: 'src/middleware/auth.rs', content: `use axum::{extract::State, http::StatusCode, middleware::Next};
-use jsonwebtoken::{decode, DecodingKey, Validation};
-
-pub async fn jwt_auth<B>(
-    State(state): State<AppState>,
-    mut req: Request<B>,
-    next: Next<B>,
-) -> Result<Response, StatusCode> {
-    let token = req.headers()
-        .get("Authorization")
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix("Bearer "))
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    let claims = decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    ).map_err(|_| StatusCode::UNAUTHORIZED)?.claims;
-
-    req.extensions_mut().insert(claims);
-    Ok(next.run(req).await)
-}` },
-      filebrowser: { title: 'src/components/file_browser.rs', content: `use leptos::*;
-
-#[component]
-pub fn FileBrowser() -> impl IntoView {
-    let (tree, set_tree) = create_signal(Vec::<TreeNode>::new());
-    let (selected, set_selected) = create_signal(None::<PathBuf>);
-
-    create_effect(move |_| {
-        let handler = window_event_listener("keydown", move |ev| {
-            match ev.key().as_str() {
-                "j" => move_selection_down(),
-                "k" => move_selection_up(),
-                "Enter" => toggle_or_open(),
-                _ => {}
-            }
-        });
-        on_cleanup(move || drop(handler));
-    });
-
-    view! {
-        <div class="file-browser">
-            <nav class="breadcrumb"><Breadcrumbs path=selected /></nav>
-            <div class="panels">
-                <aside><TreeView nodes=tree on_select=set_selected /></aside>
-                <main><FilePreview path=selected /></main>
-            </div>
-        </div>
-    }
-}` },
-      processor: { title: 'src/processor.rs', content: `use std::collections::HashMap;
-use anyhow::Result;
-use tokio::fs::OpenOptions;
-use tokio::io::AsyncWriteExt;
-
-pub async fn process_batch(
-    paths: &[impl AsRef<Path>],
-) -> Result<HashMap<String, Analysis>> {
-    let mut results = HashMap::new();
-    let mut log = OpenOptions::new()
-        .append(true).create(true)
-        .open("log.txt").await?;
-
-    for path in paths {
-        match process_single(path.as_ref()).await {
-            Ok(analysis) => {
-                let stem = path.as_ref().file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unknown");
-                results.insert(stem.to_string(), analysis);
-            }
-            Err(e) => {
-                log.write_all(format!("Failed {}: {}\\n",
-                    path.as_ref().display(), e).as_bytes()).await?;
-            }
-        }
-    }
-    Ok(results)
-}` },
-      subscription: { title: 'src/models/subscription.rs', content: `use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
-use uuid::Uuid;
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Subscription {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub plan: Plan,
-    pub status: SubscriptionStatus,
-    pub current_period_end: DateTime<Utc>,
-    pub stripe_subscription_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "plan", rename_all = "lowercase")]
-pub enum Plan { Free, Pro, Enterprise }
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "subscription_status", rename_all = "snake_case")]
-pub enum SubscriptionStatus { Active, Cancelled, PastDue }
-
-impl Subscription {
-    pub fn is_active(&self) -> bool {
-        matches!(self.status, SubscriptionStatus::Active)
-            && self.current_period_end > Utc::now()
-    }
-}` },
-      orderbook: { title: 'src/orderbook/matching.rs', content: `use rust_decimal::Decimal;
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum MatchError {
-    #[error("no liquidity available")]
-    NoLiquidity,
-    #[error("insufficient quantity")]
-    InsufficientQuantity,
-}
-
-impl OrderBook {
-    pub fn match_market_buy(&mut self, qty: Decimal) -> Result<Fill, MatchError> {
-        let Some(price) = self.best_ask else {
-            return Err(MatchError::NoLiquidity);
-        };
-
-        let level = self.asks.get_mut(&price)
-            .ok_or(MatchError::NoLiquidity)?;
-
-        if level.quantity < qty {
-            return Err(MatchError::InsufficientQuantity);
-        }
-
-        level.quantity -= qty;
-        if level.quantity.is_zero() {
-            self.asks.remove(&price);
-            self.update_best_ask();
-        }
-
-        Ok(Fill { price, quantity: qty, side: Side::Buy })
-    }
-}` },
-    };
-
-    const prompts = {
-      stripe: `Generate Rust types from this Stripe webhook JSON:\n{"id":"evt_1abc","type":"payment_intent.succeeded","data":{"object":{"id":"pi_xyz","amount":2000,"currency":"usd","customer":"cus_123","status":"succeeded"}}}\n\nUse serde derives, chrono for timestamps, Option<T> for nullable fields.`,
-      lifetime: `Fix this async lifetime error:\nerror[E0597]: \`connection\` does not live long enough\n  --> src/ws/handler.rs:47:23\n   |\n47 |     tokio::spawn(async move {\n   |                       ^^^^^ borrowed value does not live long enough\n\nExplain what's wrong and fix it.`,
-      tests: `Write comprehensive tests for src/parser/inline.rs\n\nCover:\n- All public functions\n- Edge cases (empty input, unicode, malformed)\n- Error paths\n\nRun cargo test after generating.`,
-      jwt: `Add JWT authentication to all routes in src/routes/\n\nRequirements:\n- Use jsonwebtoken crate\n- Create middleware that extracts user from token\n- Return 401 for invalid tokens\n- Include tests for auth success/failure`,
-      leptos: `Create a file browser component in Leptos:\n- Tree view on left (collapsible folders)\n- File preview on right\n- Breadcrumb navigation\n- Keyboard nav: j/k to move, Enter to open`,
-      pyrust: `Port to idiomatic Rust with tokio:\n\nasync def process_batch(paths):\n    async with aiofiles.open("log.txt", "a") as log:\n        for path in paths:\n            try:\n                img = Image.open(path)\n                results[path.stem] = analyze(img)\n            except Exception as e:\n                await log.write(f"Failed: {e}\\n")`,
-      crud: `Create entity: Subscription\n\nFields:\n- id: UUID\n- user_id: UUID (foreign key)\n- plan: enum (free, pro, enterprise)\n- status: enum (active, cancelled, past_due)\n- current_period_end: DateTime\n- stripe_subscription_id: Option<String>\n\nGenerate: migration, model, handlers, tests, OpenAPI.`,
-      split: `src/event_store.rs is 2000+ lines. Split into logical modules.\n\n- Analyze dependency graph\n- Create src/event_store/ directory\n- Fix all imports\n- Verify tests pass`,
-      panic: `Sentry shows this panic, find and fix:\n\nthread 'tokio-runtime-worker' panicked at\n'called \`Option::unwrap()\` on a \`None\` value',\nsrc/orderbook/matching.rs:142:35\n\nAdd a regression test.`,
-      spec: `Implement this spec, run tests after each step:\n\n## Token Bucket Rate Limiter\n- Configurable capacity and refill rate\n- Thread-safe (Arc<RateLimiter>)\n- Returns remaining tokens on check\n- Multiple named buckets\n- Async-compatible`,
-    };
-
+    /* ── Terminal demos: static lines, no API calls ── */
     const demos = [
-      { title: '~/code/axum-sessions', label: 'Redis session storage', lines: [
-        { type: 'cmd', prompt: '$', text: 'hyle' },
-        { type: 'output', text: '[Resumed session from yesterday]' },
-        { type: 'cmd', prompt: '>', text: 'add redis session storage to the auth middleware' },
-        { type: 'info', text: '[read] src/middleware/auth.rs (89 lines)' },
-        { type: 'info', text: '[read] Cargo.toml' },
-        { type: 'warn', text: 'Adding redis and async-session dependencies...' },
-        { type: 'info', text: '[write] src/session/redis_store.rs (67 lines)' },
-        { type: 'info', text: '[patch] src/middleware/auth.rs (+23 -4)' },
-        { type: 'info', text: '[bash] cargo check' },
-        { type: 'success', text: 'Compiles. Sessions now persist in Redis.' },
-      ]},
-      { title: '~/code/graphql-api', label: 'N+1 query fix', lines: [
-        { type: 'cmd', prompt: '$', text: 'hyle --model claude-3-opus' },
-        { type: 'cmd', prompt: '>', text: 'the users resolver is N+1ing, add dataloader' },
-        { type: 'info', text: '[read] src/graphql/query.rs' },
-        { type: 'info', text: '[read] src/graphql/types/user.rs' },
-        { type: 'output', text: 'Found 3 places loading users in loops.' },
-        { type: 'info', text: '[write] src/graphql/loaders/user_loader.rs' },
-        { type: 'info', text: '[patch] src/graphql/query.rs' },
-        { type: 'info', text: '[bash] cargo test graphql' },
-        { type: 'success', text: '14 tests pass. Queries now batch lookups.' },
-      ]},
-      { title: '~/code/cli-toolkit', label: 'Test failures', lines: [
-        { type: 'cmd', prompt: '$', text: 'hyle' },
-        { type: 'cmd', prompt: '>', text: '/test' },
-        { type: 'warn', text: '3 tests failed: test_parse_args, test_config, test_output' },
-        { type: 'cmd', prompt: '>', text: 'fix the failing tests' },
-        { type: 'info', text: '[read] tests/cli_tests.rs, src/args.rs, src/config.rs' },
-        { type: 'output', text: 'Issues: 1. arg name changed 2. XDG paths 3. JSON format' },
-        { type: 'info', text: '[patch] tests/cli_tests.rs' },
+      { title: '~/project', label: 'Tool use loop', lines: [
+        { type: 'cmd', prompt: '>', text: 'fix the unwrap on line 47 of src/lib.rs' },
+        { type: 'info', text: '[read] src/lib.rs (312 lines)' },
+        { type: 'output', text: 'Line 47: let val = map.get(&key).unwrap();' },
+        { type: 'output', text: 'This panics when key is missing. Replacing with match.' },
+        { type: 'info', text: '[edit] src/lib.rs: replace line 47' },
+        { type: 'output', text: '-    let val = map.get(&key).unwrap();' },
+        { type: 'success', text: '+    let Some(val) = map.get(&key) else {' },
+        { type: 'success', text: '+        return Err(anyhow!("key not found: {}", key));' },
+        { type: 'success', text: '+    };' },
         { type: 'info', text: '[bash] cargo test' },
-        { type: 'success', text: 'All 47 tests pass.' },
+        { type: 'success', text: '\u2713 23 tests passed. Backup at src/lib.rs.bak.1' },
       ]},
-      { title: '~/code/event-processor', label: 'Async refactor', lines: [
-        { type: 'cmd', prompt: '$', text: 'hyle --free' },
-        { type: 'output', text: '[Using qwen/qwen-2.5-coder-32b-instruct:free]' },
-        { type: 'cmd', prompt: '>', text: 'convert src/processor.rs from sync to async tokio' },
-        { type: 'info', text: '[read] src/processor.rs (234 lines)' },
-        { type: 'output', text: 'Found: std::fs, std::thread::sleep, blocking HTTP' },
-        { type: 'info', text: '[patch] src/processor.rs (+45 -38)' },
-        { type: 'info', text: '[patch] Cargo.toml (tokio features)' },
-        { type: 'info', text: '[bash] cargo clippy' },
-        { type: 'success', text: 'Converted. No blocking calls remain.' },
+      { title: '~/project', label: 'Slash commands', lines: [
+        { type: 'cmd', prompt: '>', text: '/status' },
+        { type: 'warn', text: 'Modified: src/lib.rs, src/parser.rs' },
+        { type: 'output', text: 'Staged:   tests/integration.rs' },
+        { type: 'cmd', prompt: '>', text: '/diff src/lib.rs' },
+        { type: 'output', text: '-    let result = parse(input)?;' },
+        { type: 'success', text: '+    let result = parse(input)' },
+        { type: 'success', text: '+        .map_err(|e| anyhow!("Parse: {}", e))?;' },
+        { type: 'cmd', prompt: '>', text: '/cost' },
+        { type: 'output', text: 'Tokens in: 12,441  Tokens out: 3,892' },
+        { type: 'output', text: 'Total cost: $0.019  Context: 48.8%' },
+        { type: 'cmd', prompt: '>', text: '/commit "fix parse error handling"' },
+        { type: 'success', text: '\u2713 [a3f7c2d] fix parse error handling' },
+      ]},
+      { title: '~/project', label: 'Agentic task', lines: [
+        { type: 'cmd', prompt: '$', text: 'hyle --task "add rate limiting to /api/upload"' },
+        { type: 'output', text: 'iter 1:' },
+        { type: 'info', text: '  [read] src/routes/upload.rs (247 lines)' },
+        { type: 'info', text: '  [grep] "rate" in src/ (3 matches)' },
+        { type: 'output', text: 'iter 2:' },
+        { type: 'info', text: '  [write] src/middleware/rate_limit.rs (63 lines)' },
+        { type: 'info', text: '  [edit] src/routes/upload.rs (+4 -1)' },
+        { type: 'output', text: 'iter 3:' },
+        { type: 'info', text: '  [bash] cargo check' },
+        { type: 'success', text: '\u2713 Done. 3 iterations, 8.2s, 4,120 tokens' },
+      ]},
+      { title: '~/project', label: 'Self-correction', lines: [
+        { type: 'cmd', prompt: '$', text: 'hyle smoke' },
+        { type: 'success', text: '\u2713 recenter-list   4 prompts loaded' },
+        { type: 'success', text: '\u2713 recenter-all    all parseable' },
+        { type: 'success', text: '\u2713 recenter-auto   classifier selects tier 3' },
+        { type: 'cmd', prompt: '>', text: '/recenter auto' },
+        { type: 'warn', text: '[tier 3: Test-First Nudge]' },
+        { type: 'output', text: 'Before changing more code, run the existing' },
+        { type: 'output', text: 'tests. If any fail, fix those first.' },
+        { type: 'cmd', prompt: '>', text: '/doctor' },
+        { type: 'success', text: '\u2713 API key  \u2713 Connectivity  \u2713 State dir' },
       ]},
     ];
 
-    let currentDemo = 0, currentLine = 0, isPlaying = true, interval = null;
+    let currentDemo = 0;
+    let demoBusy = false;
 
     function renderLine(l) {
       const d = document.createElement('div');
@@ -1162,43 +1237,23 @@ impl OrderBook {
       return d;
     }
 
-    function playNext() {
-      const demo = demos[currentDemo], body = document.getElementById('terminalBody');
-      if (currentLine < demo.lines.length) {
-        body.appendChild(renderLine(demo.lines[currentLine++]));
-        body.scrollTop = body.scrollHeight;
-      } else stopReplay();
-    }
-
-    function startReplay() {
-      isPlaying = true;
-      document.getElementById('playBtn').textContent = 'Pause';
-      document.getElementById('playBtn').classList.add('active');
-      interval = setInterval(playNext, 450);
-    }
-
-    function stopReplay() {
-      isPlaying = false;
-      document.getElementById('playBtn').textContent = 'Play';
-      document.getElementById('playBtn').classList.remove('active');
-      if (interval) { clearInterval(interval); interval = null; }
-    }
-
-    function toggleReplay() { isPlaying ? stopReplay() : startReplay(); }
-
-    function restartReplay() {
-      stopReplay(); currentLine = 0;
-      document.getElementById('terminalBody').innerHTML = '';
-      startReplay();
-    }
-
-    function switchDemo(i) {
-      stopReplay(); currentDemo = i; currentLine = 0;
-      document.getElementById('terminalBody').innerHTML = '';
-      document.getElementById('terminalTitle').textContent = demos[i].title;
-      document.getElementById('demoLabel').textContent = demos[i].label;
+    async function switchDemo(i) {
+      if (demoBusy) return;
+      demoBusy = true;
+      currentDemo = i;
+      const demo = demos[i];
+      const body = document.getElementById('terminalBody');
+      body.innerHTML = '';
+      document.getElementById('terminalTitle').textContent = demo.title;
+      document.getElementById('demoLabel').textContent = demo.label;
       document.querySelectorAll('.demo-dot').forEach((d, j) => d.classList.toggle('active', i === j));
-      startReplay();
+
+      for (const line of demo.lines) {
+        body.appendChild(renderLine(line));
+        body.scrollTop = body.scrollHeight;
+        await new Promise(r => setTimeout(r, line.type === 'cmd' ? 120 : 55));
+      }
+      demoBusy = false;
     }
 
     function toggleFeature(el) {
@@ -1214,7 +1269,9 @@ impl OrderBook {
 
     function copyPrompt(e, key) {
       e.stopPropagation();
-      navigator.clipboard.writeText(prompts[key]).then(() => {
+      const p = document.querySelector(`[data-prompt="${key}"]`);
+      if (!p) return;
+      navigator.clipboard.writeText(p.textContent).then(() => {
         const btn = e.target;
         btn.textContent = 'copied!';
         btn.classList.add('copied');
@@ -1222,29 +1279,36 @@ impl OrderBook {
       });
     }
 
-    function showFile(e, key) {
-      e.stopPropagation();
-      const f = files[key];
-      if (!f) return;
-      document.getElementById('modalTitle').textContent = f.title;
-      const lines = f.content.split('\n');
-      document.getElementById('modalBody').innerHTML = '<pre>' + lines.map((l, i) =>
-        `<span class="line-number">${String(i + 1).padStart(3)}</span>${l.replace(/</g, '&lt;')}`
-      ).join('\n') + '</pre>';
-      document.getElementById('fileModal').classList.add('open');
-    }
-
-    function closeModal(e) {
-      if (!e || e.target.id === 'fileModal') document.getElementById('fileModal').classList.remove('open');
-    }
-
     function toggleSwitcher() { document.getElementById('switcherPanel').classList.toggle('open'); }
 
     document.addEventListener('click', e => {
       if (!e.target.closest('.variant-switcher')) document.getElementById('switcherPanel').classList.remove('open');
     });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-    window.addEventListener('load', () => setTimeout(startReplay, 500));
+
+    /* ── Affordance Cascade ──────────────────────── */
+    function toggleCascade(level) {
+      const was = level.classList.contains('active');
+      document.querySelectorAll('.cascade-level.active').forEach(l => l.classList.remove('active'));
+      if (!was) level.classList.add('active');
+    }
+
+    function cascadeReveal() {
+      const levels = document.querySelectorAll('.cascade-level');
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) entry.target.classList.add('visible');
+        });
+      }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+      levels.forEach((level, i) => {
+        level.style.transitionDelay = `${i * 0.08}s`;
+        observer.observe(level);
+      });
+    }
+
+    window.addEventListener('load', () => {
+      cascadeReveal();
+      setTimeout(() => switchDemo(0), 200);
+    });
   </script>
 </body>
 </html>
