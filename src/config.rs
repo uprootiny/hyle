@@ -1,8 +1,8 @@
 //! Configuration management with XDG paths
 //!
-//! ~/.config/codish/config.json - API key, preferences (0600)
-//! ~/.cache/codish/models.json  - Cached model list
-//! ~/.local/state/codish/       - Session logs
+//! ~/.config/hyle/config.json - API key, preferences (0600)
+//! ~/.cache/hyle/models.json  - Cached model list
+//! ~/.local/state/hyle/       - Session logs
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -455,7 +455,7 @@ pub fn get_api_key() -> Result<String> {
     // Otherwise, check config
     let cfg = Config::load()?;
     cfg.api_key.context(
-        "No API key configured. Set OPENROUTER_API_KEY or run: codish config set key <your-key>",
+        "No API key configured. Set OPENROUTER_API_KEY or run: hyle config set key <your-key>",
     )
 }
 

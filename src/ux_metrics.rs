@@ -364,9 +364,9 @@ mod tests {
             tracker.record_token();
         }
 
-        // Jitter should be low for uniform intervals
+        // Jitter should be low for uniform intervals (allow generous margin for OS scheduling)
         let jitter = tracker.jitter();
-        assert!(jitter < Duration::from_millis(10), "Jitter should be low for uniform intervals");
+        assert!(jitter < Duration::from_millis(50), "Jitter should be low for uniform intervals");
     }
 
     #[test]

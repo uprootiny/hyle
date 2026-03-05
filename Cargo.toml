@@ -18,6 +18,9 @@ name = "hyle-api"
 path = "src/api/main.rs"
 
 [dependencies]
+# Cognitive core — AtomSpace, PLN, ECAN from coggy
+coggy = { path = "../coggy" }
+
 # Core
 anyhow = "1"
 thiserror = "1"
