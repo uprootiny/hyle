@@ -13,4 +13,5 @@ Cargo.lock
 *.log
 *.tmp
 reports/
+logs/
 target/

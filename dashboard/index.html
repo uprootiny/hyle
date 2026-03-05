@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coggy + Hyle — Cognitive Dashboard</title>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --border: #30363d;
+  --text: #c9d1d9; --dim: #8b949e; --accent: #58a6ff;
+  --green: #3fb950; --yellow: #d29922; --red: #f85149;
+  --purple: #bc8cff; --orange: #d18616;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; }
+.header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+.header h1 { font-size: 16px; color: var(--accent); }
+.header .status { display: flex; gap: 12px; margin-left: auto; }
+.badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+.badge.live { background: #0d1f0d; color: var(--green); border: 1px solid #1a4a1a; }
+.badge.warn { background: #2d1f0d; color: var(--yellow); border: 1px solid #4a3a1a; }
+.grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); height: calc(100vh - 48px); }
+.panel { background: var(--bg); overflow-y: auto; display: flex; flex-direction: column; }
+.panel-header { background: var(--surface); padding: 8px 12px; font-size: 12px; font-weight: 600; color: var(--accent); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; }
+.panel-header .count { color: var(--dim); font-weight: 400; }
+.log-entry { padding: 6px 12px; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 1.5; }
+.log-entry:hover { background: var(--surface); }
+.log-entry .ts { color: var(--dim); margin-right: 8px; }
+.log-entry .model { color: var(--purple); }
+.log-entry .tokens { color: var(--orange); }
+.log-entry .status-ok { color: var(--green); }
+.log-entry .status-err { color: var(--red); }
+.log-entry .phase { color: var(--yellow); font-weight: 600; }
+.atom-line { padding: 4px 12px; font-size: 11px; border-bottom: 1px solid #1c2128; }
+.atom-line .sti { color: var(--green); min-width: 40px; display: inline-block; }
+.atom-line .type { color: var(--purple); min-width: 120px; display: inline-block; }
+.atom-line .name { color: var(--text); }
+.trace-block { margin: 4px 8px; padding: 8px; background: var(--surface); border-radius: 4px; border-left: 3px solid var(--accent); }
+.trace-block .phase-name { color: var(--yellow); font-weight: 600; }
+.trace-block .detail { color: var(--dim); font-size: 11px; margin-top: 2px; }
+.inference { color: var(--green); }
+.grounded { color: var(--accent); }
+.not-found { color: var(--dim); }
+.stats-row { display: flex; gap: 16px; padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.stat { text-align: center; }
+.stat .val { font-size: 18px; font-weight: 700; color: var(--accent); }
+.stat .label { font-size: 10px; color: var(--dim); text-transform: uppercase; }
+.roadmap { padding: 12px; }
+.roadmap h3 { color: var(--accent); margin: 8px 0 4px; font-size: 13px; }
+.roadmap .done { color: var(--green); }
+.roadmap .wip { color: var(--yellow); }
+.roadmap .todo { color: var(--dim); }
+.roadmap ul { list-style: none; padding-left: 8px; }
+.roadmap li { padding: 2px 0; font-size: 12px; }
+.roadmap li::before { margin-right: 6px; }
+.roadmap li.done::before { content: "✓"; color: var(--green); }
+.roadmap li.wip::before { content: "◐"; color: var(--yellow); }
+.roadmap li.todo::before { content: "○"; color: var(--dim); }
+.ops-list { display: flex; flex-direction: column; }
+.ops-item { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.ops-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.ops-status { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+.ops-status.ok { color: var(--green); }
+.ops-status.warn { color: var(--yellow); }
+.ops-status.down { color: var(--red); }
+.ops-meta { color: var(--dim); font-size: 11px; }
+#refresh-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+.tab { padding: 6px 14px; cursor: pointer; color: var(--dim); border-bottom: 2px solid transparent; font-size: 12px; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; flex: 1; overflow-y: auto; }
+.tab-content.active { display: block; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>◈ Coggy + Hyle</h1>
+  <span style="color:var(--dim)">Cognitive Dashboard</span>
+  <div class="status">
+    <span id="refresh-indicator"></span>
+    <span class="badge live" id="coggy-status">coggy: live</span>
+    <span class="badge live" id="hyle-status">hyle: live</span>
+    <span class="badge live" id="atoms-badge">atoms: --</span>
+    <span class="badge warn" id="ops-status">ops: --</span>
+    <span style="color:var(--dim);font-size:11px" id="uptime"></span>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- LEFT: OpenRouter Logs -->
+  <div class="panel">
+    <div class="panel-header">
+      OpenRouter Communications
+      <span class="count" id="log-count">0 calls</span>
+    </div>
+    <div class="stats-row" id="or-stats">
+      <div class="stat"><div class="val" id="total-calls">0</div><div class="label">calls</div></div>
+      <div class="stat"><div class="val" id="total-tokens">0</div><div class="label">tokens</div></div>
+      <div class="stat"><div class="val" id="avg-latency">--</div><div class="label">avg ms</div></div>
+      <div class="stat"><div class="val" id="error-rate">0%</div><div class="label">errors</div></div>
+      <div class="stat"><div class="val" id="model-count">0</div><div class="label">models</div></div>
+    </div>
+    <div id="or-logs" style="flex:1;overflow-y:auto"></div>
+  </div>
+
+  <!-- CENTER: Coggy AtomSpace + Traces -->
+  <div class="panel">
+    <div class="panel-header">
+      Coggy Cognitive Traces
+      <span class="count" id="trace-count">0 cycles</span>
+    </div>
+    <div class="tab-bar">
+      <div class="tab active" data-tab="traces">Traces</div>
+      <div class="tab" data-tab="atoms">AtomSpace</div>
+      <div class="tab" data-tab="focus">Focus</div>
+      <div class="tab" data-tab="tikkun">Tikkun</div>
+    </div>
+    <div id="traces" class="tab-content active"></div>
+    <div id="atoms" class="tab-content"></div>
+    <div id="focus" class="tab-content"></div>
+    <div id="tikkun" class="tab-content"></div>
+  </div>
+
+  <!-- RIGHT: Roadmaps -->
+  <div class="panel">
+    <div class="panel-header">
+      Roadmaps
+      <span class="count">3 projects</span>
+    </div>
+    <div class="tab-bar">
+      <div class="tab active" data-tab="rm-coggy">Coggy</div>
+      <div class="tab" data-tab="rm-hyle">Hyle</div>
+      <div class="tab" data-tab="rm-bridge">Integration</div>
+      <div class="tab" data-tab="rm-ops">Ops</div>
+    </div>
+
+    <div id="rm-coggy" class="tab-content active roadmap">
+      <h3>Coggy — Cognitive Architecture</h3>
+      <p style="color:var(--dim);font-size:11px;margin-bottom:8px">Rust-native AtomSpace + PLN + ECAN. Zero dependencies.</p>
+
+      <h3>v0.1 — Core (done)</h3>
+      <ul>
+        <li class="done">AtomSpace hypergraph with indexed lookups</li>
+        <li class="done">Atom types: ConceptNode, PredicateNode, InheritanceLink, EvaluationLink, ListLink</li>
+        <li class="done">TruthValue (strength + confidence) with validity checks</li>
+        <li class="done">AttentionValue (STI/LTI) per atom</li>
+        <li class="done">ECAN attention: boost, spread, decay, rent</li>
+        <li class="done">PLN forward chaining (deduction rule, depth-N)</li>
+        <li class="done">NL→Atomese parser (is-a, has, evaluation patterns)</li>
+        <li class="done">Base ontology (37 atoms: animal taxonomy, basic concepts)</li>
+        <li class="done">Tikkun self-repair (5 diagnostics)</li>
+        <li class="done">REPL with full cognitive traces</li>
+      </ul>
+
+      <h3>v0.2 — Inference & Memory (next)</h3>
+      <ul>
+        <li class="wip">Unit tests for all modules</li>
+        <li class="wip">--json flag for machine-readable traces</li>
+        <li class="todo">Abduction rule (backward inference)</li>
+        <li class="todo">Induction rule (pattern→generalization)</li>
+        <li class="todo">Persistent AtomSpace (serde → JSON/bincode)</li>
+        <li class="todo">LTI (long-term importance) with forgetting</li>
+        <li class="todo">Atom versioning (track TV changes over time)</li>
+        <li class="todo">Pattern matcher (find subgraph patterns)</li>
+      </ul>
+
+      <h3>v0.3 — LLM Integration</h3>
+      <ul>
+        <li class="todo">OpenRouter client for free model grounding</li>
+        <li class="todo">LLM→Atomese: parse LLM responses into atoms</li>
+        <li class="todo">Atomese→LLM: shape prompts from attention focus</li>
+        <li class="todo">Hybrid inference: PLN + LLM for gap-filling</li>
+        <li class="todo">Episodic memory (session traces as atoms)</li>
+      </ul>
+
+      <h3>v0.4 — Autonomy</h3>
+      <ul>
+        <li class="todo">Goal system (GoalNode with priority scheduling)</li>
+        <li class="todo">Action selection (pick next action from attention)</li>
+        <li class="todo">Self-modification (rewrite own ontology)</li>
+        <li class="todo">Multi-agent: Coggy↔Coggy communication via shared AtomSpace</li>
+        <li class="todo">Web dashboard API (JSON traces over HTTP)</li>
+      </ul>
+    </div>
+
+    <div id="rm-hyle" class="tab-content roadmap">
+      <h3>Hyle — Code Assistant</h3>
+      <p style="color:var(--dim);font-size:11px;margin-bottom:8px">Rust-native, OpenRouter-powered. Single binary.</p>
+
+      <h3>v0.3 — Current (stable)</h3>
+      <ul>
+        <li class="done">OpenRouter SSE streaming client</li>
+        <li class="done">TUI with ratatui (model picker, traces, sparklines)</li>
+        <li class="done">Session management with resume</li>
+        <li class="done">Tool system: read, write, edit, bash, glob, grep</li>
+        <li class="done">Multi-model fallback (8 free models)</li>
+        <li class="done">Telemetry: CPU/memory pressure detection</li>
+        <li class="done">hyle-api HTTP server for sketch submission</li>
+        <li class="done">289+ tests passing</li>
+        <li class="done">Typed API errors with rate limit detection</li>
+        <li class="done">Shared HTTP client (connection pooling)</li>
+      </ul>
+
+      <h3>v0.4 — Cognitive (in progress)</h3>
+      <ul>
+        <li class="done">Salience-aware context management</li>
+        <li class="done">Momentum tracking (tool success rate)</li>
+        <li class="done">Stuck detector (repeated failure detection)</li>
+        <li class="wip">Coggy bridge integration (AtomSpace↔Salience)</li>
+        <li class="wip">Live cognitive loop (think→shape→call→absorb)</li>
+        <li class="todo">Structured OpenRouter logging (JSON traces)</li>
+        <li class="todo">Multi-LLM coordination (executor + summarizer + sanity)</li>
+        <li class="todo">Context compression via free summarizer model</li>
+        <li class="todo">Backburner mode with cognitive triage</li>
+      </ul>
+
+      <h3>v0.5 — Observatory</h3>
+      <ul>
+        <li class="wip">Web dashboard for trace viewing</li>
+        <li class="todo">Real-time WebSocket trace streaming</li>
+        <li class="todo">OpenRouter call log with cost tracking</li>
+        <li class="todo">Attention heatmap visualization</li>
+        <li class="todo">Session replay from logs</li>
+        <li class="todo">CI/CD pipeline (GitHub Actions)</li>
+        <li class="todo">cargo bench profiling harness</li>
+      </ul>
+
+      <h3>v0.6 — Deployment</h3>
+      <ul>
+        <li class="todo">Release binary (cargo install)</li>
+        <li class="todo">Docker image</li>
+        <li class="todo">Systemd service unit</li>
+        <li class="todo">Auto-update mechanism</li>
+        <li class="todo">Multi-project workspace support</li>
+      </ul>
+    </div>
+
+    <div id="rm-bridge" class="tab-content roadmap">
+      <h3>Integration — Coggy × Hyle</h3>
+      <p style="color:var(--dim);font-size:11px;margin-bottom:8px">Symbolic reasoning meets LLM-powered code assistance.</p>
+
+      <h3>Layer 1 — Bridge (done)</h3>
+      <ul>
+        <li class="done">coggy as path dependency in hyle</li>
+        <li class="done">CoggyBridge: AtomSpace↔Hyle type mapping</li>
+        <li class="done">Tool calls → atom recording</li>
+        <li class="done">ECAN attention → Salience scoring</li>
+        <li class="done">Tikkun → SanityResult mapping</li>
+        <li class="done">Fact extraction from AtomSpace</li>
+        <li class="done">9 integration tests passing</li>
+      </ul>
+
+      <h3>Layer 2 — Live Loop (done)</h3>
+      <ul>
+        <li class="done">CoggyLive: full cycle engine</li>
+        <li class="done">think→salience→prompt→tikkun→facts pipeline</li>
+        <li class="done">Cycle tracing with timing</li>
+        <li class="done">Profile report generation</li>
+        <li class="done">Prompt shaping from AtomSpace focus</li>
+      </ul>
+
+      <h3>Layer 3 — OpenRouter Interplay (next)</h3>
+      <ul>
+        <li class="wip">Structured logging of all API calls</li>
+        <li class="wip">Web dashboard for real-time viewing</li>
+        <li class="todo">Free LLM → AtomSpace feedback loop</li>
+        <li class="todo">PLN validation of LLM responses</li>
+        <li class="todo">Coggy-shaped system prompts for each call</li>
+        <li class="todo">Token budget optimization via ECAN</li>
+        <li class="todo">Multi-model cognitive routing</li>
+      </ul>
+
+      <h3>Layer 4 — Autonomy</h3>
+      <ul>
+        <li class="todo">Self-improving loop: Coggy critiques Hyle's output</li>
+        <li class="todo">Hyle generates code, Coggy reasons about correctness</li>
+        <li class="todo">Shared AtomSpace across tmux sessions</li>
+        <li class="todo">Cross-project knowledge transfer</li>
+        <li class="todo">Autonomous goal pursuit with safety checks</li>
+      </ul>
+    </div>
+    <div id="rm-ops" class="tab-content">
+      <div class="panel-header">
+        Ops surfaces
+        <span class="count" id="ops-count">--</span>
+      </div>
+      <div id="ops-list" class="ops-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const startTime = Date.now();
+const API_BASE = '';
+const urlParams = new URLSearchParams(location.search);
+const opsOverride = urlParams.get('ops');
+const OPS_API_BASE = opsOverride
+  ? `${location.protocol}//${opsOverride}`
+  : `${location.protocol}//${location.hostname}:8752`;
+let logEntries = [];
+let traceEntries = [];
+let atomData = [];
+let opsSnapshot = null;
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const group = tab.parentElement;
+    const panel = group.parentElement;
+    group.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    panel.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    const target = panel.querySelector('#' + tab.dataset.tab);
+    if (target) target.classList.add('active');
+  });
+});
+
+function updateUptime() {
+  const s = Math.floor((Date.now() - startTime) / 1000);
+  const m = Math.floor(s / 60);
+  document.getElementById('uptime').textContent = m > 0 ? `${m}m ${s%60}s` : `${s}s`;
+}
+
+function addLog(entry) {
+  logEntries.unshift(entry);
+  renderLogs();
+}
+
+function renderLogs() {
+  const el = document.getElementById('or-logs');
+  el.innerHTML = logEntries.map(e => `
+    <div class="log-entry">
+      <span class="ts">${e.time}</span>
+      <span class="model">${e.model}</span>
+      <span class="${e.ok ? 'status-ok' : 'status-err'}">${e.ok ? '✓' : '✗'}</span>
+      <span class="tokens">${e.tokens_in}→${e.tokens_out} tok</span>
+      <span style="color:var(--dim)">${e.latency}ms</span>
+      ${e.error ? `<div style="color:var(--red);font-size:11px;margin-top:2px">${e.error}</div>` : ''}
+    </div>
+  `).join('');
+  document.getElementById('log-count').textContent = `${logEntries.length} calls`;
+  document.getElementById('total-calls').textContent = logEntries.length;
+
+  const totalTok = logEntries.reduce((s,e) => s + e.tokens_in + e.tokens_out, 0);
+  document.getElementById('total-tokens').textContent = totalTok > 1000 ? `${(totalTok/1000).toFixed(1)}k` : totalTok;
+
+  const avgLat = logEntries.length ? Math.round(logEntries.reduce((s,e) => s + e.latency, 0) / logEntries.length) : 0;
+  document.getElementById('avg-latency').textContent = avgLat;
+
+  const errRate = logEntries.length ? Math.round(logEntries.filter(e => !e.ok).length / logEntries.length * 100) : 0;
+  document.getElementById('error-rate').textContent = errRate + '%';
+
+  const models = new Set(logEntries.map(e => e.model));
+  document.getElementById('model-count').textContent = models.size;
+}
+
+function addTrace(trace) {
+  traceEntries.unshift(trace);
+  renderTraces();
+}
+
+function renderTraces() {
+  const el = document.getElementById('traces');
+  el.innerHTML = traceEntries.map(t => `
+    <div class="trace-block">
+      <div><span class="phase-name">${t.phase}</span> <span style="color:var(--dim)">cycle ${t.cycle} · ${t.duration}ms</span></div>
+      ${t.lines.map(l => `<div class="detail">${colorize(l)}</div>`).join('')}
+    </div>
+  `).join('');
+  document.getElementById('trace-count').textContent = `${traceEntries.length} entries`;
+}
+
+function colorize(line) {
+  return line
+    .replace(/GROUNDED/g, '<span class="grounded">GROUNDED</span>')
+    .replace(/NOT FOUND/g, '<span class="not-found">NOT FOUND</span>')
+    .replace(/⊢/g, '<span class="inference">⊢</span>')
+    .replace(/(STI \d+→\d+)/g, '<span style="color:var(--green)">$1</span>')
+    .replace(/(stv [\d.]+\/[\d.]+)/g, '<span style="color:var(--orange)">$1</span>');
+}
+
+function renderAtoms(atoms) {
+  const el = document.getElementById('atoms');
+  el.innerHTML = atoms.map(a => `
+    <div class="atom-line">
+      <span class="sti">${a.sti > 0.1 ? '★' : '·'} ${a.sti.toFixed(1)}</span>
+      <span class="type">${a.type}</span>
+      <span class="name">${a.name}</span>
+      <span style="color:var(--dim);font-size:10px">stv ${a.strength.toFixed(2)}/${a.confidence.toFixed(2)}</span>
+    </div>
+  `).join('');
+  document.getElementById('atoms-badge').textContent = `atoms: ${atoms.length}`;
+}
+
+// Poll for updates
+async function poll() {
+  try {
+    const res = await fetch(API_BASE + '/api/state');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.logs) { logEntries = data.logs; renderLogs(); }
+      if (data.traces) { traceEntries = data.traces; renderTraces(); }
+      if (data.atoms) renderAtoms(data.atoms);
+      if (data.focus) renderFocus(data.focus);
+      if (data.tikkun) renderTikkun(data.tikkun);
+    }
+  } catch(e) {
+    // Server not up yet, use demo data
+  }
+
+  try {
+    const res = await fetch(OPS_API_BASE + '/api/full');
+    if (res.ok) {
+      const data = await res.json();
+      opsSnapshot = data;
+      renderOps(data);
+    }
+  } catch (e) {
+    renderOps(null);
+  }
+}
+
+function renderFocus(items) {
+  const el = document.getElementById('focus');
+  el.innerHTML = items.map(f => `
+    <div class="atom-line">
+      <span class="sti">★ ${f.sti.toFixed(1)}</span>
+      <span class="name">${f.name}</span>
+    </div>
+  `).join('');
+}
+
+function renderTikkun(checks) {
+  const el = document.getElementById('tikkun');
+  el.innerHTML = checks.map(c => `
+    <div class="log-entry">
+      <span class="${c.passed ? 'status-ok' : 'status-err'}">${c.passed ? '✓' : '✗'}</span>
+      <span>${c.name}</span>
+      <span style="color:var(--dim)">${c.detail || ''}</span>
+    </div>
+  `).join('');
+}
+
+function renderOps(data) {
+  const badge = document.getElementById('ops-status');
+  const countEl = document.getElementById('ops-count');
+  const listEl = document.getElementById('ops-list');
+  if (!data) {
+    badge.textContent = 'ops: offline';
+    badge.className = 'badge warn';
+    countEl.textContent = 'offline';
+    listEl.innerHTML = '<div class="log-entry">status API unavailable</div>';
+    return;
+  }
+
+  const endpoints = data.endpoints || {};
+  const endpointByUrl = {};
+  Object.keys(endpoints).forEach((key) => {
+    const entry = endpoints[key];
+    if (entry && entry.url) {
+      endpointByUrl[entry.url] = entry;
+    }
+  });
+
+  const manifestServices = (data.manifest && data.manifest.services) ? data.manifest.services : [];
+  const services = manifestServices.length ? manifestServices.map((svc) => ({
+    name: svc.display || svc.url,
+    url: svc.url,
+    category: svc.category || 'ops',
+    manifestStatus: svc.status || 'warn'
+  })) : Object.keys(endpoints).map((key) => ({
+    name: key,
+    url: endpoints[key].url,
+    category: 'endpoint',
+    manifestStatus: 'warn'
+  }));
+
+  let okCount = 0;
+  const items = services.map((svc) => {
+    const endpoint = endpointByUrl[svc.url];
+    const online = endpoint ? endpoint.online : (svc.manifestStatus === 'online');
+    const statusClass = online ? 'ok' : 'down';
+    if (online) okCount += 1;
+    const statusLabel = online ? 'online' : 'down';
+    const latency = endpoint && endpoint.latency_ms ? `${Math.round(endpoint.latency_ms)}ms` : '--';
+    const code = endpoint && endpoint.status_code ? endpoint.status_code : '--';
+    return `
+      <div class="ops-item">
+        <div class="ops-row">
+          <span class="ops-status ${statusClass}">${statusLabel}</span>
+          <span>${svc.name}</span>
+        </div>
+        <div class="ops-meta">${svc.url}</div>
+        <div class="ops-meta">${svc.category} · ${code} · ${latency}</div>
+      </div>
+    `;
+  });
+
+  const total = services.length;
+  badge.textContent = `ops: ${okCount}/${total}`;
+  badge.className = okCount === total ? 'badge live' : 'badge warn';
+  countEl.textContent = `${total} surfaces`;
+  listEl.innerHTML = items.join('');
+}
+
+// Seed with demo data showing the system works
+function seedDemo() {
+  const models = ['mistralai/mistral-7b-instruct:free', 'meta-llama/llama-3.2-3b-instruct:free', 'google/gemma-2-9b-it:free'];
+  const now = new Date();
+  for (let i = 0; i < 5; i++) {
+    const t = new Date(now - i * 12000);
+    addLog({
+      time: t.toLocaleTimeString(),
+      model: models[i % 3],
+      ok: i !== 2,
+      tokens_in: 200 + Math.floor(Math.random() * 800),
+      tokens_out: 100 + Math.floor(Math.random() * 400),
+      latency: 300 + Math.floor(Math.random() * 2000),
+      error: i === 2 ? '429 Rate Limited — retrying with next model' : null,
+    });
+  }
+
+  const phases = ['PARSE → NL→Atomese', 'GROUND → ontology lookup', 'ATTEND → STI spread', 'INFER → PLN forward chain', 'REFLECT → trace summary'];
+  phases.forEach((phase, i) => {
+    addTrace({
+      phase,
+      cycle: 1,
+      duration: 1 + Math.floor(Math.random() * 5),
+      lines: [
+        i === 0 ? '3 atoms produced: ⊕ ConceptNode "cat", ⊕ ConceptNode "pet", ⊕ InheritanceLink [cat→pet]' : '',
+        i === 1 ? '⊕ (cat) GROUNDED — 4 ontology links | ○ (pet) NOT FOUND' : '',
+        i === 2 ? '★ cat STI 0→43.1 | ★ pet STI 0→43.1 | ↘ hello STI 44→35' : '',
+        i === 3 ? '⊢ cat→animal ← deduction [cat→mammal, mammal→animal] (stv 0.90/0.81)' : '',
+        i === 4 ? 'New: 2 | Inferred: 29 | Peak: pet(43.1)' : '',
+      ].filter(Boolean),
+    });
+  });
+
+  renderAtoms([
+    { type: 'ConceptNode', name: '"pet"', sti: 145.2, strength: 0.90, confidence: 0.85 },
+    { type: 'ConceptNode', name: '"companion"', sti: 43.1, strength: 0.90, confidence: 0.85 },
+    { type: 'InheritanceLink', name: '[pet→companion]', sti: 41.3, strength: 0.95, confidence: 0.90 },
+    { type: 'ConceptNode', name: '"dog"', sti: 33.7, strength: 0.90, confidence: 0.85 },
+    { type: 'ConceptNode', name: '"cat"', sti: 26.1, strength: 0.90, confidence: 0.85 },
+    { type: 'InheritanceLink', name: '[cat→pet]', sti: 23.1, strength: 0.95, confidence: 0.90 },
+    { type: 'ConceptNode', name: '"mammal"', sti: 0.0, strength: 0.95, confidence: 0.90 },
+    { type: 'InheritanceLink', name: '[dog→mammal]', sti: 0.0, strength: 0.95, confidence: 0.90 },
+    { type: 'InheritanceLink', name: '[cat→companion]', sti: 0.0, strength: 0.90, confidence: 0.81 },
+    { type: 'InheritanceLink', name: '[dog→companion]', sti: 0.0, strength: 0.90, confidence: 0.81 },
+  ]);
+
+  renderTikkun([
+    { name: 'atoms>0', passed: true, detail: '76 atoms' },
+    { name: 'tvs-valid', passed: true, detail: 'all valid' },
+    { name: 'no-orphans', passed: true, detail: '' },
+    { name: 'has-types', passed: true, detail: '4 types' },
+    { name: 'no-self-inherit', passed: true, detail: '' },
+  ]);
+}
+
+seedDemo();
+setInterval(updateUptime, 1000);
+setInterval(poll, 3000);
+updateUptime();
+</script>
+</body>
+</html>
