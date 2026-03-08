@@ -171,125 +171,230 @@
     }
 
     /* ── Affordance Cascade ────────────────────────── */
-    .cascade { margin: 2rem 0; }
+    .cascade {
+      margin: 2rem 0;
+      position: relative;
+      --track-color: var(--border);
+    }
+    .cascade:focus-within { outline: none; }
+    .cascade-track {
+      position: absolute;
+      left: 1.95rem;
+      top: 1rem;
+      bottom: 1rem;
+      width: 2px;
+      background: var(--border);
+      z-index: 0;
+    }
+    .cascade-track-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 0;
+      background: var(--accent);
+      transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 6px rgba(122, 162, 247, 0.4);
+    }
     .cascade-level {
       position: relative;
-      border-left: 2px solid var(--border);
-      margin-left: 1.2rem;
-      padding: 0 0 0.5rem 1.5rem;
+      margin-left: 0;
+      padding: 0 0 0.25rem 3.5rem;
       opacity: 0;
-      transform: translateY(12px);
-      transition: opacity 0.4s ease, transform 0.4s ease;
+      transform: translateY(10px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
     }
     .cascade-level.visible { opacity: 1; transform: translateY(0); }
-    .cascade-level:last-child { border-left-color: transparent; }
-    .cascade-level::before {
-      content: attr(data-level);
+    /* depth encoding: deeper levels get subtly indented */
+    .cascade-level[data-level="0"] { padding-left: 3.5rem; }
+    .cascade-level[data-level="1"] { padding-left: 3.7rem; }
+    .cascade-level[data-level="2"] { padding-left: 3.9rem; }
+    .cascade-level[data-level="3"] { padding-left: 4.1rem; }
+    .cascade-level[data-level="4"] { padding-left: 4.3rem; }
+    .cascade-level[data-level="5"] { padding-left: 4.5rem; }
+    .cascade-level[data-level="6"] { padding-left: 4.7rem; }
+    /* inactive levels recede when a sibling is active */
+    .cascade.has-active .cascade-level:not(.active):not(.focused) .cascade-head {
+      opacity: 0.55;
+    }
+    .cascade-level .cascade-head { transition: all 0.25s ease, opacity 0.35s ease; }
+    /* node marker */
+    .cascade-node {
       position: absolute;
-      left: -1.1rem;
-      top: 0;
-      width: 2rem;
-      height: 2rem;
+      left: 1.2rem;
+      top: 0.45rem;
+      width: 1.5rem;
+      height: 1.5rem;
       border-radius: 50%;
-      background: var(--surface);
+      background: var(--bg);
       border: 2px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       color: var(--dim);
       font-weight: 600;
       z-index: 1;
-      transition: all 0.3s;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
     }
-    .cascade-level.active::before {
+    .cascade-level.focused .cascade-node {
+      border-color: var(--dim);
+      color: var(--fg);
+    }
+    .cascade-level.active .cascade-node {
       border-color: var(--accent);
       color: var(--accent);
-      background: #161b22;
-      box-shadow: 0 0 12px rgba(122, 162, 247, 0.3);
+      background: var(--surface);
+      box-shadow: 0 0 14px rgba(122, 162, 247, 0.35);
+      transform: scale(1.15);
     }
-    .cascade-level.active { border-left-color: var(--accent); }
     .cascade-head {
       cursor: pointer;
-      padding: 0.6rem 0.9rem;
+      padding: 0.55rem 0.85rem;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 6px;
-      transition: all 0.2s;
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.65rem;
+      user-select: none;
     }
     .cascade-head:hover { border-color: var(--dim); background: #1c2128; }
-    .cascade-level.active .cascade-head { border-color: var(--accent); }
-    .cascade-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .cascade-level.focused .cascade-head {
+      border-color: var(--dim);
+      background: #1c2128;
+      box-shadow: 0 0 0 1px rgba(110, 118, 129, 0.2);
+    }
+    .cascade-level.active .cascade-head {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, #161b22 0%, #131922 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(122, 162, 247, 0.08),
+        0 0 0 1px rgba(122, 162, 247, 0.15);
+    }
+    .cascade-icon {
+      font-size: 0.95rem;
+      flex-shrink: 0;
+      width: 1.4rem;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+    .cascade-level.active .cascade-icon { transform: scale(1.1); }
     .cascade-info { flex: 1; min-width: 0; }
     .cascade-title {
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       font-weight: 500;
       color: var(--fg);
-      margin-bottom: 0.15rem;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.1rem;
     }
-    .cascade-sub { font-size: 0.78rem; color: var(--dim); }
+    .cascade-sub {
+      font-size: 0.75rem;
+      color: var(--dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .cascade-tag {
-      font-size: 0.65rem;
-      padding: 0.15rem 0.5rem;
-      border-radius: 999px;
+      font-size: 0.6rem;
+      padding: 0.12rem 0.45rem;
+      border-radius: 3px;
       border: 1px solid var(--border);
       color: var(--dim);
       flex-shrink: 0;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-weight: 600;
     }
-    .cascade-tag.ready { color: var(--green); border-color: rgba(158, 206, 106, 0.3); }
-    .cascade-tag.wip { color: var(--yellow); border-color: rgba(224, 175, 104, 0.3); }
-    .cascade-tag.new { color: var(--accent); border-color: rgba(122, 162, 247, 0.3); }
-    .cascade-chevron {
+    .cascade-tag.ready { color: var(--green); border-color: rgba(158, 206, 106, 0.25); background: rgba(158, 206, 106, 0.05); }
+    .cascade-tag.wip { color: var(--yellow); border-color: rgba(224, 175, 104, 0.25); background: rgba(224, 175, 104, 0.05); }
+    .cascade-tag.new { color: var(--accent); border-color: rgba(122, 162, 247, 0.25); background: rgba(122, 162, 247, 0.05); }
+    .cascade-hint {
+      font-size: 0.65rem;
       color: var(--dim);
-      font-size: 0.75rem;
-      transition: transform 0.3s;
+      opacity: 0;
+      max-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      transition: all 0.3s ease;
       flex-shrink: 0;
     }
-    .cascade-level.active .cascade-chevron { transform: rotate(90deg); }
+    .cascade-level.focused:not(.active) .cascade-hint {
+      opacity: 0.7;
+      max-width: 10rem;
+      margin-left: 0.25rem;
+    }
     .cascade-body {
       max-height: 0;
       overflow: hidden;
-      transition: max-height 0.4s ease, margin-top 0.3s ease;
+      transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                  margin-top 0.3s ease,
+                  opacity 0.3s ease;
+      opacity: 0;
     }
     .cascade-level.active .cascade-body {
-      max-height: 400px;
-      margin-top: 0.6rem;
+      max-height: 420px;
+      margin-top: 0.5rem;
+      opacity: 1;
     }
     .cascade-content {
-      padding: 0.75rem;
+      padding: 0.7rem 0.85rem;
       background: linear-gradient(180deg, #121820, #0f141b);
       border: 1px solid var(--border);
       border-radius: 6px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
     }
-    .cascade-content p { color: var(--dim); line-height: 1.7; margin-bottom: 0.6rem; }
+    .cascade-content p {
+      color: var(--dim);
+      line-height: 1.65;
+      margin-bottom: 0.5rem;
+      max-width: 55ch;
+    }
     .cascade-content pre {
       background: var(--bg);
-      padding: 0.6rem 0.75rem;
+      padding: 0.55rem 0.7rem;
       border-radius: 4px;
       overflow-x: auto;
       white-space: pre;
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       line-height: 1.5;
+      border: 1px solid rgba(48, 54, 61, 0.5);
     }
     .cascade-flow {
       display: flex;
-      gap: 0.35rem;
+      gap: 0.3rem;
       flex-wrap: wrap;
-      margin-top: 0.5rem;
+      margin-top: 0.45rem;
+      align-items: center;
     }
     .cascade-flow-step {
-      font-size: 0.7rem;
-      padding: 0.2rem 0.55rem;
+      font-size: 0.68rem;
+      padding: 0.15rem 0.5rem;
       background: var(--bg);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: 3px;
       color: var(--dim);
     }
-    .cascade-flow-arrow { color: var(--accent); font-size: 0.7rem; align-self: center; }
+    .cascade-flow-arrow { color: var(--accent); font-size: 0.65rem; }
+    .cascade-kbd {
+      position: fixed;
+      bottom: 3.5rem;
+      right: 1rem;
+      font-size: 0.62rem;
+      color: var(--dim);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.3rem 0.5rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 999;
+      pointer-events: none;
+      line-height: 1.5;
+    }
+    .cascade:focus-within ~ .cascade-kbd,
+    .cascade.has-focus .cascade-kbd { opacity: 1; }
 
     .examples-grid {
       display: grid;
@@ -415,7 +520,7 @@
       <h1><span>></span> hyle</h1>
       <p class="tagline">Code assistant in a single Rust binary</p>
       <p class="tagline-detail">
-        <code>cargo install</code>, set an OpenRouter key, start working. 7 tools the LLM calls directly (read, write, edit, grep, glob, bash, patch). 30+ slash commands that run locally with zero latency. Multi-model. Session persistence. Event-sourced everything.
+        <code>cargo install</code>, set an <a href="https://openrouter.ai/keys">OpenRouter</a> key, start working. 7 tools the LLM calls directly (read, write, edit, grep, glob, bash, patch). 30+ slash commands with zero latency. Multi-model. Session persistence. Event-sourced.
       </p>
     </header>
 
@@ -429,10 +534,10 @@
       <div class="terminal-body" id="terminalBody"></div>
       <div class="terminal-controls">
         <div class="demo-selector">
-          <div class="demo-dot active" onclick="switchDemo(0)" title="Tool use loop"></div>
-          <div class="demo-dot" onclick="switchDemo(1)" title="Slash commands"></div>
-          <div class="demo-dot" onclick="switchDemo(2)" title="Agentic task"></div>
-          <div class="demo-dot" onclick="switchDemo(3)" title="Self-correction"></div>
+          <div class="demo-dot active" onclick="switchDemo(0)" title="Tool use loop" role="button" aria-label="Demo: Tool use loop"></div>
+          <div class="demo-dot" onclick="switchDemo(1)" title="Slash commands" role="button" aria-label="Demo: Slash commands"></div>
+          <div class="demo-dot" onclick="switchDemo(2)" title="Agentic task" role="button" aria-label="Demo: Agentic task"></div>
+          <div class="demo-dot" onclick="switchDemo(3)" title="Self-correction" role="button" aria-label="Demo: Self-correction"></div>
         </div>
         <span class="demo-label" id="demoLabel">Tool use loop</span>
         <button class="terminal-btn" onclick="switchDemo(currentDemo)" style="margin-left:auto">Replay</button>
@@ -441,29 +546,35 @@
 
     <div class="section-header">
       <h2>Affordance cascade</h2>
-      <p>Each layer builds on the previous. Click to expand.</p>
+      <p>Each layer builds on the previous. <kbd>j</kbd>/<kbd>k</kbd> to navigate, <kbd>enter</kbd> to expand.</p>
     </div>
 
-    <div class="cascade" id="affordanceCascade">
-      <div class="cascade-level" data-level="0">
-        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+    <div class="cascade" id="affordanceCascade" tabindex="0" role="list" aria-label="Capability layers">
+      <div class="cascade-track" aria-hidden="true"><div class="cascade-track-fill" id="trackFill"></div></div>
+
+      <div class="cascade-level" data-level="0" data-hint="cargo install" role="listitem">
+        <div class="cascade-node" aria-hidden="true">0</div>
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)" aria-expanded="false">
           <span class="cascade-icon">$</span>
           <div class="cascade-info">
             <div class="cascade-title">Install</div>
-            <div class="cascade-sub">Single binary, no runtime dependencies</div>
+            <div class="cascade-sub">Single binary. Bring your OpenRouter key.</div>
           </div>
           <span class="cascade-tag ready">ready</span>
-          <span class="cascade-chevron">&#x25B6;</span>
+          <span class="cascade-hint">cargo install...</span>
         </div>
         <div class="cascade-body">
           <div class="cascade-content">
             <pre><span style="color:var(--green)">$</span> cargo install --git https://github.com/uprootiny/hyle
+<span style="color:var(--green)">$</span> export OPENROUTER_API_KEY=sk-or-...
 <span style="color:var(--green)">$</span> hyle doctor
 <span style="color:var(--green)">&#x2713;</span> API key configured
 <span style="color:var(--green)">&#x2713;</span> OpenRouter reachable
 <span style="color:var(--green)">&#x2713;</span> State directory ready</pre>
             <div class="cascade-flow">
               <span class="cascade-flow-step">cargo install</span>
+              <span class="cascade-flow-arrow">&#x2192;</span>
+              <span class="cascade-flow-step">set API key</span>
               <span class="cascade-flow-arrow">&#x2192;</span>
               <span class="cascade-flow-step">hyle doctor</span>
               <span class="cascade-flow-arrow">&#x2192;</span>
@@ -473,19 +584,20 @@
         </div>
       </div>
 
-      <div class="cascade-level" data-level="1">
-        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+      <div class="cascade-level" data-level="1" data-hint="streaming chat" role="listitem">
+        <div class="cascade-node" aria-hidden="true">1</div>
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)" aria-expanded="false">
           <span class="cascade-icon">></span>
           <div class="cascade-info">
             <div class="cascade-title">Chat</div>
-            <div class="cascade-sub">Streaming responses, multi-model, session persistence</div>
+            <div class="cascade-sub">Streaming responses, 35+ models, session persistence</div>
           </div>
           <span class="cascade-tag ready">ready</span>
-          <span class="cascade-chevron">&#x25B6;</span>
+          <span class="cascade-hint">type a prompt...</span>
         </div>
         <div class="cascade-body">
           <div class="cascade-content">
-            <p>Type a prompt, get a streaming response. Switch models with <code>/model</code>. Resume sessions across restarts. 35+ free models via OpenRouter.</p>
+            <p>Type a prompt, get a streaming response. Switch models with <code>/model</code>. Resume sessions across restarts. Free models via OpenRouter.</p>
             <pre><span style="color:var(--green)">></span> explain the borrow checker error on line 47
 <span style="color:var(--dim)">The value `connection` is moved into the async block...</span>
 
@@ -495,19 +607,20 @@
         </div>
       </div>
 
-      <div class="cascade-level" data-level="2">
-        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+      <div class="cascade-level" data-level="2" data-hint="7 tools" role="listitem">
+        <div class="cascade-node" aria-hidden="true">2</div>
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)" aria-expanded="false">
           <span class="cascade-icon">&#x2692;</span>
           <div class="cascade-info">
             <div class="cascade-title">Tool use</div>
             <div class="cascade-sub">read, write, edit, bash, grep &mdash; executed directly</div>
           </div>
           <span class="cascade-tag ready">ready</span>
-          <span class="cascade-chevron">&#x25B6;</span>
+          <span class="cascade-hint">LLM calls tools...</span>
         </div>
         <div class="cascade-body">
           <div class="cascade-content">
-            <p>The LLM emits tool calls, hyle executes them. Atomic writes with backup rotation. Recursive grep. Search-and-replace edits. Compilation verification before commit.</p>
+            <p>The LLM emits tool calls, hyle executes them. Atomic writes with backup rotation. Recursive grep across directories. Compilation verification.</p>
             <pre><span style="color:var(--accent)">[read]</span>  src/routes/upload.rs (247 lines)
 <span style="color:var(--accent)">[grep]</span>  "rate_limit" in src/ (3 matches)
 <span style="color:var(--accent)">[edit]</span>  src/routes/upload.rs: +4 -1 lines
@@ -528,25 +641,25 @@
         </div>
       </div>
 
-      <div class="cascade-level" data-level="3">
-        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+      <div class="cascade-level" data-level="3" data-hint="multi-step" role="listitem">
+        <div class="cascade-node" aria-hidden="true">3</div>
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)" aria-expanded="false">
           <span class="cascade-icon">&#x21BB;</span>
           <div class="cascade-info">
             <div class="cascade-title">Agentic loop</div>
-            <div class="cascade-sub">Plan, execute, verify, iterate until done</div>
+            <div class="cascade-sub">Plan, execute, verify, iterate &mdash; bounded context</div>
           </div>
           <span class="cascade-tag wip">experimental</span>
-          <span class="cascade-chevron">&#x25B6;</span>
+          <span class="cascade-hint">--task flag...</span>
         </div>
         <div class="cascade-body">
           <div class="cascade-content">
-            <p>Multi-step autonomous execution with bounded context window (16-message cap with summarization). Intent detection prevents narration without action. Permission system gates destructive operations.</p>
-            <pre><span style="color:var(--green)">$</span> hyle --task "add JWT auth to all routes"
-<span style="color:var(--dim)">iteration 1:</span> <span style="color:var(--accent)">[read]</span> src/routes/*.rs
-<span style="color:var(--dim)">iteration 2:</span> <span style="color:var(--accent)">[write]</span> src/middleware/auth.rs
-<span style="color:var(--dim)">iteration 3:</span> <span style="color:var(--accent)">[edit]</span> src/routes/mod.rs
-<span style="color:var(--dim)">iteration 4:</span> <span style="color:var(--accent)">[bash]</span> cargo test
-<span style="color:var(--green)">&#x2713;</span> 47 tests passed (4 iterations, 12.3s)</pre>
+            <p>Multi-step execution with 16-message context cap and summarization. Intent detection prevents idle narration. Works best on bounded tasks; complex runs still need supervision.</p>
+            <pre><span style="color:var(--green)">$</span> hyle --task "add error handling to parse()"
+<span style="color:var(--dim)">iter 1:</span> <span style="color:var(--accent)">[read]</span> src/lib.rs
+<span style="color:var(--dim)">iter 2:</span> <span style="color:var(--accent)">[edit]</span> src/lib.rs (+12 -3)
+<span style="color:var(--dim)">iter 3:</span> <span style="color:var(--accent)">[bash]</span> cargo test
+<span style="color:var(--green)">&#x2713;</span> 3 iterations, all tests pass</pre>
             <div class="cascade-flow">
               <span class="cascade-flow-step">plan</span>
               <span class="cascade-flow-arrow">&#x2192;</span>
@@ -555,77 +668,76 @@
               <span class="cascade-flow-step">verify</span>
               <span class="cascade-flow-arrow">&#x2192;</span>
               <span class="cascade-flow-step">iterate</span>
-              <span class="cascade-flow-arrow">&#x2192;</span>
-              <span class="cascade-flow-step">done</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="cascade-level" data-level="4">
-        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+      <div class="cascade-level" data-level="4" data-hint="JSONL + metrics" role="listitem">
+        <div class="cascade-node" aria-hidden="true">4</div>
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)" aria-expanded="false">
           <span class="cascade-icon">&#x25C9;</span>
           <div class="cascade-info">
             <div class="cascade-title">Observability</div>
-            <div class="cascade-sub">JSONL event logs, UX metrics, token tracking, cost telemetry</div>
+            <div class="cascade-sub">JSONL event logs, UX metrics, cost telemetry</div>
           </div>
           <span class="cascade-tag new">new</span>
-          <span class="cascade-chevron">&#x25B6;</span>
+          <span class="cascade-hint">structured events...</span>
         </div>
         <div class="cascade-body">
           <div class="cascade-content">
-            <p>Every agent run emits structured events to JSONL. UX metrics track responsiveness (time-to-first-token), smoothness (token rate variance), and autonomy (tasks completed vs stuck). Token usage and cost tracked per session.</p>
+            <p>Every agent run emits structured events to JSONL. UX metrics track responsiveness, smoothness, and autonomy. Token usage and cost tracked per session.</p>
             <pre><span style="color:var(--green)">></span> /cost
 <span style="color:var(--yellow)">Session:</span> a3f7c2d
   Tokens in:  47,832  ($0.024)
   Tokens out: 12,441  ($0.037)
-  UX score:   78/100
 
 <span style="color:var(--green)">$</span> cat ~/.local/share/hyle/run_a3f7c2d.jsonl
-<span style="color:var(--dim)">{"event":"tool_call","tool":"read","args":{"path":"src/lib.rs"}...}</span></pre>
+<span style="color:var(--dim)">{"event":"tool_call","tool":"read",...}</span></pre>
           </div>
         </div>
       </div>
 
-      <div class="cascade-level" data-level="5">
-        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+      <div class="cascade-level" data-level="5" data-hint="13 tiers" role="listitem">
+        <div class="cascade-node" aria-hidden="true">5</div>
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)" aria-expanded="false">
           <span class="cascade-icon">&#x2638;</span>
           <div class="cascade-info">
             <div class="cascade-title">Self-correction</div>
-            <div class="cascade-sub">Smoke tests, recentering prompts, homeostasis interrupts</div>
+            <div class="cascade-sub">Recentering prompts, smoke tests, drift detection</div>
           </div>
           <span class="cascade-tag new">new</span>
-          <span class="cascade-chevron">&#x25B6;</span>
+          <span class="cascade-hint">/recenter auto...</span>
         </div>
         <div class="cascade-body">
           <div class="cascade-content">
-            <p>13-tier recentering prompt system detects when the agent drifts (over-architecting, hallucinating APIs, ignoring tests) and injects corrective nudges. From gentle taps to hard resets. Automatic symptom-to-prompt classifier.</p>
+            <p>13-tier recentering system detects agent drift (over-architecting, hallucinating APIs, ignoring tests) and injects corrective nudges. Automatic symptom classifier picks the tier.</p>
             <pre><span style="color:var(--green)">$</span> hyle smoke
 <span style="color:var(--green)">&#x2713;</span> recenter-list   4 prompts loaded
-<span style="color:var(--green)">&#x2713;</span> recenter-all    all prompts parseable
-<span style="color:var(--green)">&#x2713;</span> recenter-auto   classifier selects tier 3
+<span style="color:var(--green)">&#x2713;</span> recenter-auto   classifier: tier 3
 
 <span style="color:var(--green)">></span> /recenter auto
 <span style="color:var(--yellow)">[tier 3: Test-First Nudge]</span>
-<span style="color:var(--dim)">Before changing more code, run the existing tests...</span></pre>
+<span style="color:var(--dim)">Run the existing tests before changing more code.</span></pre>
           </div>
         </div>
       </div>
 
-      <div class="cascade-level" data-level="6">
-        <div class="cascade-head" onclick="toggleCascade(this.parentElement)">
+      <div class="cascade-level" data-level="6" data-hint="scenario files" role="listitem">
+        <div class="cascade-node" aria-hidden="true">6</div>
+        <div class="cascade-head" onclick="toggleCascade(this.parentElement)" aria-expanded="false">
           <span class="cascade-icon">&#x2637;</span>
           <div class="cascade-info">
             <div class="cascade-title">Orchestration</div>
             <div class="cascade-sub">Scenarios, timed prompt injection, multi-phase workflows</div>
           </div>
           <span class="cascade-tag wip">experimental</span>
-          <span class="cascade-chevron">&#x25B6;</span>
+          <span class="cascade-hint">--scenario flag...</span>
         </div>
         <div class="cascade-body">
           <div class="cascade-content">
-            <p>Define scenario files with phased prompt injection. Triggers fire on iteration count, elapsed time, output patterns, or task completion. The scenario runner nudges the agent through multi-phase workflows without manual intervention.</p>
-            <pre><span style="color:var(--dim)">// scenario.json</span>
+            <p>Define scenario files with phased prompt injection. Triggers fire on iteration count, elapsed time, or output patterns. The runner nudges the agent through workflows without manual intervention.</p>
+            <pre><span style="color:var(--dim)">scenario.json</span>
 { "phases": [
   { "trigger": "Immediate",
     "prompt": "Read the codebase structure first" },
@@ -637,16 +749,17 @@
             <div class="cascade-flow">
               <span class="cascade-flow-step">scenario.json</span>
               <span class="cascade-flow-arrow">&#x2192;</span>
-              <span class="cascade-flow-step">phase triggers</span>
+              <span class="cascade-flow-step">triggers</span>
               <span class="cascade-flow-arrow">&#x2192;</span>
-              <span class="cascade-flow-step">prompt injection</span>
+              <span class="cascade-flow-step">inject</span>
               <span class="cascade-flow-arrow">&#x2192;</span>
-              <span class="cascade-flow-step">agent adapts</span>
+              <span class="cascade-flow-step">adapt</span>
             </div>
           </div>
         </div>
       </div>
     </div>
+    <div class="cascade-kbd" id="cascadeKbd"><kbd>j</kbd>/<kbd>k</kbd> navigate &middot; <kbd>enter</kbd> expand &middot; <kbd>esc</kbd> close</div>
 
     <div class="section-header">
       <h2>What actually works</h2>
@@ -1286,27 +1399,112 @@ src/orderbook/matching.rs:142:35
     });
 
     /* ── Affordance Cascade ──────────────────────── */
-    function toggleCascade(level) {
-      const was = level.classList.contains('active');
-      document.querySelectorAll('.cascade-level.active').forEach(l => l.classList.remove('active'));
-      if (!was) level.classList.add('active');
-    }
+    const cascade = {
+      el: null,
+      levels: [],
+      focusIdx: -1,
 
-    function cascadeReveal() {
-      const levels = document.querySelectorAll('.cascade-level');
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) entry.target.classList.add('visible');
+      init() {
+        this.el = document.getElementById('affordanceCascade');
+        this.levels = Array.from(this.el.querySelectorAll('.cascade-level'));
+
+        // intersection observer for scroll-reveal
+        const obs = new IntersectionObserver((entries) => {
+          entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+        }, { threshold: 0.12, rootMargin: '0px 0px -30px 0px' });
+        this.levels.forEach((l, i) => {
+          l.style.transitionDelay = `${i * 0.07}s`;
+          obs.observe(l);
         });
-      }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
-      levels.forEach((level, i) => {
-        level.style.transitionDelay = `${i * 0.08}s`;
-        observer.observe(level);
-      });
-    }
+
+        // keyboard navigation
+        this.el.addEventListener('keydown', e => this.onKey(e));
+        this.el.addEventListener('focusin', () => {
+          this.el.classList.add('has-focus');
+          if (this.focusIdx < 0) this.setFocus(0);
+        });
+        this.el.addEventListener('focusout', (e) => {
+          if (!this.el.contains(e.relatedTarget)) {
+            this.el.classList.remove('has-focus');
+            this.clearFocus();
+          }
+        });
+      },
+
+      onKey(e) {
+        switch (e.key) {
+          case 'j': case 'ArrowDown':
+            e.preventDefault();
+            this.setFocus(Math.min(this.focusIdx + 1, this.levels.length - 1));
+            break;
+          case 'k': case 'ArrowUp':
+            e.preventDefault();
+            this.setFocus(Math.max(this.focusIdx - 1, 0));
+            break;
+          case 'Enter': case ' ':
+            e.preventDefault();
+            if (this.focusIdx >= 0) this.toggle(this.levels[this.focusIdx]);
+            break;
+          case 'Escape':
+            e.preventDefault();
+            this.closeAll();
+            break;
+        }
+      },
+
+      setFocus(idx) {
+        this.levels.forEach(l => l.classList.remove('focused'));
+        this.focusIdx = idx;
+        if (idx >= 0 && idx < this.levels.length) {
+          this.levels[idx].classList.add('focused');
+          this.levels[idx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      },
+
+      clearFocus() {
+        this.levels.forEach(l => l.classList.remove('focused'));
+        this.focusIdx = -1;
+      },
+
+      toggle(level) {
+        const was = level.classList.contains('active');
+        this.closeAll();
+        if (!was) {
+          level.classList.add('active');
+          level.querySelector('.cascade-head')?.setAttribute('aria-expanded', 'true');
+          this.el.classList.add('has-active');
+        }
+        this.updateTrack();
+      },
+
+      closeAll() {
+        this.levels.forEach(l => {
+          l.classList.remove('active');
+          l.querySelector('.cascade-head')?.setAttribute('aria-expanded', 'false');
+        });
+        this.el.classList.remove('has-active');
+        this.updateTrack();
+      },
+
+      updateTrack() {
+        const fill = document.getElementById('trackFill');
+        const active = this.el.querySelector('.cascade-level.active');
+        if (!active || !fill) {
+          if (fill) fill.style.height = '0';
+          return;
+        }
+        const track = fill.parentElement;
+        const trackRect = track.getBoundingClientRect();
+        const nodeRect = active.querySelector('.cascade-node').getBoundingClientRect();
+        const pct = ((nodeRect.top + nodeRect.height / 2) - trackRect.top) / trackRect.height;
+        fill.style.height = `${Math.max(0, Math.min(100, pct * 100))}%`;
+      },
+    };
+
+    function toggleCascade(level) { cascade.toggle(level); }
 
     window.addEventListener('load', () => {
-      cascadeReveal();
+      cascade.init();
       setTimeout(() => switchDemo(0), 200);
     });
   </script>
