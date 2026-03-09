@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - TUI Demo</title>
+  <style>
+    :root {
+      --bg: #1e1e2e;
+      --fg: #cdd6f4;
+      --surface: #313244;
+      --surface2: #45475a;
+      --accent: #89b4fa;
+      --green: #a6e3a1;
+      --peach: #fab387;
+      --mauve: #cba6f7;
+      --red: #f38ba8;
+      --yellow: #f9e2af;
+      --dim: #6c7086;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+      background: var(--bg);
+      color: var(--fg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .header { text-align: center; margin-bottom: 1.5rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; }
+    h1 span { color: var(--accent); }
+    .subtitle { font-size: 0.8rem; color: var(--dim); margin-top: 0.3rem; }
+
+    /* Terminal window */
+    .terminal {
+      width: 100%;
+      max-width: 900px;
+      background: #11111b;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    /* Title bar */
+    .title-bar {
+      background: var(--surface);
+      padding: 0.5rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .dots { display: flex; gap: 6px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red { background: var(--red); }
+    .dot.yellow { background: var(--yellow); }
+    .dot.green { background: var(--green); }
+    .title-text {
+      flex: 1;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--dim);
+    }
+
+    /* Tab bar */
+    .tab-bar {
+      background: var(--surface2);
+      display: flex;
+      padding: 0 0.5rem;
+    }
+    .tab {
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      color: var(--dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab:hover { color: var(--fg); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab .shortcut {
+      font-size: 0.6rem;
+      background: rgba(255,255,255,0.08);
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      margin-left: 0.3rem;
+    }
+
+    /* View container */
+    .view-container {
+      height: 500px;
+      overflow-y: auto;
+      position: relative;
+    }
+    .view { display: none; height: 100%; }
+    .view.active { display: flex; flex-direction: column; }
+
+    /* Chat view */
+    .chat-messages {
+      flex: 1;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+    .msg {
+      margin-bottom: 1rem;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; } }
+    .msg-role {
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+    .msg-role.user { color: var(--green); }
+    .msg-role.assistant { color: var(--accent); }
+    .msg-role.system { color: var(--mauve); }
+    .msg-content {
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: var(--fg);
+    }
+    .msg-content code {
+      background: var(--surface);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+    .msg-content pre {
+      background: var(--surface);
+      padding: 0.75rem;
+      border-radius: 6px;
+      margin: 0.5rem 0;
+      overflow-x: auto;
+      font-size: 0.8rem;
+    }
+
+    /* Chat input */
+    .chat-input-area {
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .prompt-icon { color: var(--green); font-size: 0.9rem; }
+    .chat-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--fg);
+      font-family: inherit;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .model-badge {
+      font-size: 0.65rem;
+      background: var(--surface2);
+      color: var(--dim);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    /* Telemetry view */
+    .telemetry {
+      padding: 1rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      height: 100%;
+      overflow-y: auto;
+    }
+    .metric-card {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    .metric-label { font-size: 0.7rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    .metric-value { font-size: 1.8rem; font-weight: 700; margin: 0.5rem 0; }
+    .metric-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--surface2);
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+    .metric-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+    /* Log view */
+    .log-view {
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      overflow-y: auto;
+      height: 100%;
+    }
+    .log-line {
+      padding: 0.15rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.02);
+      display: flex;
+      gap: 0.75rem;
+    }
+    .log-time { color: var(--dim); min-width: 80px; }
+    .log-level { min-width: 40px; }
+    .log-level.info { color: var(--accent); }
+    .log-level.warn { color: var(--yellow); }
+    .log-level.error { color: var(--red); }
+    .log-level.debug { color: var(--dim); }
+    .log-msg { color: var(--fg); }
+
+    /* Session view */
+    .sessions {
+      padding: 1rem;
+      overflow-y: auto;
+      height: 100%;
+    }
+    .session-item {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+    .session-item:hover { border-color: var(--accent); }
+    .session-item.current { border-color: var(--green); }
+    .session-title { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem; }
+    .session-meta { font-size: 0.7rem; color: var(--dim); display: flex; gap: 1rem; }
+
+    /* Slash command palette */
+    .cmd-palette {
+      position: absolute;
+      bottom: 50px;
+      left: 1rem;
+      right: 1rem;
+      background: var(--surface);
+      border-radius: 8px;
+      border: 1px solid var(--surface2);
+      max-height: 250px;
+      overflow-y: auto;
+      display: none;
+      z-index: 10;
+      box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
+    }
+    .cmd-palette.show { display: block; }
+    .cmd-item {
+      padding: 0.5rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .cmd-item:hover { background: var(--surface2); }
+    .cmd-item .cmd-name { color: var(--accent); }
+    .cmd-item .cmd-desc { color: var(--dim); font-size: 0.75rem; }
+
+    /* Keyboard shortcuts overlay */
+    .shortcuts-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+    .shortcuts-overlay.show { display: flex; }
+    .shortcuts-panel {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+    }
+    .shortcuts-panel h3 {
+      font-size: 1rem;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+    .shortcut-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.4rem 0;
+      font-size: 0.8rem;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .shortcut-key {
+      background: var(--surface2);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      color: var(--accent);
+    }
+
+    /* Status bar */
+    .status-bar {
+      background: var(--surface2);
+      padding: 0.3rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      color: var(--dim);
+    }
+    .status-indicator { display: flex; align-items: center; gap: 0.3rem; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+    /* Typing animation */
+    .typing-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 16px;
+      background: var(--accent);
+      animation: blink 1s infinite;
+      vertical-align: text-bottom;
+      margin-left: 2px;
+    }
+    @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><span>hyle</span> TUI</h1>
+    <div class="subtitle">Terminal interface &mdash; simulated in browser. Press ? for shortcuts.</div>
+  </div>
+
+  <div class="terminal">
+    <div class="title-bar">
+      <div class="dots">
+        <div class="dot red"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+      </div>
+      <div class="title-text">hyle v0.3.0 &mdash; google/gemini-2.0-flash-exp:free</div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab('chat')">Chat <span class="shortcut">^C</span></div>
+      <div class="tab" onclick="switchTab('telemetry')">Telemetry <span class="shortcut">^T</span></div>
+      <div class="tab" onclick="switchTab('log')">Log <span class="shortcut">^L</span></div>
+      <div class="tab" onclick="switchTab('sessions')">Sessions <span class="shortcut">^S</span></div>
+    </div>
+
+    <div class="view-container">
+      <!-- Chat View -->
+      <div class="view active" id="view-chat">
+        <div class="chat-messages" id="chatMessages">
+          <div class="msg">
+            <div class="msg-role system">system</div>
+            <div class="msg-content">Welcome to hyle. Type a message or use /commands. AtomSpace: 42 atoms.</div>
+          </div>
+        </div>
+        <div class="cmd-palette" id="cmdPalette"></div>
+        <div class="chat-input-area">
+          <span class="prompt-icon">&gt;</span>
+          <input type="text" class="chat-input" id="chatInput" placeholder="Type a message or / for commands..." autocomplete="off" />
+          <span class="model-badge">gemini-2.0-flash</span>
+        </div>
+      </div>
+
+      <!-- Telemetry View -->
+      <div class="view" id="view-telemetry">
+        <div class="telemetry">
+          <div class="metric-card">
+            <div class="metric-label">Tokens In</div>
+            <div class="metric-value" style="color:var(--accent)" id="tokensIn">2,847</div>
+            <div class="metric-bar"><div class="metric-bar-fill" style="width:35%;background:var(--accent)"></div></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Tokens Out</div>
+            <div class="metric-value" style="color:var(--green)" id="tokensOut">1,203</div>
+            <div class="metric-bar"><div class="metric-bar-fill" style="width:20%;background:var(--green)"></div></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Avg Latency</div>
+            <div class="metric-value" style="color:var(--peach)">342<span style="font-size:0.8rem">ms</span></div>
+            <div class="metric-bar"><div class="metric-bar-fill" style="width:45%;background:var(--peach)"></div></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Cost (session)</div>
+            <div class="metric-value" style="color:var(--green)">$0.00</div>
+            <div style="font-size:0.7rem;color:var(--dim)">Free model tier</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">AtomSpace</div>
+            <div class="metric-value" style="color:var(--mauve)" id="atomSpaceCount">42</div>
+            <div style="font-size:0.7rem;color:var(--dim)">atoms | 3 inferences</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Context Budget</div>
+            <div class="metric-value" style="color:var(--yellow)">67<span style="font-size:0.8rem">%</span></div>
+            <div class="metric-bar"><div class="metric-bar-fill" style="width:67%;background:var(--yellow)"></div></div>
+          </div>
+          <div class="metric-card" style="grid-column:1/-1">
+            <div class="metric-label">Cognitive Cycle</div>
+            <div style="display:flex;gap:1rem;margin-top:0.5rem;flex-wrap:wrap">
+              <div style="text-align:center"><div style="font-size:1.2rem;color:var(--accent)">2ms</div><div style="font-size:0.65rem;color:var(--dim)">THINK</div></div>
+              <div style="text-align:center"><div style="font-size:1.2rem;color:var(--green)">1ms</div><div style="font-size:0.65rem;color:var(--dim)">SALIENCE</div></div>
+              <div style="text-align:center"><div style="font-size:1.2rem;color:var(--peach)">0ms</div><div style="font-size:0.65rem;color:var(--dim)">PROMPT</div></div>
+              <div style="text-align:center"><div style="font-size:1.2rem;color:var(--mauve)">1ms</div><div style="font-size:0.65rem;color:var(--dim)">TIKKUN</div></div>
+              <div style="text-align:center"><div style="font-size:1.2rem;color:var(--yellow)">0ms</div><div style="font-size:0.65rem;color:var(--dim)">FACTS</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Log View -->
+      <div class="view" id="view-log">
+        <div class="log-view" id="logView"></div>
+      </div>
+
+      <!-- Sessions View -->
+      <div class="view" id="view-sessions">
+        <div class="sessions">
+          <div class="session-item current">
+            <div class="session-title">Current Session</div>
+            <div class="session-meta">
+              <span>3 messages</span>
+              <span>42 atoms</span>
+              <span>gemini-2.0-flash</span>
+              <span>now</span>
+            </div>
+          </div>
+          <div class="session-item">
+            <div class="session-title">Fix login bug in auth module</div>
+            <div class="session-meta">
+              <span>28 messages</span>
+              <span>156 atoms</span>
+              <span>qwen/qwen3-32b:free</span>
+              <span>2h ago</span>
+            </div>
+          </div>
+          <div class="session-item">
+            <div class="session-title">Refactor client.rs error handling</div>
+            <div class="session-meta">
+              <span>15 messages</span>
+              <span>89 atoms</span>
+              <span>gemini-2.0-flash</span>
+              <span>yesterday</span>
+            </div>
+          </div>
+          <div class="session-item">
+            <div class="session-title">Add ECAN attention to context builder</div>
+            <div class="session-meta">
+              <span>42 messages</span>
+              <span>312 atoms</span>
+              <span>deepseek-r1:free</span>
+              <span>3 days ago</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-indicator">
+        <div class="status-dot" style="background:var(--green)"></div>
+        <span>connected</span>
+      </div>
+      <span>hyle v0.3.0 | rust-native | ? for help</span>
+      <span id="statusTime">00:00</span>
+    </div>
+  </div>
+
+  <!-- Shortcuts overlay -->
+  <div class="shortcuts-overlay" id="shortcutsOverlay" onclick="toggleShortcuts()">
+    <div class="shortcuts-panel" onclick="event.stopPropagation()">
+      <h3>Keyboard Shortcuts</h3>
+      <div class="shortcut-row"><span>Switch to Chat</span><span class="shortcut-key">Ctrl+C</span></div>
+      <div class="shortcut-row"><span>Switch to Telemetry</span><span class="shortcut-key">Ctrl+T</span></div>
+      <div class="shortcut-row"><span>Switch to Log</span><span class="shortcut-key">Ctrl+L</span></div>
+      <div class="shortcut-row"><span>Switch to Sessions</span><span class="shortcut-key">Ctrl+S</span></div>
+      <div class="shortcut-row"><span>Model Picker</span><span class="shortcut-key">Ctrl+M</span></div>
+      <div class="shortcut-row"><span>New Session</span><span class="shortcut-key">Ctrl+N</span></div>
+      <div class="shortcut-row"><span>Toggle Agent Mode</span><span class="shortcut-key">Ctrl+A</span></div>
+      <div class="shortcut-row"><span>Interrupt</span><span class="shortcut-key">Esc</span></div>
+      <div class="shortcut-row"><span>Submit</span><span class="shortcut-key">Enter</span></div>
+      <div class="shortcut-row"><span>Show Shortcuts</span><span class="shortcut-key">?</span></div>
+      <div style="margin-top:1rem;text-align:center;font-size:0.75rem;color:var(--dim)">Press ? or click outside to close</div>
+    </div>
+  </div>
+
+<script>
+const COMMANDS = [
+  { name: '/status', desc: 'Show session status and diagnostics' },
+  { name: '/models', desc: 'List available free LLM models' },
+  { name: '/model', desc: 'Switch to a different model' },
+  { name: '/config', desc: 'Show or update configuration' },
+  { name: '/project', desc: 'Detect project type and structure' },
+  { name: '/agent', desc: 'Toggle autonomous agent mode' },
+  { name: '/session', desc: 'Session management' },
+  { name: '/diff', desc: 'Show recent file changes' },
+  { name: '/undo', desc: 'Undo last file edit' },
+  { name: '/compact', desc: 'Compact conversation context' },
+  { name: '/pressure', desc: 'Check system resource pressure' },
+  { name: '/think', desc: 'Run coggy cognitive cycle' },
+  { name: '/atoms', desc: 'Show AtomSpace contents' },
+  { name: '/focus', desc: 'Show ECAN attention focus' },
+  { name: '/tikkun', desc: 'Run self-repair health check' },
+  { name: '/help', desc: 'Show all commands' },
+];
+
+const RESPONSES = {
+  '/status': `<pre>hyle v0.3.0 | session: active
+Model: google/gemini-2.0-flash-exp:free
+Tokens: 2847 in / 1203 out
+AtomSpace: 42 atoms, 3 inferences
+Health: all 5/5 tikkun checks passing
+Uptime: 12m 34s</pre>`,
+  '/models': `<pre>Free models on OpenRouter:
+  google/gemini-2.0-flash-exp:free
+  qwen/qwen3-32b:free
+  deepseek/deepseek-r1:free
+  meta-llama/llama-4-scout:free
+  mistralai/mistral-small-3.1-24b-instruct:free
+Currently using: gemini-2.0-flash</pre>`,
+  '/tikkun': `<pre>Tikkun Self-Repair Report:
+  [PASS] atoms-exist: 42 atoms in space
+  [PASS] tvs-valid: All TVs in [0,1]
+  [PASS] no-orphans: All links resolve
+  [PASS] has-types: 4 atom types
+  [PASS] no-self-inherit: No self-loops
+Status: HEALTHY (5/5)</pre>`,
+  '/atoms': `<pre>AtomSpace (42 atoms):
+  ConceptNode "hyle" <0.90, 0.90> STI:45
+  ConceptNode "code-assistant" <0.90, 0.90> STI:38
+  InheritanceLink [hyle, code-assistant] <0.90, 0.90>
+  ConceptNode "tool-call" <0.90, 0.90> STI:22
+  ConceptNode "user-intent" <0.90, 0.90> STI:15
+  ... +37 more atoms</pre>`,
+  '/focus': `<pre>ECAN Attention Focus (top 5):
+  1. hyle          STI: 45.0
+  2. code-assistant STI: 38.0
+  3. tool-call     STI: 22.0
+  4. user-intent   STI: 15.0
+  5. success       STI: 12.0</pre>`,
+};
+
+const AI_RESPONSES = [
+  "I can see the project structure. Based on the AtomSpace, `client.rs` handles API communication with OpenRouter. The cognitive trace shows `tool-call` has high attention - let me focus there.\n\nLet me read the file first:\n<pre>read src/client.rs</pre>\n\nThe client uses a shared `reqwest::Client` with connection pooling via `OnceLock`. Good pattern. I notice the `ApiError` enum handles rate limiting with retry-after extraction.",
+  "Looking at the codebase through the cognitive lens:\n\n1. **AtomSpace** has 42 atoms tracking code concepts\n2. **PLN** inferred: `hyle -> code-assistant -> tool-user` (deduction chain)\n3. **ECAN** attention is focused on `client.rs` and `tool-call`\n\nThe salience context allocates: Focus 40%, Recent 30%, Summary 20%, Background 10%.",
+  "Done. I've applied the fix with a proper error boundary. The `ApiError::RateLimited` variant now extracts the `retry-after` header from OpenRouter's JSON response.\n<pre>// Fixed in src/client.rs:142\nfn extract_retry_after(body: &str) -> Option&lt;u64&gt; {\n    serde_json::from_str::&lt;Value&gt;(body)\n        .ok()\n        .and_then(|v| v[\"error\"][\"metadata\"][\"retry_after\"]\n            .as_u64())\n}</pre>",
+];
+
+let logEntries = [
+  { time: '00:00.001', level: 'info', msg: 'hyle v0.3.0 starting' },
+  { time: '00:00.003', level: 'info', msg: 'Loading base ontology: 35 atoms' },
+  { time: '00:00.005', level: 'debug', msg: 'ECAN config: decay=0.7, spread=0.3' },
+  { time: '00:00.012', level: 'info', msg: 'AtomSpace initialized: 42 atoms' },
+  { time: '00:00.015', level: 'info', msg: 'OpenRouter API key loaded' },
+  { time: '00:00.018', level: 'info', msg: 'Model: google/gemini-2.0-flash-exp:free' },
+  { time: '00:00.020', level: 'info', msg: 'TUI initialized, entering main loop' },
+  { time: '00:01.234', level: 'debug', msg: 'Cognitive cycle: 4ms (THINK:2 SAL:1 PROMPT:0 TIK:1 FACT:0)' },
+  { time: '00:02.567', level: 'info', msg: 'Tikkun: 5/5 checks passing' },
+];
+
+let msgCount = 1;
+let aiResponseIdx = 0;
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelector(`.tab:nth-child(${['chat','telemetry','log','sessions'].indexOf(name)+1})`).classList.add('active');
+  document.getElementById(`view-${name}`).classList.add('active');
+
+  if (name === 'log') renderLogs();
+}
+
+function renderLogs() {
+  const view = document.getElementById('logView');
+  view.innerHTML = logEntries.map(e =>
+    `<div class="log-line">
+      <span class="log-time">${e.time}</span>
+      <span class="log-level ${e.level}">${e.level}</span>
+      <span class="log-msg">${e.msg}</span>
+    </div>`
+  ).join('');
+}
+
+function addMessage(role, content) {
+  const container = document.getElementById('chatMessages');
+  const msg = document.createElement('div');
+  msg.className = 'msg';
+  msg.innerHTML = `<div class="msg-role ${role}">${role}</div><div class="msg-content">${content}</div>`;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+  msgCount++;
+}
+
+function typeResponse(text) {
+  const container = document.getElementById('chatMessages');
+  const msg = document.createElement('div');
+  msg.className = 'msg';
+  msg.innerHTML = `<div class="msg-role assistant">assistant</div><div class="msg-content"><span class="typing-cursor"></span></div>`;
+  container.appendChild(msg);
+
+  const contentEl = msg.querySelector('.msg-content');
+  let i = 0;
+  const stripped = text.replace(/<[^>]*>/g, '');
+
+  function typeChar() {
+    if (i < Math.min(stripped.length, 20)) {
+      contentEl.innerHTML = stripped.substring(0, i + 1) + '<span class="typing-cursor"></span>';
+      i++;
+      setTimeout(typeChar, 20 + Math.random() * 30);
+    } else {
+      contentEl.innerHTML = text;
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+  setTimeout(typeChar, 500);
+}
+
+// Command palette
+const input = document.getElementById('chatInput');
+const palette = document.getElementById('cmdPalette');
+
+input.addEventListener('input', () => {
+  const val = input.value;
+  if (val.startsWith('/')) {
+    const filter = val.toLowerCase();
+    const matches = COMMANDS.filter(c => c.name.startsWith(filter));
+    if (matches.length > 0) {
+      palette.innerHTML = matches.map(c =>
+        `<div class="cmd-item" onclick="runCommand('${c.name}')">
+          <span class="cmd-name">${c.name}</span>
+          <span class="cmd-desc">${c.desc}</span>
+        </div>`
+      ).join('');
+      palette.classList.add('show');
+    } else {
+      palette.classList.remove('show');
+    }
+  } else {
+    palette.classList.remove('show');
+  }
+});
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const val = input.value.trim();
+    if (!val) return;
+    input.value = '';
+    palette.classList.remove('show');
+
+    if (val.startsWith('/')) {
+      runCommand(val);
+    } else {
+      addMessage('user', val);
+      logEntries.push({ time: getTime(), level: 'info', msg: `User: "${val.substring(0, 50)}"` });
+      logEntries.push({ time: getTime(), level: 'debug', msg: 'Cognitive cycle started' });
+      typeResponse(AI_RESPONSES[aiResponseIdx % AI_RESPONSES.length]);
+      aiResponseIdx++;
+      logEntries.push({ time: getTime(), level: 'info', msg: 'Stream complete, 342ms latency' });
+    }
+  }
+  if (e.key === 'Escape') palette.classList.remove('show');
+});
+
+function runCommand(cmd) {
+  input.value = '';
+  palette.classList.remove('show');
+  addMessage('user', cmd);
+  logEntries.push({ time: getTime(), level: 'info', msg: `Command: ${cmd}` });
+
+  const response = RESPONSES[cmd];
+  if (response) {
+    setTimeout(() => addMessage('system', response), 200);
+  } else {
+    setTimeout(() => addMessage('system', `<span style="color:var(--dim)">Command ${cmd} executed.</span>`), 200);
+  }
+}
+
+function toggleShortcuts() {
+  document.getElementById('shortcutsOverlay').classList.toggle('show');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === '?' && document.activeElement !== input) {
+    e.preventDefault();
+    toggleShortcuts();
+  }
+});
+
+function getTime() {
+  const now = new Date();
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  return `${m}:${s}.${ms}`;
+}
+
+// Status bar clock
+setInterval(() => {
+  document.getElementById('statusTime').textContent = getTime();
+}, 1000);
+
+renderLogs();
+</script>
+</body>
+</html>

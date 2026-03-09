@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyle - Cognitive Dashboard</title>
+  <style>
+    :root {
+      --bg: #1e1e2e;
+      --fg: #cdd6f4;
+      --surface: #313244;
+      --surface2: #45475a;
+      --accent: #89b4fa;
+      --green: #a6e3a1;
+      --peach: #fab387;
+      --mauve: #cba6f7;
+      --red: #f38ba8;
+      --yellow: #f9e2af;
+      --dim: #6c7086;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+      background: var(--bg);
+      color: var(--fg);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Dashboard layout */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 360px 1fr 280px;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+      gap: 1px;
+      background: rgba(0,0,0,0.3);
+    }
+
+    .top-bar {
+      grid-column: 1 / -1;
+      background: var(--surface);
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .top-bar h1 { font-size: 0.9rem; font-weight: 600; }
+    .top-bar h1 span { color: var(--accent); }
+    .top-bar-stats {
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.7rem;
+      color: var(--dim);
+    }
+    .top-bar-stats .val { color: var(--accent); font-weight: 600; }
+
+    .pane {
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .pane-header {
+      background: var(--surface);
+      padding: 0.4rem 0.8rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--mauve);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    .pane-header .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+    .pane-body { flex: 1; overflow-y: auto; padding: 0.5rem; }
+
+    /* Left: Terminal pane */
+    .terminal-pane .chat-area { flex: 1; overflow-y: auto; padding: 0.5rem; }
+    .terminal-pane .msg {
+      margin-bottom: 0.5rem;
+      font-size: 0.8rem;
+    }
+    .terminal-pane .msg-role { font-size: 0.65rem; font-weight: 600; margin-bottom: 0.15rem; }
+    .terminal-pane .msg-role.user { color: var(--green); }
+    .terminal-pane .msg-role.ai { color: var(--accent); }
+    .terminal-pane .msg-role.sys { color: var(--mauve); }
+    .terminal-pane .msg-text { color: var(--fg); line-height: 1.4; }
+    .terminal-pane pre {
+      background: var(--surface);
+      padding: 0.5rem;
+      border-radius: 4px;
+      margin: 0.3rem 0;
+      font-size: 0.75rem;
+      overflow-x: auto;
+    }
+    .terminal-input {
+      padding: 0.4rem 0.8rem;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-shrink: 0;
+    }
+    .terminal-input span { color: var(--green); }
+    .terminal-input input {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--fg);
+      font-family: inherit;
+      font-size: 0.8rem;
+      outline: none;
+    }
+
+    /* Center: Visualization */
+    .viz-pane { display: flex; flex-direction: column; }
+    .viz-tabs {
+      display: flex;
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .viz-tab {
+      padding: 0.35rem 0.8rem;
+      font-size: 0.7rem;
+      color: var(--dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .viz-tab:hover { color: var(--fg); }
+    .viz-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .viz-content { flex: 1; position: relative; }
+    .viz-view { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+    .viz-view.active { display: block; }
+    #graphCanvas { width: 100%; height: 100%; }
+
+    /* Cycle timeline */
+    .timeline {
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      overflow-y: auto;
+    }
+    .cycle-entry {
+      background: var(--surface);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+    }
+    .cycle-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      margin-bottom: 0.4rem;
+    }
+    .cycle-num { color: var(--accent); font-weight: 600; }
+    .cycle-time { color: var(--dim); }
+    .cycle-phases { display: flex; gap: 2px; }
+    .cycle-phase {
+      flex: 1;
+      height: 20px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.55rem;
+      font-weight: 600;
+      color: var(--bg);
+    }
+
+    /* Salience view */
+    .salience-view { padding: 0.75rem; overflow-y: auto; }
+    .salience-tier {
+      margin-bottom: 0.75rem;
+    }
+    .tier-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      margin-bottom: 0.3rem;
+    }
+    .tier-name { font-weight: 600; }
+    .tier-pct { color: var(--dim); }
+    .tier-bar {
+      height: 6px;
+      border-radius: 3px;
+      background: var(--surface2);
+      overflow: hidden;
+      margin-bottom: 0.3rem;
+    }
+    .tier-fill { height: 100%; border-radius: 3px; }
+    .tier-items { font-size: 0.7rem; color: var(--dim); padding-left: 0.5rem; }
+
+    /* Prompt preview */
+    .prompt-view { padding: 0.75rem; overflow-y: auto; }
+    .prompt-section {
+      margin-bottom: 0.5rem;
+      font-size: 0.75rem;
+    }
+    .prompt-tag {
+      color: var(--mauve);
+      font-size: 0.7rem;
+    }
+    .prompt-content {
+      background: var(--surface);
+      border-radius: 4px;
+      padding: 0.5rem;
+      font-size: 0.7rem;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+
+    /* Right: Metrics sidebar */
+    .metrics-pane .pane-body { padding: 0.5rem; }
+    .metric-block {
+      background: var(--surface);
+      border-radius: 6px;
+      padding: 0.6rem;
+      margin-bottom: 0.5rem;
+    }
+    .metric-title { font-size: 0.6rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    .metric-val { font-size: 1.3rem; font-weight: 700; margin: 0.2rem 0; }
+    .metric-sub { font-size: 0.65rem; color: var(--dim); }
+    .mini-bar { height: 3px; background: var(--surface2); border-radius: 2px; margin-top: 0.3rem; }
+    .mini-fill { height: 100%; border-radius: 2px; }
+
+    .health-list { list-style: none; }
+    .health-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.7rem;
+      padding: 0.2rem 0;
+    }
+    .health-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+    @media (max-width: 900px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto 300px auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Top bar -->
+    <div class="top-bar">
+      <h1><span>hyle</span> cognitive dashboard</h1>
+      <div class="top-bar-stats">
+        <span>Atoms: <span class="val" id="topAtoms">42</span></span>
+        <span>Inferences: <span class="val" id="topInf">0</span></span>
+        <span>Cycles: <span class="val" id="topCycles">0</span></span>
+        <span>Health: <span class="val" style="color:var(--green)" id="topHealth">5/5</span></span>
+        <span>Model: <span class="val">gemini-2.0-flash</span></span>
+      </div>
+    </div>
+
+    <!-- Left: Terminal -->
+    <div class="pane terminal-pane">
+      <div class="pane-header"><span class="dot" style="background:var(--green)"></span> Terminal</div>
+      <div class="chat-area" id="chatArea">
+        <div class="msg"><div class="msg-role sys">coggy</div><div class="msg-text">AtomSpace ready. 42 atoms, base ontology loaded. Type below to start a cognitive cycle.</div></div>
+      </div>
+      <div class="terminal-input">
+        <span>&gt;</span>
+        <input type="text" id="termInput" placeholder="Type a statement..." autocomplete="off" />
+      </div>
+    </div>
+
+    <!-- Center: Visualization -->
+    <div class="pane viz-pane">
+      <div class="viz-tabs">
+        <div class="viz-tab active" onclick="switchViz('graph')">Graph</div>
+        <div class="viz-tab" onclick="switchViz('timeline')">Timeline</div>
+        <div class="viz-tab" onclick="switchViz('salience')">Salience</div>
+        <div class="viz-tab" onclick="switchViz('prompt')">Prompt</div>
+      </div>
+      <div class="viz-content">
+        <div class="viz-view active" id="viz-graph">
+          <canvas id="graphCanvas"></canvas>
+        </div>
+        <div class="viz-view" id="viz-timeline">
+          <div class="timeline" id="timelineList"></div>
+        </div>
+        <div class="viz-view" id="viz-salience">
+          <div class="salience-view" id="salienceView"></div>
+        </div>
+        <div class="viz-view" id="viz-prompt">
+          <div class="prompt-view" id="promptView"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Metrics -->
+    <div class="pane metrics-pane">
+      <div class="pane-header"><span class="dot" style="background:var(--peach)"></span> Metrics</div>
+      <div class="pane-body">
+        <div class="metric-block">
+          <div class="metric-title">Atoms</div>
+          <div class="metric-val" style="color:var(--accent)" id="metAtoms">42</div>
+          <div class="metric-sub"><span id="metNodes">35</span> nodes, <span id="metLinks">7</span> links</div>
+        </div>
+        <div class="metric-block">
+          <div class="metric-title">Inferences</div>
+          <div class="metric-val" style="color:var(--mauve)" id="metInf">0</div>
+          <div class="metric-sub">PLN deduction chains</div>
+        </div>
+        <div class="metric-block">
+          <div class="metric-title">Cycle Time</div>
+          <div class="metric-val" style="color:var(--peach)" id="metCycleMs">-</div>
+          <div class="metric-sub" id="metPhases">waiting for input</div>
+        </div>
+        <div class="metric-block">
+          <div class="metric-title">Context Budget</div>
+          <div class="mini-bar"><div class="mini-fill" style="width:40%;background:var(--accent)" id="budgetFocus"></div></div>
+          <div class="metric-sub">Focus: 40%</div>
+          <div class="mini-bar"><div class="mini-fill" style="width:30%;background:var(--green)" id="budgetRecent"></div></div>
+          <div class="metric-sub">Recent: 30%</div>
+          <div class="mini-bar"><div class="mini-fill" style="width:20%;background:var(--peach)" id="budgetSummary"></div></div>
+          <div class="metric-sub">Summary: 20%</div>
+          <div class="mini-bar"><div class="mini-fill" style="width:10%;background:var(--dim)" id="budgetBg"></div></div>
+          <div class="metric-sub">Background: 10%</div>
+        </div>
+        <div class="metric-block">
+          <div class="metric-title">Tikkun Health</div>
+          <ul class="health-list" id="healthList">
+            <li class="health-item"><span class="health-dot" style="background:var(--green)"></span> atoms-exist</li>
+            <li class="health-item"><span class="health-dot" style="background:var(--green)"></span> tvs-valid</li>
+            <li class="health-item"><span class="health-dot" style="background:var(--green)"></span> no-orphans</li>
+            <li class="health-item"><span class="health-dot" style="background:var(--green)"></span> has-types</li>
+            <li class="health-item"><span class="health-dot" style="background:var(--green)"></span> no-self-inherit</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ============================================================
+// Shared cognitive engine (simplified from coggy-demo.html)
+// ============================================================
+
+class TV { constructor(s=1,c=0.9){this.s=s;this.c=c;} toString(){return`<${this.s.toFixed(2)},${this.c.toFixed(2)}>`} }
+class AV { constructor(sti=0){this.sti=sti;} }
+
+const atoms = new Map();
+let nextId = 1;
+const nameIdx = new Map();
+let totalInf = 0, cycles = 0;
+const cycleHistory = [];
+
+function addNode(type, name, tv) {
+  const k = type+':'+name;
+  if (nameIdx.has(k)) { const a = atoms.get(nameIdx.get(k)); a.tv = tv; return a; }
+  const a = {id:nextId++, type, name, tv, av:new AV(), out:[], x:Math.random()*500+50, y:Math.random()*350+25, vx:0, vy:0};
+  atoms.set(a.id, a);
+  nameIdx.set(k, a.id);
+  return a;
+}
+function addLink(type, out, tv) {
+  const a = {id:nextId++, type, name:type, tv, av:new AV(), out, x:0, y:0, vx:0, vy:0};
+  atoms.set(a.id, a);
+  return a;
+}
+function getNode(name) { return atoms.get(nameIdx.get('C:'+name)); }
+
+// Base ontology
+['thing','entity','object','event','property','hyle','code-assistant','tool-call','user-intent','success','error'].forEach(n =>
+  addNode('C', n, new TV(0.9, 0.9)));
+addLink('Inh', [getNode('hyle').id, getNode('code-assistant').id], new TV(0.9, 0.9));
+addLink('Inh', [getNode('entity').id, getNode('thing').id], new TV(0.9, 0.9));
+
+function parse(input) {
+  const p = input.trim().split(/\s+/);
+  const tv = new TV(0.8, 0.7);
+  const newAtoms = [];
+  if (p.length >= 3 && (p[1]==='is-a'||p[1]==='isa')) {
+    const c = addNode('C', p[0], tv), par = addNode('C', p[2], tv);
+    newAtoms.push(c, par, addLink('Inh', [c.id, par.id], tv));
+  } else if (p.length >= 3 && p[1]==='has-property') {
+    const s = addNode('C', p[0], tv), pr = addNode('P', p[2], new TV(0.7,0.6));
+    newAtoms.push(s, pr, addLink('Eval', [pr.id, s.id], tv));
+  } else {
+    p.forEach(w => newAtoms.push(addNode('C', w, new TV(0.5, 0.4))));
+  }
+  return newAtoms;
+}
+
+function attend(newAtoms) {
+  newAtoms.forEach(a => a.av.sti += 50);
+  for (const a of atoms.values()) {
+    if (a.type==='Inh'||a.type==='Eval') {
+      const spread = a.av.sti * 0.3;
+      a.out.forEach(id => { const t = atoms.get(id); if(t) t.av.sti += spread/a.out.length; });
+      a.av.sti *= 0.7;
+    }
+  }
+  for (const a of atoms.values()) { a.av.sti *= 0.85; if(a.av.sti<1) a.av.sti=0; }
+}
+
+function infer() {
+  const links = [...atoms.values()].filter(a => a.type==='Inh');
+  const newInf = [];
+  for (const ab of links) {
+    if (ab.out.length!==2) continue;
+    for (const bc of links) {
+      if (bc.out.length!==2 || bc.out[0]!==ab.out[1] || ab.out[0]===bc.out[1]) continue;
+      if (!links.some(l => l.out[0]===ab.out[0] && l.out[1]===bc.out[1])) {
+        const tv = new TV(ab.tv.s*bc.tv.s, ab.tv.c*bc.tv.c*0.9);
+        addLink('Inh', [ab.out[0], bc.out[1]], tv);
+        const aName = atoms.get(ab.out[0])?.name, bName = atoms.get(ab.out[1])?.name, cName = atoms.get(bc.out[1])?.name;
+        newInf.push(`${aName} -> ${bName} -> ${cName}`);
+        totalInf++;
+      }
+    }
+  }
+  return newInf;
+}
+
+function tikkunCheck() {
+  return [
+    {name:'atoms-exist', ok: atoms.size > 0},
+    {name:'tvs-valid', ok: ![...atoms.values()].some(a => a.tv.s<0||a.tv.s>1||a.tv.c<0||a.tv.c>1)},
+    {name:'no-orphans', ok: ![...atoms.values()].some(a => (a.type==='Inh'||a.type==='Eval') && a.out.some(id => !atoms.has(id)))},
+    {name:'has-types', ok: new Set([...atoms.values()].map(a=>a.type)).size >= 2},
+    {name:'no-self-inherit', ok: ![...atoms.values()].some(a => a.type==='Inh' && a.out.length===2 && a.out[0]===a.out[1])},
+  ];
+}
+
+// ============================================================
+// Cycle runner
+// ============================================================
+
+function runCycle(input) {
+  const t0 = performance.now();
+  cycles++;
+  const phases = {};
+
+  let t = performance.now();
+  const newAtoms = parse(input);
+  phases.THINK = performance.now()-t;
+
+  t = performance.now();
+  attend(newAtoms);
+  phases.SALIENCE = performance.now()-t;
+
+  t = performance.now();
+  const prompt = buildPromptPreview(input);
+  phases.PROMPT = performance.now()-t;
+
+  t = performance.now();
+  const health = tikkunCheck();
+  phases.TIKKUN = performance.now()-t;
+
+  t = performance.now();
+  const inferences = infer();
+  phases.FACTS = performance.now()-t;
+
+  const totalMs = performance.now()-t0;
+  const nodes = [...atoms.values()].filter(a => a.type==='C'||a.type==='P');
+  const links = [...atoms.values()].filter(a => a.type==='Inh'||a.type==='Eval');
+
+  cycleHistory.unshift({ num: cycles, ms: totalMs, phases, inferences, atomCount: atoms.size });
+
+  // Update everything
+  document.getElementById('topAtoms').textContent = atoms.size;
+  document.getElementById('topInf').textContent = totalInf;
+  document.getElementById('topCycles').textContent = cycles;
+  document.getElementById('metAtoms').textContent = atoms.size;
+  document.getElementById('metNodes').textContent = nodes.length;
+  document.getElementById('metLinks').textContent = links.length;
+  document.getElementById('metInf').textContent = totalInf;
+  document.getElementById('metCycleMs').textContent = totalMs.toFixed(0)+'ms';
+  document.getElementById('metPhases').textContent =
+    Object.entries(phases).map(([k,v]) => `${k}:${v.toFixed(0)}`).join(' ');
+
+  updateHealth(health);
+  updateTimeline();
+  updateSalience(input);
+  updatePromptView(prompt);
+  addChatMsg('sys', `Cycle ${cycles}: ${atoms.size} atoms, ${inferences.length} new inferences, ${totalMs.toFixed(0)}ms`);
+  if (inferences.length > 0) {
+    addChatMsg('sys', `PLN: ${inferences.join('; ')}`);
+  }
+  renderGraph();
+}
+
+function buildPromptPreview(input) {
+  const focus = [...atoms.values()].filter(a => a.type==='C'||a.type==='P')
+    .sort((a,b) => b.av.sti - a.av.sti).slice(0, 5);
+  const focusStr = focus.map(a => `  - ${a.name} (attention: ${a.av.sti.toFixed(0)})`).join('\n');
+  return `<symbolic-grounding>
+AtomSpace: ${atoms.size} atoms | Turn ${cycles}
+
+Focus:
+${focusStr || '  (no focus atoms)'}
+</symbolic-grounding>
+
+<context>
+${input}
+</context>`;
+}
+
+// ============================================================
+// UI updates
+// ============================================================
+
+function addChatMsg(role, text) {
+  const area = document.getElementById('chatArea');
+  const d = document.createElement('div');
+  d.className = 'msg';
+  d.innerHTML = `<div class="msg-role ${role}">${role==='sys'?'coggy':role}</div><div class="msg-text">${text}</div>`;
+  area.appendChild(d);
+  area.scrollTop = area.scrollHeight;
+}
+
+function updateHealth(checks) {
+  const list = document.getElementById('healthList');
+  const passed = checks.filter(c=>c.ok).length;
+  document.getElementById('topHealth').textContent = `${passed}/5`;
+  document.getElementById('topHealth').style.color = passed===5 ? 'var(--green)' : 'var(--red)';
+  list.innerHTML = checks.map(c =>
+    `<li class="health-item"><span class="health-dot" style="background:${c.ok?'var(--green)':'var(--red)'}"></span> ${c.name}</li>`
+  ).join('');
+}
+
+function updateTimeline() {
+  const list = document.getElementById('timelineList');
+  list.innerHTML = cycleHistory.slice(0, 20).map(c => {
+    const colors = {THINK:'var(--accent)',SALIENCE:'var(--green)',PROMPT:'var(--peach)',TIKKUN:'var(--mauve)',FACTS:'var(--yellow)'};
+    const total = Object.values(c.phases).reduce((a,b)=>a+b, 0.01);
+    return `<div class="cycle-entry">
+      <div class="cycle-header"><span class="cycle-num">Cycle ${c.num}</span><span class="cycle-time">${c.ms.toFixed(0)}ms | ${c.atomCount} atoms</span></div>
+      <div class="cycle-phases">${Object.entries(c.phases).map(([k,v]) =>
+        `<div class="cycle-phase" style="background:${colors[k]};flex:${Math.max(v/total,0.1).toFixed(2)}">${k.slice(0,3)}</div>`
+      ).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateSalience(input) {
+  const view = document.getElementById('salienceView');
+  const focus = [...atoms.values()].filter(a=>(a.type==='C'||a.type==='P')&&a.av.sti>10)
+    .sort((a,b)=>b.av.sti-a.av.sti).slice(0,5);
+  view.innerHTML = [
+    {name:'Focus', pct:40, color:'var(--accent)', items: focus.map(a=>`${a.name} (STI:${a.av.sti.toFixed(0)})`)},
+    {name:'Recent', pct:30, color:'var(--green)', items: [input.substring(0,60)]},
+    {name:'Summary', pct:20, color:'var(--peach)', items: [`${atoms.size} atoms tracked`]},
+    {name:'Background', pct:10, color:'var(--dim)', items: ['Base ontology']},
+  ].map(t => `<div class="salience-tier">
+    <div class="tier-header"><span class="tier-name" style="color:${t.color}">${t.name}</span><span class="tier-pct">${t.pct}%</span></div>
+    <div class="tier-bar"><div class="tier-fill" style="width:${t.pct}%;background:${t.color}"></div></div>
+    <div class="tier-items">${t.items.join('<br>')}</div>
+  </div>`).join('');
+}
+
+function updatePromptView(prompt) {
+  document.getElementById('promptView').innerHTML =
+    `<div class="prompt-section"><div class="prompt-tag">&lt;shaped-prompt&gt;</div><div class="prompt-content">${prompt.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div><div class="prompt-tag">&lt;/shaped-prompt&gt;</div></div>`;
+}
+
+function switchViz(name) {
+  document.querySelectorAll('.viz-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.viz-view').forEach(v=>v.classList.remove('active'));
+  document.querySelector(`.viz-tab:nth-child(${['graph','timeline','salience','prompt'].indexOf(name)+1})`).classList.add('active');
+  document.getElementById(`viz-${name}`).classList.add('active');
+  if (name==='graph') renderGraph();
+}
+
+// ============================================================
+// Graph rendering
+// ============================================================
+
+const canvas = document.getElementById('graphCanvas');
+const ctx = canvas.getContext('2d');
+let animFrame;
+
+function resizeCanvas() {
+  const r = canvas.parentElement.getBoundingClientRect();
+  canvas.width = r.width;
+  canvas.height = r.height;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function renderGraph() {
+  if (animFrame) cancelAnimationFrame(animFrame);
+  resizeCanvas();
+  let steps = 0;
+  function step() {
+    const nodes = [...atoms.values()].filter(a => a.type==='C'||a.type==='P');
+    const links = [...atoms.values()].filter(a => a.type==='Inh'||a.type==='Eval');
+
+    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+      const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
+      const d=Math.sqrt(dx*dx+dy*dy)||1, f=600/(d*d);
+      nodes[i].vx-=(dx/d)*f; nodes[i].vy-=(dy/d)*f;
+      nodes[j].vx+=(dx/d)*f; nodes[j].vy+=(dy/d)*f;
+    }
+    for (const l of links) for (let i=0;i<l.out.length-1;i++) {
+      const a=atoms.get(l.out[i]), b=atoms.get(l.out[i+1]);
+      if(!a||!b||!a.name) continue;
+      const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=(d-70)*0.01;
+      a.vx+=(dx/d)*f; a.vy+=(dy/d)*f; b.vx-=(dx/d)*f; b.vy-=(dy/d)*f;
+    }
+    const cx=canvas.width/2, cy=canvas.height/2;
+    for (const n of nodes) {
+      n.vx+=(cx-n.x)*0.003; n.vy+=(cy-n.y)*0.003;
+      n.vx*=0.8; n.vy*=0.8; n.x+=n.vx; n.y+=n.vy;
+      n.x=Math.max(20,Math.min(canvas.width-20,n.x));
+      n.y=Math.max(20,Math.min(canvas.height-20,n.y));
+    }
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for (const l of links) for (let i=0;i<l.out.length-1;i++) {
+      const a=atoms.get(l.out[i]),b=atoms.get(l.out[i+1]);
+      if(!a||!b) continue;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+      ctx.strokeStyle=l.type==='Inh'?'rgba(137,180,250,0.4)':'rgba(203,166,247,0.3)';
+      ctx.lineWidth=1.5; ctx.stroke();
+    }
+    const maxSTI=Math.max(...nodes.map(n=>n.av.sti),1);
+    for (const n of nodes) {
+      const h=n.av.sti/maxSTI, r=4+h*8;
+      if(h>0.3){ctx.beginPath();ctx.arc(n.x,n.y,r+6,0,Math.PI*2);ctx.fillStyle=`rgba(137,180,250,${h*0.2})`;ctx.fill();}
+      ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);
+      ctx.fillStyle=n.type==='P'?`rgba(203,166,247,${0.5+h*0.5})`:`rgba(137,180,250,${0.4+h*0.6})`;ctx.fill();
+      ctx.font=`${9+h*2}px monospace`;ctx.fillStyle=`rgba(205,214,244,${0.6+h*0.4})`;ctx.textAlign='center';
+      ctx.fillText(n.name,n.x,n.y-r-3);
+    }
+    if(++steps<100) animFrame=requestAnimationFrame(step);
+  }
+  step();
+}
+
+// ============================================================
+// Input handling
+// ============================================================
+
+document.getElementById('termInput').addEventListener('keydown', e => {
+  if (e.key==='Enter') {
+    const val = e.target.value.trim();
+    if (!val) return;
+    e.target.value = '';
+    addChatMsg('user', val);
+    setTimeout(() => runCycle(val), 50);
+  }
+});
+
+// Initial render
+renderGraph();
+updateSalience('');
+updatePromptView(buildPromptPreview(''));
+</script>
+</body>
+</html>
